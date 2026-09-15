@@ -190,6 +190,17 @@ class StorageApi {
   }
 
   async getOrders(): Promise<Order[]> {
+    try {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/orders');
+        if (res.ok) {
+          const live = await res.json();
+          if (Array.isArray(live) && live.length > 0) {
+            return live;
+          }
+        }
+      }
+    } catch (e) {}
     return this.getOrdersFromStorage();
   }
 
@@ -198,59 +209,102 @@ class StorageApi {
   }
 
   async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
+    try {
+      await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status }),
+      });
+    } catch (e) {}
+
     const orders = this.getOrdersFromStorage();
     const index = orders.findIndex((o) => o.id === orderId);
-    if (index === -1) throw new Error('Order not found');
-
-    orders[index] = {
-      ...orders[index],
-      status,
-    };
-
-    this.saveOrdersToStorage(orders);
-    return orders[index];
+    if (index !== -1) {
+      orders[index] = { ...orders[index], status };
+      this.saveOrdersToStorage(orders);
+      return orders[index];
+    }
+    return { id: orderId, status } as Order;
   }
 
   async dispatchSteadfast(orderId: string): Promise<Order> {
-    const orders = this.getOrdersFromStorage();
-    const index = orders.findIndex((o) => o.id === orderId);
-    if (index === -1) throw new Error('Order not found');
-
     const trackingCode = `STD-${Date.now().toString().slice(-6)}`;
     const consignmentId = `CID-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    orders[index] = {
-      ...orders[index],
-      status: 'DISPATCHED_TO_COURIER',
-      courierProvider: 'STEADFAST',
-      courierTrackingId: trackingCode,
-      consignmentId: consignmentId,
-      courierStatus: 'IN_TRANSIT',
-    };
+    try {
+      await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          status: 'DISPATCHED_TO_COURIER',
+          courierProvider: 'STEADFAST',
+          courierTrackingId: trackingCode,
+          consignmentId: consignmentId,
+          courierStatus: 'IN_TRANSIT',
+        }),
+      });
+    } catch (e) {}
 
-    this.saveOrdersToStorage(orders);
-    return orders[index];
+    const orders = this.getOrdersFromStorage();
+    const index = orders.findIndex((o) => o.id === orderId);
+    if (index !== -1) {
+      orders[index] = {
+        ...orders[index],
+        status: 'DISPATCHED_TO_COURIER',
+        courierProvider: 'STEADFAST',
+        courierTrackingId: trackingCode,
+        consignmentId: consignmentId,
+        courierStatus: 'IN_TRANSIT',
+      };
+      this.saveOrdersToStorage(orders);
+      return orders[index];
+    }
+    return {
+      id: orderId,
+      status: 'DISPATCHED_TO_COURIER',
+      courierTrackingId: trackingCode,
+    } as Order;
   }
 
   async dispatchPathao(orderId: string): Promise<Order> {
-    const orders = this.getOrdersFromStorage();
-    const index = orders.findIndex((o) => o.id === orderId);
-    if (index === -1) throw new Error('Order not found');
-
     const trackingCode = `PTH-${Date.now().toString().slice(-6)}`;
     const consignmentId = `PATHAO-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    orders[index] = {
-      ...orders[index],
-      status: 'DISPATCHED_TO_COURIER',
-      courierProvider: 'PATHAO',
-      courierTrackingId: trackingCode,
-      consignmentId: consignmentId,
-      courierStatus: 'PICKUP_REQUESTED',
-    };
+    try {
+      await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          status: 'DISPATCHED_TO_COURIER',
+          courierProvider: 'PATHAO',
+          courierTrackingId: trackingCode,
+          consignmentId: consignmentId,
+          courierStatus: 'PICKUP_REQUESTED',
+        }),
+      });
+    } catch (e) {}
 
-    this.saveOrdersToStorage(orders);
-    return orders[index];
+    const orders = this.getOrdersFromStorage();
+    const index = orders.findIndex((o) => o.id === orderId);
+    if (index !== -1) {
+      orders[index] = {
+        ...orders[index],
+        status: 'DISPATCHED_TO_COURIER',
+        courierProvider: 'PATHAO',
+        courierTrackingId: trackingCode,
+        consignmentId: consignmentId,
+        courierStatus: 'PICKUP_REQUESTED',
+      };
+      this.saveOrdersToStorage(orders);
+      return orders[index];
+    }
+    return {
+      id: orderId,
+      status: 'DISPATCHED_TO_COURIER',
+      courierTrackingId: trackingCode,
+    } as Order;
   }
 
   async createOrder(data: Partial<Order>): Promise<Order> {

@@ -38,6 +38,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleConfirmOrder = async (orderId: string) => {

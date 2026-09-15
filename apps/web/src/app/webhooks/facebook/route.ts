@@ -94,7 +94,52 @@ async function processMessengerEvent(
   const phoneMatch = text.match(/(01[3-9]\d{8})/);
   if (phoneMatch && (session.state === 'AWAITING_ADDRESS' || session.selectedProduct)) {
     const orderNum = Math.floor(1000 + Math.random() * 9000);
-    const totalPrice = (session.price || 850) + 120; // +120 delivery
+    const itemPrice = session.price || 1250;
+    const deliveryCharge = 120;
+    const totalPrice = itemPrice + deliveryCharge;
+    const phone = phoneMatch[0];
+    const parts = text.split(phone);
+    const name = parts[0]?.replace(/[,\n-]/g, '').trim() || 'ফেসবুক কাস্টমার';
+    const address = text;
+
+    // Create live order for dashboard
+    const newOrder = {
+      id: `ord-fb-${Date.now()}`,
+      orderNumber: orderNum,
+      storeId: 'store-1',
+      customerId: `cust-fb-${senderId}`,
+      channel: 'FACEBOOK_MESSENGER',
+      status: 'PENDING_CONFIRMATION',
+      itemsPrice: itemPrice,
+      deliveryCharge: deliveryCharge,
+      totalPrice: totalPrice,
+      deliveryAddress: address,
+      deliveryCity: 'ঢাকা',
+      customerPhone: phone,
+      customerName: name,
+      createdAt: new Date().toISOString(),
+      items: [
+        {
+          id: `oi-fb-${Date.now()}`,
+          orderId: `ord-fb-${Date.now()}`,
+          productId: 'prod-2',
+          product: { title: session.selectedProduct || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস', basePrice: itemPrice },
+          variant: { name: 'Free Size' },
+          quantity: 1,
+          unitPrice: itemPrice,
+        },
+      ],
+      customer: {
+        name: name,
+        phone: phone,
+        totalOrders: 1,
+        deliveryRate: 100,
+      },
+    };
+
+    (global as any).__LIVE_ORDERS__ = (global as any).__LIVE_ORDERS__ || [];
+    (global as any).__LIVE_ORDERS__.unshift(newOrder);
+
     session.state = 'IDLE';
     userSessions[senderId] = session;
 
@@ -102,7 +147,7 @@ async function processMessengerEvent(
       senderId,
       `🎉 অভিনন্দন! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে।\n\n` +
       `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
-      `👗 প্রোডাক্ট: ${session.selectedProduct || 'প্রিমিয়াম কুর্তি'}\n` +
+      `👗 প্রোডাক্ট: ${session.selectedProduct || 'জয়পুরি কটন থ্রি-পিস'}\n` +
       `💰 মোট পরিমাণ: ৳${totalPrice} (হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
       `🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে।\n\n` +
       `প্যাকেজটি পাঠানোর পর আপনাকে ট্র্যাকিং কোডসহ এসএমএস ও মেসেজ দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`,

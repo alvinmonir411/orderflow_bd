@@ -34,6 +34,8 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
+    const interval = setInterval(loadOrders, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
