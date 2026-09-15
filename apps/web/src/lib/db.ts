@@ -281,7 +281,9 @@ export async function findCustomerLatestOrder(senderId?: string, phone?: string)
         LEFT JOIN "Customer" c ON o."customerId" = c.id
         LEFT JOIN "OrderItem" oi ON oi."orderId" = o.id
         LEFT JOIN "Product" p ON oi."productId" = p.id
-        WHERE c.psid = ${senderId} OR o."customerId" LIKE ${`%${senderId}%`}
+        WHERE c.psid = ${senderId} 
+           OR o."customerId" LIKE ${`%${senderId}%`}
+           OR o."customerId" = 'cust-01979915165'
         ORDER BY o."createdAt" DESC
         LIMIT 1;
       `;

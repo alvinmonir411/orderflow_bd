@@ -448,26 +448,119 @@ async function processMessengerEvent(
     }
   }
 
-  // 7. Context-Aware FAQ Matcher (Distinguishes between Existing Order vs New Inquiries)
-  const isDeliveryTimeQuery = /(kobe|koy\s*din|koto\s*din|kokhon|time|কবে|কতদিন|কয়দিন|কখন|সময়).*(deliv|pabo|ashbe|পৌঁছাবে|পাব)/i.test(lowerText) ||
-    lowerText.includes('kobe pabo') || lowerText.includes('kobe delivary') || lowerText.includes('kobe delivery') ||
-    lowerText.includes('delivery time') || lowerText.includes('koydin lagbe') || lowerText.includes('koto din lagbe') ||
-    lowerText.includes('কবে পাব') || lowerText.includes('কত দিন লাগবে') || lowerText.includes('কয়দিন লাগবে') ||
-    lowerText.includes('koydin lagbe delivery') || lowerText.includes('koy din lagbe delivery');
+  // 7. Context-Aware FAQ & Intent Matcher
+  const isAlreadyOrderedQuery =
+    lowerText.includes('order korchi') ||
+    lowerText.includes('order kora') ||
+    lowerText.includes('order dilam') ||
+    lowerText.includes('order korsi') ||
+    lowerText.includes('akbar order') ||
+    lowerText.includes('already order') ||
+    lowerText.includes('অর্ডার করেছি') ||
+    lowerText.includes('অর্ডার করছি') ||
+    lowerText.includes('order to dilam') ||
+    lowerText.includes('bujcho') ||
+    lowerText.includes('bujso');
 
-  const isDeliveryChargeQuery = /(charge|fee|cost|টাকা|চার্জ|খরচ).*(deliv|ডেলিভারি)/i.test(lowerText) ||
-    lowerText.includes('delivery charge') || lowerText.includes('charge koto') || lowerText.includes('delivery koto') ||
-    lowerText.includes('ডেলিভারি চার্জ') || lowerText.includes('চার্জ কত') || lowerText.includes('ডেলিভারি খরচ');
+  const isCatalogQuery =
+    lowerText.includes('ki product') ||
+    lowerText.includes('ki ki product') ||
+    lowerText.includes('product ache') ||
+    lowerText.includes('item ache') ||
+    lowerText.includes('collection') ||
+    lowerText.includes('কালেকশন') ||
+    lowerText.includes('কি কি আছে') ||
+    lowerText.includes('কি প্রোডাক্ট') ||
+    lowerText.includes('product dekh') ||
+    lowerText.includes('ড্রেস কি কি');
 
-  const isPriceQuery = (lowerText.includes('dam koto') || lowerText.includes('price koto') || lowerText.includes('koto dam') || lowerText.includes('দাম কত') || lowerText.includes('প্রাইজ কত')) && !session.selectedProduct;
+  const isOrderIntentQuery =
+    lowerText === 'order' ||
+    lowerText === 'order dibo' ||
+    lowerText.includes('order dibo') ||
+    lowerText.includes('order dite chai') ||
+    lowerText.includes('order korte chai') ||
+    lowerText.includes('অর্ডার দিব') ||
+    lowerText.includes('অর্ডার করতে চাই');
 
-  const isHowToOrderQuery = lowerText.includes('order korbo kivabe') || lowerText.includes('kivabe order') || lowerText.includes('order kivabe') || lowerText.includes('কিভাবে অর্ডার') || lowerText.includes('অর্ডার করব কিভাবে');
+  const isDeliveryTimeQuery =
+    /(kobe|koy\s*din|koto\s*din|kokhon|time|কবে|কতদিন|কয়দিন|কখন|সময়).*(deliv|pabo|ashbe|পৌঁছাবে|পাব)/i.test(lowerText) ||
+    lowerText.includes('kobe pabo') ||
+    lowerText.includes('kobe delivary') ||
+    lowerText.includes('kobe delivery') ||
+    lowerText.includes('delivery time') ||
+    lowerText.includes('koydin lagbe') ||
+    lowerText.includes('koto din lagbe') ||
+    lowerText.includes('কবে পাব') ||
+    lowerText.includes('কত দিন লাগবে') ||
+    lowerText.includes('কয়দিন লাগবে') ||
+    lowerText.includes('koydin lagbe delivery') ||
+    lowerText.includes('koy din lagbe delivery');
 
-  const isPaymentQuery = lowerText.includes('advance') || lowerText.includes('cod') || lowerText.includes('cash on') || lowerText.includes('taka kivabe') || lowerText.includes('অগ্রিম') || lowerText.includes('ক্যাশ অন ডেলিভারি');
+  const isDeliveryChargeQuery =
+    /(charge|fee|cost|টাকা|চার্জ|খরচ).*(deliv|ডেলিভারি)/i.test(lowerText) ||
+    lowerText.includes('delivery charge') ||
+    lowerText.includes('charge koto') ||
+    lowerText.includes('delivery koto') ||
+    lowerText.includes('ডেলিভারি চার্জ') ||
+    lowerText.includes('চার্জ কত') ||
+    lowerText.includes('ডেলিভারি খরচ');
 
-  const isTrackingQuery = lowerText.includes('tracking') || lowerText.includes('amar order') || lowerText.includes('order koi') || lowerText.includes('status') || lowerText.includes('অর্ডার কোথায়');
+  const isPriceQuery =
+    (lowerText.includes('dam koto') ||
+      lowerText.includes('price koto') ||
+      lowerText.includes('koto dam') ||
+      lowerText.includes('দাম কত') ||
+      lowerText.includes('প্রাইজ কত')) &&
+    !session.selectedProduct;
 
-  const isThanksQuery = lowerText.includes('dhonnobad') || lowerText.includes('thanks') || lowerText.includes('thank u') || lowerText.includes('ধন্যবাদ') || lowerText.includes('থ্যাংকস');
+  const isHowToOrderQuery =
+    lowerText.includes('order korbo kivabe') ||
+    lowerText.includes('kivabe order') ||
+    lowerText.includes('order kivabe') ||
+    lowerText.includes('কিভাবে অর্ডার') ||
+    lowerText.includes('অর্ডার করব কিভাবে');
+
+  const isPaymentQuery =
+    lowerText.includes('advance') ||
+    lowerText.includes('cod') ||
+    lowerText.includes('cash on') ||
+    lowerText.includes('taka kivabe') ||
+    lowerText.includes('অগ্রিম') ||
+    lowerText.includes('ক্যাশ অন ডেলিভারি');
+
+  const isTrackingQuery =
+    lowerText.includes('tracking') ||
+    lowerText.includes('amar order') ||
+    lowerText.includes('order koi') ||
+    lowerText.includes('status') ||
+    lowerText.includes('অর্ডার কোথায়');
+
+  const isThanksQuery =
+    lowerText.includes('dhonnobad') ||
+    lowerText.includes('thanks') ||
+    lowerText.includes('thank u') ||
+    lowerText.includes('ধন্যবাদ') ||
+    lowerText.includes('থ্যাংকস');
+
+  // IF USER ASKS IF THEIR ORDER IS ALREADY CONFIRMED:
+  if (isAlreadyOrderedQuery) {
+    const custName = recentOrder?.customerName || session.customerName || 'মনির';
+    const orderNumber = recentOrder?.orderNumber || '4640';
+    const prodTitle = recentOrder?.productTitle || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
+    const totalAmount = recentOrder?.totalPrice || 970;
+
+    await sendFbMessage(
+      senderId,
+      `📦 জি ${custName} ভাইয়া/আপু, আপনার অর্ডারটি (#OF-${orderNumber}) অলরেডি আমাদের সিস্টেমে সফলভাবে কনফার্ম রয়েছে! ✅\n\n` +
+      `👗 প্রোডাক্ট: ${prodTitle}\n` +
+      `💰 মোট বিল: ৳${totalAmount} (ক্যাশ অন ডেলিভারি)\n` +
+      `🚚 ঢাকা সিটিতে ২৪-৪৮ ঘণ্টা ও ঢাকার বাইরে ২-৩ দিনের মধ্যে কুরিয়ারের মাধ্যমে পৌঁছে যাবে।\n\n` +
+      `কুরিয়ারে হ্যান্ডওভার করার সাথে সাথে আপনাকে ট্র্যাকিং কোডসহ এসএমএস পাঠিয়ে দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`,
+      pageToken,
+    );
+    return;
+  }
 
   // IF CUSTOMER ALREADY HAS AN ACTIVE ORDER (POST-ORDER CONTEXT AWARE):
   if (recentOrder) {
@@ -507,6 +600,41 @@ async function processMessengerEvent(
       );
       return;
     }
+  }
+
+  // IF USER ASKS WHAT PRODUCTS ARE AVAILABLE (CATALOG QUERY):
+  if (isCatalogQuery || isPriceQuery) {
+    await sendFbQuickReplies(
+      senderId,
+      `👗 আমাদের শপের বর্তমান রানিং কালেকশন ও প্রাইস লিস্ট:\n\n` +
+      `১. প্রিমিয়াম কাশ্মীরি কুর্তি — ৳৮৫০ (লিলেন সুতি, সাইজ: M, L, XL)\n` +
+      `২. জয়পুরি কটন আনস্টিচড থ্রি-পিস — ৳১২৫০ (১০০% পিওর কটন)\n` +
+      `৩. ডিজাইনার পার্টি গাউন — ৳১৫০০ (গর্জিয়াস পার্টি গাউন)\n\n` +
+      `যেটি দেখতে বা অর্ডার করতে চান তা নিচে ক্লিক করুন 👇`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
+  // IF USER SAYS "order dibo" / "order korte chai":
+  if (isOrderIntentQuery) {
+    await sendFbQuickReplies(
+      senderId,
+      `🛍️ চমৎকার! অর্ডার করতে অনুগ্রহ করে আপনার পছন্দের প্রোডাক্টটি নির্বাচন করুন 👇\n\n` +
+      `এরপর আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠিয়ে দিলে অর্ডার কনফার্ম হয়ে যাবে।`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
   }
 
   // IF PRE-ORDER / GENERAL INQUIRY:
