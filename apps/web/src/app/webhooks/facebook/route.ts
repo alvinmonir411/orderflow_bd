@@ -222,7 +222,7 @@ STRICT BEHAVIOR RULES:
             ],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 600,
+              maxOutputTokens: 3000,
             },
           }),
         });
