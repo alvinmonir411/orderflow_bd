@@ -60,16 +60,24 @@ export default function OrdersPage() {
   const filteredOrders = orders.filter((order) => {
     if (activeTab !== 'ALL' && order.status !== activeTab) return false;
     if (searchTerm) {
-      const term = searchTerm.toLowerCase().trim();
-      const numStr = String(order.orderNumber);
-      const matchName = (order.customerName || '').toLowerCase().includes(term);
-      const matchPhone = (order.customerPhone || '').includes(term);
-      const matchAddress = (order.deliveryAddress || '').toLowerCase().includes(term);
+      const raw = searchTerm.toLowerCase().trim();
+      const clean = raw.replace(/[^a-z0-9]/g, '');
+      const numStr = String(order.orderNumber).toLowerCase();
+      const cleanNum = numStr.replace(/[^a-z0-9]/g, '');
+      const formattedNum = `of${numStr}`.replace(/[^a-z0-9]/g, '');
+
       const matchOrderNum =
-        numStr.includes(term) ||
-        `of-${numStr}`.includes(term) ||
-        `#of-${numStr}`.includes(term) ||
-        `#${numStr}`.includes(term);
+        raw.includes(numStr) ||
+        numStr.includes(raw) ||
+        `#${numStr}`.includes(raw) ||
+        `#of-${numStr}`.includes(raw) ||
+        `of-${numStr}`.includes(raw) ||
+        (clean.length > 0 && (cleanNum.includes(clean) || formattedNum.includes(clean) || clean.includes(cleanNum)));
+
+      const matchName = (order.customerName || '').toLowerCase().includes(raw);
+      const matchPhone = (order.customerPhone || '').replace(/[^0-9]/g, '').includes(clean);
+      const matchAddress = (order.deliveryAddress || '').toLowerCase().includes(raw);
+
       return matchName || matchPhone || matchAddress || matchOrderNum;
     }
     return true;
@@ -108,24 +116,37 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-900/60 p-6 rounded-2xl border border-neutral-800/80 shadow-lg">
         <div>
-          <h2 className="text-2xl font-bold text-neutral-100 tracking-tight">অর্ডার ম্যানেজমেন্ট</h2>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-full">
+              লাইভ অর্ডার ম্যানেজমেন্ট
+            </span>
+          </div>
+          <h2 className="text-2xl font-bold text-neutral-100 tracking-tight">অর্ডার তালিকা ও ট্র্যাকিং</h2>
           <p className="text-sm text-neutral-400 mt-0.5">
-            সব অর্ডারের তালিকা, কাস্টমার হিস্ট্রি, ১-ক্লিক কুরিয়ার বুকিং ও ইনভয়েস
+            সব চ্যানেলের অর্ডার, গ্রাহকের বিস্তারিত হিস্ট্রি, ১-ক্লিক কুরিয়ার বুকিং ও ইনভয়েস
           </p>
         </div>
 
         {/* Search Bar */}
         <div className="relative w-full md:w-80">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="নাম, ফোন বা অর্ডার নম্বর খুঁজুন..."
-            className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-emerald-500 transition-colors"
+            placeholder="নাম, ফোন বা অর্ডার নং (#OF-7953)..."
+            className="w-full bg-neutral-950 border border-neutral-700/80 rounded-xl pl-10 pr-8 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
@@ -157,7 +178,7 @@ export default function OrdersPage() {
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-neutral-950/60 text-neutral-400 font-medium border-b border-neutral-800 text-xs uppercase tracking-wider">
+            <thead className="bg-neutral-950/80 text-neutral-400 font-medium border-b border-neutral-800 text-xs uppercase tracking-wider">
               <tr>
                 <th className="py-3.5 px-4">অর্ডার নং ও মাধ্যম</th>
                 <th className="py-3.5 px-4">গ্রাহকের বিবরণ</th>
@@ -170,20 +191,29 @@ export default function OrdersPage() {
             <tbody className="divide-y divide-neutral-800/60">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-neutral-500">
-                    কোনো অর্ডার পাওয়া যায়নি
+                  <td colSpan={6} className="text-center py-12 text-neutral-400">
+                    <p className="text-base font-semibold text-neutral-300">কোনো অর্ডার পাওয়া যায়নি</p>
+                    <p className="text-xs text-neutral-500 mt-1">অন্য কোনো নাম, ফোন নম্বর বা অর্ডার নম্বর দিয়ে সার্চ করুন</p>
                   </td>
                 </tr>
               ) : (
                 filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-neutral-850/40 transition-colors">
+                  <tr key={order.id} className="hover:bg-neutral-850/50 transition-colors">
                     {/* Order Number */}
                     <td className="py-4 px-4 align-top">
-                      <span className="font-mono font-bold text-neutral-100 text-base">
-                        #{order.orderNumber}
+                      <span className="font-mono font-bold text-emerald-400 text-base flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400">
+                          #OF-{order.orderNumber}
+                        </span>
                       </span>
-                      <div className="mt-1">
-                        <span className="px-2 py-0.5 text-[10px] font-semibold bg-neutral-800 text-neutral-400 border border-neutral-700/60 rounded">
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${
+                          order.channel === 'FACEBOOK_MESSENGER'
+                            ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                            : order.channel === 'WHATSAPP'
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : 'bg-neutral-800 text-neutral-400 border-neutral-700/60'
+                        }`}>
                           {order.channel === 'FACEBOOK_MESSENGER'
                             ? 'Messenger'
                             : order.channel === 'WHATSAPP'
@@ -191,7 +221,7 @@ export default function OrdersPage() {
                             : 'Manual'}
                         </span>
                       </div>
-                      <p className="text-[11px] text-neutral-500 mt-1">
+                      <p className="text-[11px] text-neutral-500 mt-1 font-mono">
                         {new Date(order.createdAt).toLocaleTimeString('bn-BD', {
                           hour: '2-digit',
                           minute: '2-digit',
