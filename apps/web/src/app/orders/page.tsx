@@ -559,9 +559,24 @@ export default function OrdersPage() {
                         </p>
 
                         {/* Customer Risk Indicator */}
-                        <div className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
-                          <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                          <span>১০০% ডেলিভারি সাকসেস</span>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <div className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
+                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                            <span>১০০% ডেলিভারি সাকসেস</span>
+                          </div>
+
+                          {order.channel === 'FACEBOOK_MESSENGER' && (
+                            <a
+                              href={`https://business.facebook.com/latest/inbox/messenger?mailbox_id=1314475555081210&selected_item_id=${order.psid || '28626322373646425'}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="ফেসবুক ইনবক্সে এই কাস্টমারের চ্যাট ওপেন করুন"
+                              className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 font-semibold transition-colors"
+                            >
+                              <MessageCircle className="w-3 h-3 text-blue-400" />
+                              <span>ফেসবুক চ্যাট ↗</span>
+                            </a>
+                          )}
                         </div>
                       </td>
 
