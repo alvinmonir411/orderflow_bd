@@ -196,7 +196,14 @@ STRICT BEHAVIOR RULES:
      JSON_START{"orderConfirmed":true,"product":"...","price":850,"customerName":"...","phone":"...","address":"..."}JSON_END`;
 
     // Try modern models in priority order
-    const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+    const modelsToTry = [
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+      'gemini-3-flash-preview',
+      'gemini-flash-latest',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+    ];
     let rawReply = '';
     let lastError: any = null;
 
