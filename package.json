@@ -1,0 +1,15 @@
+{
+  "name": "orderflow-bd",
+  "version": "1.0.0",
+  "description": "Smart F-Commerce Order Management Platform with Facebook Messenger & WhatsApp Automation",
+  "private": true,
+  "scripts": {
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build:api": "npm --prefix apps/api run build",
+    "build:web": "npm --prefix apps/web run build",
+    "build": "npm run build:api && npm run build:web",
+    "prisma:generate": "npm --prefix apps/api run prisma generate",
+    "prisma:push": "npx --prefix apps/api prisma db push"
+  }
+}

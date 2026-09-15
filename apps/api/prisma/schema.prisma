@@ -1,0 +1,230 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  MERCHANT_OWNER
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  PROCESSING
+  DISPATCHED_TO_COURIER
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum ChannelType {
+  FACEBOOK_MESSENGER
+  WHATSAPP
+  MANUAL_ENTRY
+}
+
+enum CourierProvider {
+  STEADFAST
+  PATHAO
+  REDX
+  PAPERFLY
+  OTHER
+}
+
+model Store {
+  id                String            @id @default(uuid())
+  name              String
+  slug              String            @unique
+  phone             String
+  email             String?
+  address           String?
+  currency          String            @default("BDT")
+  
+  // Facebook Messenger Setup
+  facebookPageId    String?           @unique
+  facebookPageToken String?
+  facebookVerifyToken String?         @default("orderflow_bd_verify_token")
+  
+  // WhatsApp Cloud API Setup
+  whatsappPhoneId   String?
+  whatsappToken     String?
+  
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  users             User[]
+  products          Product[]
+  orders            Order[]
+  customers         Customer[]
+  courierAccounts   CourierAccount[]
+  smsConfig         SmsConfig?
+  botSessions       BotSession[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(MERCHANT_OWNER)
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id          String           @id @default(uuid())
+  storeId     String
+  store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  basePrice   Decimal          @db.Decimal(10, 2)
+  sku         String?
+  stock       Int              @default(0)
+  images      String[]
+  isActive    Boolean          @default(true)
+  variants    ProductVariant[]
+  orderItems  OrderItem[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model ProductVariant {
+  id         String      @id @default(uuid())
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name       String      // যেমন: "Size: L", "Color: Black"
+  sku        String?
+  stock      Int         @default(0)
+  priceDiff  Decimal     @default(0.00) @db.Decimal(10, 2)
+  orderItems OrderItem[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Customer {
+  id           String      @id @default(uuid())
+  storeId      String
+  store        Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  psid         String?     // Facebook Page-Scoped ID
+  whatsappJid  String?     // WhatsApp User ID / Phone
+  address      String?
+  district     String?
+  totalOrders  Int         @default(0)
+  deliveryRate Float       @default(100.0) // Return/Delivery Success rate tracker
+  orders       Order[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([storeId, phone])
+  @@index([psid])
+  @@index([whatsappJid])
+}
+
+model Order {
+  id                String          @id @default(uuid())
+  orderNumber       Int             @default(autoincrement())
+  storeId           String
+  store             Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customerId        String
+  customer          Customer        @relation(fields: [customerId], references: [id])
+  channel           ChannelType     @default(FACEBOOK_MESSENGER)
+  status            OrderStatus     @default(PENDING_CONFIRMATION)
+  
+  itemsPrice        Decimal         @db.Decimal(10, 2)
+  deliveryCharge    Decimal         @default(70.00) @db.Decimal(10, 2)
+  discount          Decimal         @default(0.00) @db.Decimal(10, 2)
+  totalPrice        Decimal         @db.Decimal(10, 2)
+  
+  deliveryAddress   String
+  deliveryCity      String?         // Dhaka / Outside Dhaka
+  customerPhone     String
+  customerName      String
+  notes             String?
+  
+  // Courier Integration details
+  courierProvider   CourierProvider?
+  courierTrackingId String?
+  consignmentId     String?
+  courierStatus     String?
+  
+  items             OrderItem[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([storeId, status])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id         String          @id @default(uuid())
+  orderId    String
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id])
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity   Int             @default(1)
+  unitPrice  Decimal         @db.Decimal(10, 2)
+  createdAt  DateTime        @default(now())
+}
+
+// Chabot Interactive Session State
+model BotSession {
+  id             String      @id @default(uuid())
+  storeId        String
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  channel        ChannelType
+  senderId       String      // PSID or WhatsApp Number
+  currentState   String      // IDLE, SELECTING_PRODUCT, SELECTING_VARIANT, AWAITING_ADDRESS, AWAITING_PHONE, CONFIRM_ORDER
+  selectedProductId String?
+  selectedVariantId String?
+  tempData       Json?       // Stores cart/temp data like address, quantity
+  lastActiveAt   DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([storeId, channel, senderId])
+}
+
+// Plug-and-Play Courier Configurations (Steadfast, Pathao, RedX)
+model CourierAccount {
+  id           String          @id @default(uuid())
+  storeId      String
+  store        Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  provider     CourierProvider
+  apiKey       String
+  apiSecret    String?
+  clientSecret String?
+  isDefault    Boolean         @default(false)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([storeId, provider])
+}
+
+// Bangladeshi SMS Gateway
+model SmsConfig {
+  id                      String   @id @default(uuid())
+  storeId                 String   @unique
+  store                   Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  provider                String   @default("GREENWEB") // GREENWEB / BULKSMSBD
+  apiKey                  String
+  senderId                String
+  isEnabled               Boolean  @default(true)
+  orderPlacedSmsTemplate  String?  @default("প্রিয় {name}, OrderFlow এ আপনার অর্ডার #{order_id} সফলভাবে গ্রহণ করা হয়েছে। মোট: ৳{amount}")
+  orderShippedSmsTemplate String?  @default("প্রিয় {name}, আপনার অর্ডার #{order_id} কুরিয়ারে পাঠানো হয়েছে। ট্র্যাকিং কোড: {tracking_id}")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
