@@ -8,7 +8,7 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'RETURNED';
 
-export type ChannelType = 'FACEBOOK_MESSENGER' | 'WHATSAPP' | 'MANUAL_ENTRY';
+export type ChannelType = 'FACEBOOK_MESSENGER' | 'WHATSAPP' | 'MANUAL_ENTRY' | 'MANUAL';
 
 export interface ProductVariant {
   id: string;

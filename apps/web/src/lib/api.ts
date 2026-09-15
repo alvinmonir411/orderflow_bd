@@ -314,19 +314,27 @@ class StorageApi {
       orderNumber: (orders[0]?.orderNumber || 100) + 1,
       storeId: 'store-1',
       customerId: `cust-${Date.now()}`,
-      channel: data.channel || 'FACEBOOK_MESSENGER',
+      channel: data.channel || 'MANUAL',
       status: data.status || 'PENDING_CONFIRMATION',
       itemsPrice: data.itemsPrice || 0,
-      deliveryCharge: data.deliveryCharge || 70,
+      deliveryCharge: data.deliveryCharge || 120,
       discount: data.discount || 0,
       totalPrice: data.totalPrice || 0,
       deliveryAddress: data.deliveryAddress || '',
-      deliveryCity: data.deliveryCity || 'Dhaka',
+      deliveryCity: data.deliveryCity || 'ঢাকা',
       customerPhone: data.customerPhone || '',
       customerName: data.customerName || 'কাস্টমার',
       items: data.items || [],
       createdAt: new Date().toISOString(),
     };
+
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder),
+      });
+    } catch (e) {}
 
     orders.unshift(newOrder);
     this.saveOrdersToStorage(orders);

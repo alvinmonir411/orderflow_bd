@@ -12,7 +12,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         <Navbar onMenuToggle={() => setIsSidebarOpen((prev) => !prev)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto animate-in fade-in duration-300">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full animate-in fade-in duration-300">
           {children}
         </main>
       </div>
