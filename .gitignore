@@ -37,3 +37,4 @@ pnpm-debug.log*
 Thumbs.db
 *.exe
 cloudflared.exe
+apps/web/src/scripts/
