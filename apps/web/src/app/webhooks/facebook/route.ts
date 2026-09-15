@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBotConfig } from '@/app/api/bot-config/route';
+import { insertDbOrder } from '@/lib/db';
 
 interface UserSession {
   state: 'IDLE' | 'AWAITING_ADDRESS' | 'AWAITING_PHONE';
@@ -260,51 +261,30 @@ async function processMessengerEvent(
     const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey);
     if (replyText) {
       if (orderData && orderData.orderConfirmed) {
-        const orderNum = Math.floor(1000 + Math.random() * 9000);
         const itemPrice = orderData.price || 1500;
         const deliveryCharge = 120;
-        const totalPrice = itemPrice + deliveryCharge;
         const finalName = orderData.customerName || session.customerName || 'সম্মানিত কাস্টমার';
         const finalPhone = orderData.phone || '01700000000';
         const finalAddress = orderData.address || session.deliveryAddress || 'ঢাকা';
         const prodTitle = orderData.product || session.selectedProduct || 'ডিজাইনার পার্টি গাউন';
 
-        const newOrder = {
-          id: `ord-fb-${Date.now()}`,
-          orderNumber: orderNum,
-          storeId: 'store-1',
-          customerId: `cust-fb-${senderId}`,
-          channel: 'FACEBOOK_MESSENGER',
-          status: 'PENDING_CONFIRMATION',
-          itemsPrice: itemPrice,
-          deliveryCharge: deliveryCharge,
-          totalPrice: totalPrice,
-          deliveryAddress: finalAddress,
-          deliveryCity: 'ঢাকা',
-          customerPhone: finalPhone,
-          customerName: finalName,
-          createdAt: new Date().toISOString(),
-          items: [
-            {
-              id: `oi-fb-${Date.now()}`,
-              orderId: `ord-fb-${Date.now()}`,
-              productId: 'prod-3',
-              product: { title: prodTitle, basePrice: itemPrice },
-              variant: { name: 'Standard Size' },
-              quantity: 1,
-              unitPrice: itemPrice,
-            },
-          ],
-          customer: {
-            name: finalName,
-            phone: finalPhone,
-            totalOrders: 1,
-            deliveryRate: 100,
-          },
-        };
-
-        (global as any).__LIVE_ORDERS__ = (global as any).__LIVE_ORDERS__ || [];
-        (global as any).__LIVE_ORDERS__.unshift(newOrder);
+        try {
+          await insertDbOrder({
+            customerName: finalName,
+            customerPhone: finalPhone,
+            deliveryAddress: finalAddress,
+            deliveryCity: 'ঢাকা',
+            channel: 'FACEBOOK_MESSENGER',
+            status: 'PENDING_CONFIRMATION',
+            itemsPrice: itemPrice,
+            deliveryCharge: deliveryCharge,
+            discount: 0,
+            productTitle: prodTitle,
+            psid: senderId,
+          });
+        } catch (dbErr) {
+          console.error('[DB Insert Error from AI]:', dbErr);
+        }
 
         session.state = 'IDLE';
         userSessions[senderId] = session;
@@ -497,45 +477,27 @@ async function processMessengerEvent(
     const itemPrice = session.price || 1500;
     const deliveryCharge = 120;
     const totalPrice = itemPrice + deliveryCharge;
-    const orderNum = Math.floor(1000 + Math.random() * 9000);
 
-    // Save live order
-    const newOrder = {
-      id: `ord-fb-${Date.now()}`,
-      orderNumber: orderNum,
-      storeId: 'store-1',
-      customerId: `cust-fb-${senderId}`,
-      channel: 'FACEBOOK_MESSENGER',
-      status: 'PENDING_CONFIRMATION',
-      itemsPrice: itemPrice,
-      deliveryCharge: deliveryCharge,
-      totalPrice: totalPrice,
-      deliveryAddress: finalAddress,
-      deliveryCity: 'ঢাকা',
-      customerPhone: phone,
-      customerName: finalName,
-      createdAt: new Date().toISOString(),
-      items: [
-        {
-          id: `oi-fb-${Date.now()}`,
-          orderId: `ord-fb-${Date.now()}`,
-          productId: 'prod-3',
-          product: { title: prodTitle, basePrice: itemPrice },
-          variant: { name: 'Standard Size' },
-          quantity: 1,
-          unitPrice: itemPrice,
-        },
-      ],
-      customer: {
-        name: finalName,
-        phone: phone,
-        totalOrders: 1,
-        deliveryRate: 100,
-      },
-    };
-
-    (global as any).__LIVE_ORDERS__ = (global as any).__LIVE_ORDERS__ || [];
-    (global as any).__LIVE_ORDERS__.unshift(newOrder);
+    // Save order to Neon DB
+    let orderNum = Math.floor(1000 + Math.random() * 9000);
+    try {
+      const saved = await insertDbOrder({
+        customerName: finalName,
+        customerPhone: phone,
+        deliveryAddress: finalAddress,
+        deliveryCity: 'ঢাকা',
+        channel: 'FACEBOOK_MESSENGER',
+        status: 'PENDING_CONFIRMATION',
+        itemsPrice: itemPrice,
+        deliveryCharge: deliveryCharge,
+        discount: 0,
+        productTitle: prodTitle,
+        psid: senderId,
+      });
+      if (saved?.orderNumber) orderNum = saved.orderNumber;
+    } catch (dbErr) {
+      console.error('[DB Insert Error from Rule]:', dbErr);
+    }
 
     session.state = 'IDLE';
     userSessions[senderId] = session;
@@ -592,44 +554,26 @@ async function processMessengerEvent(
         const itemPrice = session.price || 1500;
         const deliveryCharge = 120;
         const totalPrice = itemPrice + deliveryCharge;
-        const orderNum = Math.floor(1000 + Math.random() * 9000);
+        let orderNum = Math.floor(1000 + Math.random() * 9000);
 
-        const newOrder = {
-          id: `ord-fb-${Date.now()}`,
-          orderNumber: orderNum,
-          storeId: 'store-1',
-          customerId: `cust-fb-${senderId}`,
-          channel: 'FACEBOOK_MESSENGER',
-          status: 'PENDING_CONFIRMATION',
-          itemsPrice: itemPrice,
-          deliveryCharge: deliveryCharge,
-          totalPrice: totalPrice,
-          deliveryAddress: finalAddress,
-          deliveryCity: 'ঢাকা',
-          customerPhone: combinedPhone,
-          customerName: finalName,
-          createdAt: new Date().toISOString(),
-          items: [
-            {
-              id: `oi-fb-${Date.now()}`,
-              orderId: `ord-fb-${Date.now()}`,
-              productId: 'prod-3',
-              product: { title: prodTitle, basePrice: itemPrice },
-              variant: { name: 'Standard Size' },
-              quantity: 1,
-              unitPrice: itemPrice,
-            },
-          ],
-          customer: {
-            name: finalName,
-            phone: combinedPhone,
-            totalOrders: 1,
-            deliveryRate: 100,
-          },
-        };
-
-        (global as any).__LIVE_ORDERS__ = (global as any).__LIVE_ORDERS__ || [];
-        (global as any).__LIVE_ORDERS__.unshift(newOrder);
+        try {
+          const saved = await insertDbOrder({
+            customerName: finalName,
+            customerPhone: combinedPhone,
+            deliveryAddress: finalAddress,
+            deliveryCity: 'ঢাকা',
+            channel: 'FACEBOOK_MESSENGER',
+            status: 'PENDING_CONFIRMATION',
+            itemsPrice: itemPrice,
+            deliveryCharge: deliveryCharge,
+            discount: 0,
+            productTitle: prodTitle,
+            psid: senderId,
+          });
+          if (saved?.orderNumber) orderNum = saved.orderNumber;
+        } catch (dbErr) {
+          console.error('[DB Insert Error from Phone Recovery]:', dbErr);
+        }
 
         session.state = 'IDLE';
         userSessions[senderId] = session;

@@ -369,7 +369,7 @@ class StorageApi {
   }
 
   async getMetrics(): Promise<DashboardMetrics> {
-    const orders = this.getOrdersFromStorage();
+    const orders = await this.getOrders();
     const products = this.getProductsFromStorage();
 
     const pendingCount = orders.filter((o) => o.status === 'PENDING_CONFIRMATION').length;
