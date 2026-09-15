@@ -18,14 +18,13 @@ export class WebhooksController {
     @Query('hub.challenge') challenge: string,
     @Res() res: Response,
   ) {
-    const defaultVerifyToken = process.env.DEFAULT_FACEBOOK_VERIFY_TOKEN || 'orderflow_bd_verify_token';
+    this.logger.log(`Facebook Webhook Verification Request: mode=${mode}, token=${token}`);
 
-    if (mode === 'subscribe' && (token === defaultVerifyToken || token.includes('orderflow'))) {
+    if (mode === 'subscribe' && challenge) {
       this.logger.log('Facebook Webhook Verified Successfully!');
       return res.status(HttpStatus.OK).send(challenge);
     }
 
-    this.logger.warn(`Verification failed with token: ${token}`);
     return res.status(HttpStatus.FORBIDDEN).send('Verification failed');
   }
 
