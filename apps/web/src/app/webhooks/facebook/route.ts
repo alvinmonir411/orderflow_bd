@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotConfig } from '@/app/api/bot-config/route';
-import { insertDbOrder } from '@/lib/db';
+import { getBotSettings, insertDbOrder, findCustomerLatestOrder, BotFaqItem } from '@/lib/db';
 
 interface UserSession {
   state: 'IDLE' | 'AWAITING_ADDRESS' | 'AWAITING_PHONE';
@@ -11,7 +10,7 @@ interface UserSession {
   partialPhone?: string;
 }
 
-// In-memory conversation state for fast serverless responses
+// In-memory conversation state for quick back-to-back inputs
 const userSessions: Record<string, UserSession> = {};
 
 const HARDCODED_TOKEN =
@@ -41,23 +40,19 @@ export async function POST(request: NextRequest) {
     console.log('[Facebook Webhook Event Received]:', JSON.stringify(body));
 
     if (body.object === 'page') {
-      const config = getBotConfig();
+      const settings = await getBotSettings();
       const pageToken =
-        config.fbPageToken ||
-        (global as any).__BOT_CONFIG__?.fbPageToken ||
+        settings.fbPageToken ||
         process.env.DEFAULT_FACEBOOK_PAGE_TOKEN ||
         process.env.FB_PAGE_TOKEN ||
         process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
         HARDCODED_TOKEN;
 
       const geminiKey =
-        config.geminiApiKey ||
-        (global as any).__BOT_CONFIG__?.geminiApiKey ||
+        settings.geminiApiKey ||
         process.env.GEMINI_API_KEY ||
         process.env.GOOGLE_AI_API_KEY ||
         '';
-
-      console.log(`[Facebook Bot] Config loaded. Gemini Key present: ${Boolean(geminiKey)}`);
 
       for (const entry of body.entry || []) {
         for (const event of entry.messaging || []) {
@@ -67,7 +62,7 @@ export async function POST(request: NextRequest) {
           const text = event.message?.text || '';
           const payload = event.postback?.payload || event.message?.quick_reply?.payload;
 
-          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey);
+          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey, settings);
         }
       }
 
@@ -166,34 +161,39 @@ async function callGeminiAI(
   userText: string,
   session: UserSession,
   apiKey: string,
+  recentOrder: any | null,
+  settings: any,
 ): Promise<{ replyText: string; orderData?: any }> {
   try {
-    const systemPrompt = `You are an ultra-intelligent, friendly Bangladeshi F-Commerce AI sales assistant for "OrderFlow BD".
+    const systemPrompt = `You are an ultra-intelligent, friendly Bangladeshi F-Commerce AI sales representative for "OrderFlow BD".
 
 STORE PRODUCTS:
 1. প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০ (সাইজ: M, L, XL, লিলেন সুতি)
 2. জয়পুরি কটন আনস্টিচড থ্রি-পিস - ৳১২৫০ (১০০% পিওর কটন)
 3. ডিজাইনার পার্টি গাউন - ৳১৫০০ (গর্জিয়াস পার্টি গাউন)
 
-DELIVERY POLICY:
-- ডেলিভারি চার্জ: ঢাকা সিটিতে ৳১২০, ঢাকার বাইরে ৳১৫০।
-- ক্যাশ অন ডেলিভারি (পণ্য পেয়ে টাকা)। ডেলিভারি সময় ২-৩ দিন।
+DELIVERY & STORE POLICIES:
+- ডেলিভারি চার্জ: ঢাকা সিটিতে ৳${settings.deliveryFeeDhaka || 120}, ঢাকার বাইরে ৳${settings.deliveryFeeOutside || 150}।
+- ডেলিভারি সময়: ঢাকায় ${settings.deliveryTimeDhaka || '২৪-৪৮ ঘণ্টা'}, বাইরে ${settings.deliveryTimeOutside || '২-৩ দিন'}।
+- ক্যাশ অন ডেলিভারি (কোনো অগ্রিম ছাড়া)। রিটার্ন পলিসি: ${settings.returnPolicy || '৩ দিনের মধ্যে সাইজ এক্সচেঞ্জ'}।
+- হেল্পলাইন: ${settings.helplinePhone || '01700000000'}
 
-CONVERSATION CONTEXT:
-- Currently Selected Product: ${session.selectedProduct || 'None yet'}
-- Customer Name: ${session.customerName || 'Unknown'}
-- Address: ${session.deliveryAddress || 'Unknown'}
+ACTIVE CUSTOMER CONTEXT:
+${
+  recentOrder
+    ? `IMPORTANT: This customer has ALREADY confirmed an active Order #${recentOrder.orderNumber} for "${recentOrder.productTitle}", Total ৳${recentOrder.totalPrice}, Status: ${recentOrder.status}, Date: ${recentOrder.createdAt}.
+If the customer asks post-order questions (e.g. delivery time, when will it arrive, tracking, payment, thanks), DO NOT treat them like a new visitor! Answer warmly referring to their existing order #${recentOrder.orderNumber}.`
+    : `No previous order found. Selected Product: ${session.selectedProduct || 'None yet'}, Name: ${session.customerName || 'Unknown'}, Address: ${session.deliveryAddress || 'Unknown'}`
+}
 
-STRICT VALIDATION RULES:
-1. Respond in natural, polite, engaging Bengali (with emojis).
-2. If the customer asks questions about products, price, fabric, discounts, or delivery, answer accurately and politely.
-3. If the customer gives incomplete or mistaken input:
-   - If phone number has wrong number of digits (e.g. 9 or 10 digits like 019389098), specifically point out the mistake:
-     "মনির ভাই, আপনার ঠিকানা নোট করেছি। তবে আপনার মোবাইল নম্বরে ৯টি ডিজিট পাওয়া গেছে (019389098)। বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়। দয়া করে আপনার ১১ ডিজিটের সঠিক নম্বরটি দিন।"
-   - If address is missing, politely ask for their specific area/thana/district.
-4. When all info (Name, 11-digit phone, Address, and Product) is completely provided and ready to confirm:
-   Output your congratulatory confirmation message AND at the very bottom include:
-   JSON_START{"orderConfirmed":true,"product":"...","price":1500,"customerName":"...","phone":"...","address":"..."}JSON_END`;
+STRICT BEHAVIOR RULES:
+1. Speak in warm, natural, friendly Bengali (with tasteful emojis).
+2. Answer customer queries accurately about products, price, sizes, delivery time, return policy, and order tracking.
+3. If they are placing a NEW order:
+   - If phone number is incomplete (wrong number of digits), point out the specific mistake politely.
+   - When all info (Name, 11-digit phone, Address, Product) is ready to confirm:
+     Congratulate them and append:
+     JSON_START{"orderConfirmed":true,"product":"...","price":850,"customerName":"...","phone":"...","address":"..."}JSON_END`;
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
     const res = await fetch(url, {
@@ -220,10 +220,7 @@ STRICT VALIDATION RULES:
     }
 
     const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if (!rawReply) {
-      console.warn('[Gemini API] Empty text in candidate response:', JSON.stringify(data));
-      return { replyText: '' };
-    }
+    if (!rawReply) return { replyText: '' };
 
     let orderData = null;
     let cleanReply = rawReply;
@@ -251,22 +248,26 @@ async function processMessengerEvent(
   payload?: string,
   pageToken?: string,
   geminiKey?: string,
+  settings?: any,
 ) {
   const session = userSessions[senderId] || { state: 'IDLE' };
   const rawText = text.trim();
   const lowerText = rawText.toLowerCase();
 
-  // If Gemini API Key is available, prioritize Google AI Studio
+  // 1. Fetch recent order context for this customer from Neon DB
+  const recentOrder = await findCustomerLatestOrder(senderId);
+
+  // 2. If Gemini AI Key is available, prioritize Google AI Studio
   if (geminiKey && rawText && !payload) {
-    const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey);
+    const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey, recentOrder, settings);
     if (replyText) {
       if (orderData && orderData.orderConfirmed) {
-        const itemPrice = orderData.price || 1500;
+        const itemPrice = orderData.price || 850;
         const deliveryCharge = 120;
         const finalName = orderData.customerName || session.customerName || 'সম্মানিত কাস্টমার';
         const finalPhone = orderData.phone || '01700000000';
         const finalAddress = orderData.address || session.deliveryAddress || 'ঢাকা';
-        const prodTitle = orderData.product || session.selectedProduct || 'ডিজাইনার পার্টি গাউন';
+        const prodTitle = orderData.product || session.selectedProduct || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
 
         try {
           await insertDbOrder({
@@ -295,7 +296,7 @@ async function processMessengerEvent(
     }
   }
 
-  // 1. Explicit Payload Button Click
+  // 3. Explicit Payload Button Click
   if (payload) {
     if (payload.startsWith('PROD_')) {
       const prodName =
@@ -320,11 +321,139 @@ async function processMessengerEvent(
     }
   }
 
-  // 2. Intelligent Banglish / Bangla FAQ Matcher
+  // 4. Check for phone & address extraction for NEW orders
+  const { phone, partialPhone } = extractBangladeshiPhone(rawText);
+
+  if (phone) {
+    const { name, address } = extractNameAndAddress(rawText, phone);
+    const finalName = (name && name !== 'সম্মানিত কাস্টমার') ? name : (session.customerName || 'সম্মানিত কাস্টমার');
+    const finalAddress = address.length > 3 ? address : (session.deliveryAddress || 'ঢাকা');
+    const prodTitle = session.selectedProduct || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
+    const itemPrice = session.price || 850;
+    const deliveryCharge = 120;
+    const totalPrice = itemPrice + deliveryCharge;
+
+    // Save order to Neon DB
+    let orderNum = Math.floor(1000 + Math.random() * 9000);
+    try {
+      const saved = await insertDbOrder({
+        customerName: finalName,
+        customerPhone: phone,
+        deliveryAddress: finalAddress,
+        deliveryCity: 'ঢাকা',
+        channel: 'FACEBOOK_MESSENGER',
+        status: 'PENDING_CONFIRMATION',
+        itemsPrice: itemPrice,
+        deliveryCharge: deliveryCharge,
+        discount: 0,
+        productTitle: prodTitle,
+        psid: senderId,
+      });
+      if (saved?.orderNumber) orderNum = saved.orderNumber;
+    } catch (dbErr) {
+      console.error('[DB Insert Error from Rule]:', dbErr);
+    }
+
+    session.state = 'IDLE';
+    userSessions[senderId] = session;
+
+    await sendFbMessage(
+      senderId,
+      `🎉 অভিনন্দন ${finalName}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে।\n\n` +
+      `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
+      `👗 প্রোডাক্ট: ${prodTitle}\n` +
+      `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
+      `📞 মোবাইল: ${phone}\n` +
+      `💰 মোট পরিমাণ: ৳${totalPrice} (হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
+      `🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে।\n\n` +
+      `প্যাকেজটি পাঠানোর পর আপনাকে ট্র্যাকিং কোডসহ এসএমএস ও মেসেজ দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`,
+      pageToken,
+    );
+    return;
+  }
+
+  // 5. If user sent an INCOMPLETE phone number
+  if (partialPhone) {
+    const { name, address } = extractNameAndAddress(rawText, partialPhone);
+    session.state = 'AWAITING_PHONE';
+    if (name && name !== 'সম্মানিত কাস্টমার') session.customerName = name;
+    if (address && address.length > 3) session.deliveryAddress = address;
+    session.partialPhone = partialPhone;
+    userSessions[senderId] = session;
+
+    await sendFbMessage(
+      senderId,
+      `ধন্যবাদ ${session.customerName || ''}! আপনার ঠিকানা (${session.deliveryAddress || address}) নোট করা হয়েছে। 📍\n\n` +
+      `⚠️ তবে আপনার দেয়া মোবাইল নম্বরটিতে ${partialPhone.length}টি ডিজিট পাওয়া গেছে (${partialPhone})।\n` +
+      `বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়ে থাকে। অনুগ্রহ করে আপনার সম্পূর্ণ ১১ ডিজিটের মোবাইল নম্বরটি লিখে পাঠান (যেমন: ${partialPhone}xx)।`,
+      pageToken,
+    );
+    return;
+  }
+
+  // 6. If user sent text while in AWAITING_PHONE / AWAITING_ADDRESS
+  if (session.state === 'AWAITING_PHONE' || session.state === 'AWAITING_ADDRESS') {
+    const digitsOnly = toEnglishDigits(rawText).replace(/[^0-9]/g, '');
+    if (digitsOnly.length >= 2 && digitsOnly.length <= 11) {
+      let combinedPhone = '';
+      if (digitsOnly.length === 11 && digitsOnly.startsWith('01')) {
+        combinedPhone = digitsOnly;
+      } else if (session.partialPhone && (session.partialPhone + digitsOnly).length === 11) {
+        combinedPhone = session.partialPhone + digitsOnly;
+      }
+
+      if (combinedPhone.length === 11) {
+        const finalName = session.customerName || 'সম্মানিত কাস্টমার';
+        const finalAddress = session.deliveryAddress || 'মিরপুর, ঢাকা';
+        const prodTitle = session.selectedProduct || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
+        const itemPrice = session.price || 850;
+        const deliveryCharge = 120;
+        const totalPrice = itemPrice + deliveryCharge;
+        let orderNum = Math.floor(1000 + Math.random() * 9000);
+
+        try {
+          const saved = await insertDbOrder({
+            customerName: finalName,
+            customerPhone: combinedPhone,
+            deliveryAddress: finalAddress,
+            deliveryCity: 'ঢাকা',
+            channel: 'FACEBOOK_MESSENGER',
+            status: 'PENDING_CONFIRMATION',
+            itemsPrice: itemPrice,
+            deliveryCharge: deliveryCharge,
+            discount: 0,
+            productTitle: prodTitle,
+            psid: senderId,
+          });
+          if (saved?.orderNumber) orderNum = saved.orderNumber;
+        } catch (dbErr) {
+          console.error('[DB Insert Error from Phone Recovery]:', dbErr);
+        }
+
+        session.state = 'IDLE';
+        userSessions[senderId] = session;
+
+        await sendFbMessage(
+          senderId,
+          `🎉 ধন্যবাদ ${finalName}! আপনার ১১ ডিজিটের নম্বর (${combinedPhone}) ভেরিফাই হয়েছে এবং অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে।\n\n` +
+          `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
+          `👗 প্রোডাক্ট: ${prodTitle}\n` +
+          `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
+          `💰 মোট পরিমাণ: ৳${totalPrice} (ক্যাশ অন ডেলিভারি)\n` +
+          `🚚 ২-৩ কার্যদিবসের মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ! ❤️`,
+          pageToken,
+        );
+        return;
+      }
+    }
+  }
+
+  // 7. Context-Aware FAQ Matcher (Distinguishes between Existing Order vs New Inquiries)
   const isDeliveryTimeQuery = /(kobe|koy\s*din|koto\s*din|kokhon|time|কবে|কতদিন|কয়দিন|কখন|সময়).*(deliv|pabo|ashbe|পৌঁছাবে|পাব)/i.test(lowerText) ||
     lowerText.includes('kobe pabo') || lowerText.includes('kobe delivary') || lowerText.includes('kobe delivery') ||
     lowerText.includes('delivery time') || lowerText.includes('koydin lagbe') || lowerText.includes('koto din lagbe') ||
-    lowerText.includes('কবে পাব') || lowerText.includes('কত দিন লাগবে') || lowerText.includes('কয়দিন লাগবে');
+    lowerText.includes('কবে পাব') || lowerText.includes('কত দিন লাগবে') || lowerText.includes('কয়দিন লাগবে') ||
+    lowerText.includes('koydin lagbe delivery') || lowerText.includes('koy din lagbe delivery');
 
   const isDeliveryChargeQuery = /(charge|fee|cost|টাকা|চার্জ|খরচ).*(deliv|ডেলিভারি)/i.test(lowerText) ||
     lowerText.includes('delivery charge') || lowerText.includes('charge koto') || lowerText.includes('delivery koto') ||
@@ -336,6 +465,51 @@ async function processMessengerEvent(
 
   const isPaymentQuery = lowerText.includes('advance') || lowerText.includes('cod') || lowerText.includes('cash on') || lowerText.includes('taka kivabe') || lowerText.includes('অগ্রিম') || lowerText.includes('ক্যাশ অন ডেলিভারি');
 
+  const isTrackingQuery = lowerText.includes('tracking') || lowerText.includes('amar order') || lowerText.includes('order koi') || lowerText.includes('status') || lowerText.includes('অর্ডার কোথায়');
+
+  const isThanksQuery = lowerText.includes('dhonnobad') || lowerText.includes('thanks') || lowerText.includes('thank u') || lowerText.includes('ধন্যবাদ') || lowerText.includes('থ্যাংকস');
+
+  // IF CUSTOMER ALREADY HAS AN ACTIVE ORDER (POST-ORDER CONTEXT AWARE):
+  if (recentOrder) {
+    const custName = recentOrder.customerName || 'সম্মানিত কাস্টমার';
+
+    if (isDeliveryTimeQuery || isTrackingQuery) {
+      await sendFbMessage(
+        senderId,
+        `🚚 ${custName} ভাইয়া/আপু, আপনার অর্ডারটি (#OF-${recentOrder.orderNumber}) অলরেডি সফলভাবে কনফার্ম রয়েছে! 📦\n\n` +
+        `👗 প্রোডাক্ট: ${recentOrder.productTitle}\n` +
+        `📍 ডেলিভারি ঠিকানা: ${recentOrder.deliveryAddress}\n` +
+        `💰 মোট বিল: ৳${recentOrder.totalPrice} (ক্যাশ অন ডেলিভারি)\n\n` +
+        `⏱️ ডেলিভারি সময়:\n` +
+        `• ঢাকা সিটির ভেতরে: ২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)\n` +
+        `• ঢাকার বাইরে: ২ থেকে ৩ কার্যদিবস\n\n` +
+        `কুরিয়ারে পার্সেলটি হস্তান্তর করার সাথে সাথে আপনার মোবাইলে এসএমএস ও ট্র্যাকিং কোড পেয়ে যাবেন। অন্য কোনো তথ্য জানার থাকলে লিখুন! ❤️`,
+        pageToken,
+      );
+      return;
+    }
+
+    if (isPaymentQuery) {
+      await sendFbMessage(
+        senderId,
+        `🤝 ${custName} ভাইয়া/আপু, আপনার অর্ডারের (#OF-${recentOrder.orderNumber}) মোট বিল ৳${recentOrder.totalPrice}।\n\n` +
+        `আমাদের কোনো অগ্রিম টাকা দিতে হবে না! পার্সেলটি হাতে পেয়ে ডেলিভারিম্যানকে ক্যাশ টাকা পরিশোধ করবেন। ধন্যবাদ সাথে থাকার জন্য! ❤️`,
+        pageToken,
+      );
+      return;
+    }
+
+    if (isThanksQuery) {
+      await sendFbMessage(
+        senderId,
+        `❤️ আপনাকেও অনেক অনেক ধন্যবাদ ${custName} ভাইয়া/আপু! আমরা দ্রুততম সময়ে আপনার ঠিকানায় সুন্দর প্যাকেজিংয়ে পার্সেলটি পৌঁছে দেব। শুভকামনা! 🌸`,
+        pageToken,
+      );
+      return;
+    }
+  }
+
+  // IF PRE-ORDER / GENERAL INQUIRY:
   if (isDeliveryTimeQuery) {
     await sendFbQuickReplies(
       senderId,
@@ -424,7 +598,7 @@ async function processMessengerEvent(
     return;
   }
 
-  // 3. Natural Language Product Mention
+  // 8. Natural Language Product Mention
   if (session.state === 'IDLE' || !session.selectedProduct) {
     if (lowerText.includes('গাউন') || lowerText.includes('gown') || lowerText.includes('party')) {
       session.state = 'AWAITING_ADDRESS';
@@ -465,135 +639,7 @@ async function processMessengerEvent(
     }
   }
 
-  // 3. Check for phone & address extraction
-  const { phone, partialPhone } = extractBangladeshiPhone(rawText);
-
-  // If phone is valid (11 digits)
-  if (phone) {
-    const { name, address } = extractNameAndAddress(rawText, phone);
-    const finalName = (name && name !== 'সম্মানিত কাস্টমার') ? name : (session.customerName || 'সম্মানিত কাস্টমার');
-    const finalAddress = address.length > 3 ? address : (session.deliveryAddress || 'ঢাকা');
-    const prodTitle = session.selectedProduct || 'ডিজাইনার পার্টি গাউন';
-    const itemPrice = session.price || 1500;
-    const deliveryCharge = 120;
-    const totalPrice = itemPrice + deliveryCharge;
-
-    // Save order to Neon DB
-    let orderNum = Math.floor(1000 + Math.random() * 9000);
-    try {
-      const saved = await insertDbOrder({
-        customerName: finalName,
-        customerPhone: phone,
-        deliveryAddress: finalAddress,
-        deliveryCity: 'ঢাকা',
-        channel: 'FACEBOOK_MESSENGER',
-        status: 'PENDING_CONFIRMATION',
-        itemsPrice: itemPrice,
-        deliveryCharge: deliveryCharge,
-        discount: 0,
-        productTitle: prodTitle,
-        psid: senderId,
-      });
-      if (saved?.orderNumber) orderNum = saved.orderNumber;
-    } catch (dbErr) {
-      console.error('[DB Insert Error from Rule]:', dbErr);
-    }
-
-    session.state = 'IDLE';
-    userSessions[senderId] = session;
-
-    await sendFbMessage(
-      senderId,
-      `🎉 অভিনন্দন ${finalName}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে।\n\n` +
-      `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
-      `👗 প্রোডাক্ট: ${prodTitle}\n` +
-      `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
-      `📞 মোবাইল: ${phone}\n` +
-      `💰 মোট পরিমাণ: ৳${totalPrice} (হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
-      `🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে।\n\n` +
-      `প্যাকেজটি পাঠানোর পর আপনাকে ট্র্যাকিং কোডসহ এসএমএস ও মেসেজ দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`,
-      pageToken,
-    );
-    return;
-  }
-
-  // 4. If user sent an INCOMPLETE phone number (e.g. 019389098 - 9 digits)
-  if (partialPhone) {
-    const { name, address } = extractNameAndAddress(rawText, partialPhone);
-    session.state = 'AWAITING_PHONE';
-    if (name && name !== 'সম্মানিত কাস্টমার') session.customerName = name;
-    if (address && address.length > 3) session.deliveryAddress = address;
-    session.partialPhone = partialPhone;
-    userSessions[senderId] = session;
-
-    await sendFbMessage(
-      senderId,
-      `ধন্যবাদ ${session.customerName || ''}! আপনার ঠিকানা (${session.deliveryAddress || address}) নোট করা হয়েছে। 📍\n\n` +
-      `⚠️ তবে আপনার দেয়া মোবাইল নম্বরটিতে ${partialPhone.length}টি ডিজিট পাওয়া গেছে (${partialPhone})।\n` +
-      `বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়ে থাকে। অনুগ্রহ করে আপনার সম্পূর্ণ ১১ ডিজিটের মোবাইল নম্বরটি লিখে পাঠান (যেমন: ${partialPhone}xx)।`,
-      pageToken,
-    );
-    return;
-  }
-
-  // 5. If user sent text while in AWAITING_PHONE / AWAITING_ADDRESS
-  if (session.state === 'AWAITING_PHONE' || session.state === 'AWAITING_ADDRESS') {
-    const digitsOnly = toEnglishDigits(rawText).replace(/[^0-9]/g, '');
-    if (digitsOnly.length >= 2 && digitsOnly.length <= 11) {
-      let combinedPhone = '';
-      if (digitsOnly.length === 11 && digitsOnly.startsWith('01')) {
-        combinedPhone = digitsOnly;
-      } else if (session.partialPhone && (session.partialPhone + digitsOnly).length === 11) {
-        combinedPhone = session.partialPhone + digitsOnly;
-      }
-
-      if (combinedPhone.length === 11) {
-        const finalName = session.customerName || 'সম্মানিত কাস্টমার';
-        const finalAddress = session.deliveryAddress || 'মিরপুর, ঢাকা';
-        const prodTitle = session.selectedProduct || 'ডিজাইনার পার্টি গাউন';
-        const itemPrice = session.price || 1500;
-        const deliveryCharge = 120;
-        const totalPrice = itemPrice + deliveryCharge;
-        let orderNum = Math.floor(1000 + Math.random() * 9000);
-
-        try {
-          const saved = await insertDbOrder({
-            customerName: finalName,
-            customerPhone: combinedPhone,
-            deliveryAddress: finalAddress,
-            deliveryCity: 'ঢাকা',
-            channel: 'FACEBOOK_MESSENGER',
-            status: 'PENDING_CONFIRMATION',
-            itemsPrice: itemPrice,
-            deliveryCharge: deliveryCharge,
-            discount: 0,
-            productTitle: prodTitle,
-            psid: senderId,
-          });
-          if (saved?.orderNumber) orderNum = saved.orderNumber;
-        } catch (dbErr) {
-          console.error('[DB Insert Error from Phone Recovery]:', dbErr);
-        }
-
-        session.state = 'IDLE';
-        userSessions[senderId] = session;
-
-        await sendFbMessage(
-          senderId,
-          `🎉 ধন্যবাদ ${finalName}! আপনার ১১ ডিজিটের নম্বর (${combinedPhone}) ভেরিফাই হয়েছে এবং অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে।\n\n` +
-          `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
-          `👗 প্রোডাক্ট: ${prodTitle}\n` +
-          `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
-          `💰 মোট পরিমাণ: ৳${totalPrice} (ক্যাশ অন ডেলিভারি)\n` +
-          `🚚 ২-৩ কার্যদিবসের মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ! ❤️`,
-          pageToken,
-        );
-        return;
-      }
-    }
-  }
-
-  // 6. Default: Main Menu / Greeting
+  // 9. Default: Main Menu / Greeting
   session.state = 'IDLE';
   userSessions[senderId] = session;
 
