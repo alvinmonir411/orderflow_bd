@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '@/lib/api';
-import { Product } from '@/lib/types';
-import { Send, Bot, User, CheckCircle2, RotateCcw, Sparkles } from 'lucide-react';
+import { Send, Bot, User, CheckCircle2, RotateCcw, Sparkles, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Message {
@@ -15,11 +14,11 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: 'bot',
-      text: 'আসসালামু আলাইকুম! OrderFlow BD ডেমো শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇',
+      text: 'আসসালামু আলাইকুম! Moner Kotha শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇',
       quickReplies: [
-        { title: 'প্রিন্ট কুর্তি - ৳৮৫০', payload: 'PROD_1' },
-        { title: 'জয়পুরি থ্রি-পিস - ৳১২৫০', payload: 'PROD_2' },
-        { title: 'পার্টি কুর্তি - ৳১১০০', payload: 'PROD_3' },
+        { title: 'প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০', payload: 'PROD_1' },
+        { title: 'জয়পুরি কটন থ্রি-পিস - ৳১২৫০', payload: 'PROD_2' },
+        { title: 'ডিজাইনার পার্টি গাউন - ৳১৫০০', payload: 'PROD_3' },
       ],
       timestamp: 'এখন',
     },
@@ -28,17 +27,16 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
   const [input, setInput] = useState('');
   const [step, setStep] = useState<'SELECT_PRODUCT' | 'SELECT_VARIANT' | 'PHONE' | 'ADDRESS' | 'CONFIRM'>('SELECT_PRODUCT');
   const [orderDraft, setOrderDraft] = useState<any>({
-    productName: 'প্রিমিয়াম কাশ্মীরি কুর্তি (মারুন)',
-    price: 850,
+    productName: 'ডিজাইনার পার্টি গাউন',
+    price: 1500,
     variant: 'Size: L (40)',
-    deliveryCharge: 70,
+    deliveryCharge: 120,
   });
 
   const handleSend = (textToSend?: string) => {
     const text = textToSend || input;
     if (!text.trim()) return;
 
-    // Add user message
     const newMessages: Message[] = [
       ...messages,
       { sender: 'user', text, timestamp: 'এখন' },
@@ -48,7 +46,7 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
 
     setTimeout(() => {
       processBotReply(text, newMessages);
-    }, 600);
+    }, 500);
   };
 
   const handleQuickReply = (title: string, payload: string) => {
@@ -60,8 +58,13 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
 
     setTimeout(() => {
       if (payload === 'PROD_1' || payload === 'PROD_2' || payload === 'PROD_3') {
-        const prodName = payload === 'PROD_1' ? 'প্রিমিয়াম কাশ্মীরি কুর্তি' : payload === 'PROD_2' ? 'জয়পুরি থ্রি-পিস' : 'পার্টি কুর্তি';
-        const price = payload === 'PROD_1' ? 850 : payload === 'PROD_2' ? 1250 : 1100;
+        const prodName =
+          payload === 'PROD_1'
+            ? 'প্রিমিয়াম কাশ্মীরি কুর্তি'
+            : payload === 'PROD_2'
+            ? 'জয়পুরি কটন থ্রি-পিস'
+            : 'ডিজাইনার পার্টি গাউন';
+        const price = payload === 'PROD_1' ? 850 : payload === 'PROD_2' ? 1250 : 1500;
         setOrderDraft((prev: any) => ({ ...prev, productName: prodName, price }));
         setStep('SELECT_VARIANT');
 
@@ -69,7 +72,7 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
           ...newMessages,
           {
             sender: 'bot',
-            text: `আপনি নির্বাচন করেছেন: ${prodName} (৳${price})\nঅনুগ্রহ করে আপনার সাইজ বেছে নিন 👇`,
+            text: `আপনি নির্বাচন করেছেন: ${prodName} (৳${price}) ✨\nঅনুগ্রহ করে আপনার সাইজ বেছে নিন 👇`,
             quickReplies: [
               { title: 'Size: M (38)', payload: 'VAR_M' },
               { title: 'Size: L (40)', payload: 'VAR_L' },
@@ -79,7 +82,8 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
           },
         ]);
       } else if (payload.startsWith('VAR_')) {
-        const sizeName = payload === 'VAR_M' ? 'Size: M (38)' : payload === 'VAR_L' ? 'Size: L (40)' : 'Size: XL (42)';
+        const sizeName =
+          payload === 'VAR_M' ? 'Size: M (38)' : payload === 'VAR_L' ? 'Size: L (40)' : 'Size: XL (42)';
         setOrderDraft((prev: any) => ({ ...prev, variant: sizeName }));
         setStep('PHONE');
 
@@ -87,27 +91,26 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
           ...newMessages,
           {
             sender: 'bot',
-            text: `চমৎকার! "${orderDraft.productName}" (${sizeName}) এর জন্য অনুগ্রহ করে আপনার নাম ও ১১ ডিজিটের মোবাইল নম্বর লিখে পাঠান:\n(যেমন: সাকিব আল হাসান, 01712345678)`,
+            text: `চমৎকার! "${orderDraft.productName}" (${sizeName}) এর জন্য অনুগ্রহ করে আপনার নাম ও ১১ ডিজিটের মোবাইল নম্বর লিখে পাঠান:\n(যেমন: মনির, 01938909812)`,
             timestamp: 'এখন',
           },
         ]);
       } else if (payload === 'CONFIRM_YES') {
-        // Create Order in live store
         api.createOrder({
-          customerName: orderDraft.customerName || 'সাকিব আল হাসান',
-          customerPhone: orderDraft.customerPhone || '01712345678',
+          customerName: orderDraft.customerName || 'আলভিন মনির',
+          customerPhone: orderDraft.customerPhone || '01938909812',
           deliveryAddress: orderDraft.deliveryAddress || 'মিরপুর ১০, ঢাকা',
           deliveryCity: 'Dhaka',
           itemsPrice: orderDraft.price,
-          deliveryCharge: 70,
-          totalPrice: orderDraft.price + 70,
+          deliveryCharge: 120,
+          totalPrice: orderDraft.price + 120,
           channel: 'FACEBOOK_MESSENGER',
           status: 'PENDING_CONFIRMATION',
           items: [
             {
               id: `oi-${Date.now()}`,
               orderId: '',
-              productId: 'prod-1',
+              productId: 'prod-3',
               product: { title: orderDraft.productName, basePrice: orderDraft.price },
               variant: { name: orderDraft.variant },
               quantity: 1,
@@ -122,20 +125,20 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
             ...newMessages,
             {
               sender: 'bot',
-              text: `🎉 অভিনন্দন ${orderDraft.customerName || ''}! আপনার অর্ডারটি গ্রহণ করা হয়েছে।\n\n📦 অর্ডার নম্বর: #${newOrd.orderNumber}\n💰 মোট: ৳${orderDraft.price + 70} (ক্যাশ অন ডেলিভারি)\n🚚 ২-৩ দিনের মধ্যে ডেলিভারি সম্পন্ন হবে। ধন্যবাদ! ❤️`,
+              text: `🎉 অভিনন্দন ${orderDraft.customerName || ''}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে।\n\n📦 অর্ডার নম্বর: #OF-${newOrd.orderNumber}\n👗 পণ্য: ${orderDraft.productName}\n💰 মোট: ৳${orderDraft.price + 120} (ক্যাশ অন ডেলিভারি)\n🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে পৌঁছে যাবে। ধন্যবাদ! ❤️`,
               timestamp: 'এখন',
             },
           ]);
         });
       }
-    }, 500);
+    }, 450);
   };
 
   const processBotReply = (text: string, currentMsgs: Message[]) => {
     if (step === 'PHONE') {
       const phoneMatch = text.match(/(01[3-9]\d{8})/);
-      const phone = phoneMatch ? phoneMatch[0] : '01712345678';
-      const name = text.replace(phone, '').replace(/[,]/g, '').trim() || 'সম্মানিত কাস্টমার';
+      const phone = phoneMatch ? phoneMatch[0] : '01938909812';
+      const name = text.replace(phone, '').replace(/[,]/g, '').trim() || 'মনির ভাই';
 
       setOrderDraft((prev: any) => ({ ...prev, customerName: name, customerPhone: phone }));
       setStep('ADDRESS');
@@ -144,7 +147,7 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
         ...currentMsgs,
         {
           sender: 'bot',
-          text: `ধন্যবাদ ${name}! এবার অনুগ্রহ করে আপনার সম্পূর্ণ ডেলিভারি ঠিকানা লিখুন (যেমন: বাসা #৪, রোড #২, ধানমন্ডি, ঢাকা):`,
+          text: `ধন্যবাদ ${name}! এবার অনুগ্রহ করে আপনার সম্পূর্ণ ডেলিভারি ঠিকানা লিখুন (যেমন: মিরপুর ১৬, ঢাকা):`,
           timestamp: 'এখন',
         },
       ]);
@@ -153,16 +156,16 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
       setOrderDraft((prev: any) => ({ ...prev, deliveryAddress: address }));
       setStep('CONFIRM');
 
-      const total = orderDraft.price + 70;
+      const total = orderDraft.price + 120;
 
       setMessages([
         ...currentMsgs,
         {
           sender: 'bot',
-          text: `📝 আপনার অর্ডার সামারি:\n\n🛍️ প্রোডাক্ট: ${orderDraft.productName} (${orderDraft.variant})\n💵 পণ্যের দাম: ৳${orderDraft.price}\n🚚 ডেলিভারি চার্জ: ৳৭০\n💰 মোট প্রদেয়: ৳${total} (ক্যাশ অন ডেলিভারি)\n\n👤 নাম: ${orderDraft.customerName}\n📞 ফোন: ${orderDraft.customerPhone}\n📍 ঠিকানা: ${address}\n\nঅর্ডারটি কনফার্ম করতে নিচের বাটনে চাপ দিন 👇`,
+          text: `📝 আপনার অর্ডার সামারি:\n\n🛍️ প্রোডাক্ট: ${orderDraft.productName} (${orderDraft.variant})\n💵 পণ্যের দাম: ৳${orderDraft.price}\n🚚 ডেলিভারি চার্জ: ৳১২০\n💰 মোট বিল: ৳${total} (ক্যাশ অন ডেলিভারি)\n\n👤 নাম: ${orderDraft.customerName}\n📞 ফোন: ${orderDraft.customerPhone}\n📍 ঠিকানা: ${address}\n\nঅর্ডারটি নিশ্চিত করতে নিচের বাটনে চাপ দিন 👇`,
           quickReplies: [
             { title: '✅ কনফার্ম করুন', payload: 'CONFIRM_YES' },
-            { title: '❌ বাতিল করুন', payload: 'CANCEL' },
+            { title: '❌ বাতিল', payload: 'CANCEL' },
           ],
           timestamp: 'এখন',
         },
@@ -175,11 +178,11 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
     setMessages([
       {
         sender: 'bot',
-        text: 'আসসালামু আলাইকুম! OrderFlow BD ডেমো শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇',
+        text: 'আসসালামু আলাইকুম! Moner Kotha শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇',
         quickReplies: [
-          { title: 'প্রিন্ট কুর্তি - ৳৮৫০', payload: 'PROD_1' },
-          { title: 'জয়পুরি থ্রি-পিস - ৳১২৫০', payload: 'PROD_2' },
-          { title: 'পার্টি কুর্তি - ৳১১০০', payload: 'PROD_3' },
+          { title: 'প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০', payload: 'PROD_1' },
+          { title: 'জয়পুরি কটন থ্রি-পিস - ৳১২৫০', payload: 'PROD_2' },
+          { title: 'ডিজাইনার পার্টি গাউন - ৳১৫০০', payload: 'PROD_3' },
         ],
         timestamp: 'এখন',
       },
@@ -187,54 +190,54 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
   };
 
   return (
-    <div className="flex flex-col h-[560px] bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-      {/* Chat Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-neutral-950 border-b border-neutral-800">
+    <div className="flex flex-col h-[580px] bg-[#0c0e15] border border-neutral-800/90 rounded-3xl overflow-hidden shadow-2xl relative">
+      {/* Smartphone Top Notch & Header */}
+      <div className="flex items-center justify-between px-4 py-3.5 bg-[#121520] border-b border-neutral-800/80 relative z-10">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white">
-              <Bot className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 font-bold">
+              <MessageCircle className="w-5 h-5" />
             </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-neutral-950 rounded-full" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#121520] rounded-full" />
           </div>
           <div>
-            <h4 className="font-semibold text-neutral-100 text-sm flex items-center gap-1.5">
-              Facebook Messenger বটের লাইভ সিমুলেটর
-              <span className="px-1.5 py-0.5 text-[10px] bg-blue-500/20 text-blue-400 font-normal rounded">
-                Live Interactive
+            <h4 className="font-extrabold text-neutral-100 text-sm flex items-center gap-1.5">
+              Moner Kotha
+              <span className="px-1.5 py-0.5 text-[9px] bg-blue-500/20 text-blue-300 font-bold rounded-md border border-blue-500/30">
+                Active Now
               </span>
             </h4>
-            <p className="text-xs text-neutral-400">কাস্টমার যেভাবে মেসেঞ্জারে অর্ডার করবে</p>
+            <p className="text-[11px] text-neutral-400 font-medium">লাইভ কাস্টমার মেসেঞ্জার সিমুলেটর</p>
           </div>
         </div>
         <button
           onClick={resetChat}
-          className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200 px-2.5 py-1.5 rounded-lg bg-neutral-800/60 hover:bg-neutral-800 transition-all"
+          className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white px-3 py-1.5 rounded-xl bg-neutral-800/80 hover:bg-neutral-750 transition-all border border-neutral-700/60 shadow-sm"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          রিসেট চ্যাট
+          রিসেট
         </button>
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-neutral-900/60">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#090b10]/95 scrollbar-thin">
         {messages.map((msg, index) => (
           <div
             key={index}
             className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
-            <div className="flex items-start gap-2 max-w-[85%]">
+            <div className="flex items-start gap-2 max-w-[88%]">
               {msg.sender === 'bot' && (
-                <div className="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
+                <div className="w-7 h-7 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5 shadow-sm">
                   <Bot className="w-4 h-4" />
                 </div>
               )}
               <div>
                 <div
-                  className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-line shadow-sm ${
+                  className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-line shadow-md ${
                     msg.sender === 'user'
-                      ? 'bg-blue-600 text-white rounded-tr-none'
-                      : 'bg-neutral-800 text-neutral-200 border border-neutral-700/60 rounded-tl-none'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none'
+                      : 'bg-[#151924] text-neutral-200 border border-neutral-750/80 rounded-tl-none'
                   }`}
                 >
                   {msg.text}
@@ -242,12 +245,12 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
 
                 {/* Quick Reply Buttons */}
                 {msg.quickReplies && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
                     {msg.quickReplies.map((qr, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleQuickReply(qr.title, qr.payload)}
-                        className="px-3 py-1.5 bg-neutral-800 hover:bg-blue-600 hover:text-white text-blue-400 border border-blue-500/30 rounded-full text-xs font-medium transition-all shadow-sm active:scale-95"
+                        className="px-3.5 py-1.5 bg-[#161a26] hover:bg-blue-600 hover:text-white text-blue-300 border border-blue-500/30 rounded-full text-xs font-bold transition-all shadow-sm active:scale-95 hover:border-blue-400"
                       >
                         {qr.title}
                       </button>
@@ -260,19 +263,19 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
         ))}
       </div>
 
-      {/* Input Form */}
-      <div className="p-3 bg-neutral-950 border-t border-neutral-800 flex items-center gap-2">
+      {/* Input Bar */}
+      <div className="p-3 bg-[#10131c] border-t border-neutral-800/80 flex items-center gap-2">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="মেসেজ লিখুন বা বাটনে চাপ দিন..."
-          className="flex-1 bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-blue-500 transition-colors"
+          placeholder="মেসেজ লিখুন (যেমন: মনির, 01938909812, মিরপুর)..."
+          className="flex-1 bg-[#090a0f] border border-neutral-750 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-blue-500 transition-colors shadow-inner"
         />
         <button
           onClick={() => handleSend()}
-          className="p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-md active:scale-95"
+          className="p-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl transition-all shadow-md shadow-blue-600/20 active:scale-95"
         >
           <Send className="w-4 h-4" />
         </button>

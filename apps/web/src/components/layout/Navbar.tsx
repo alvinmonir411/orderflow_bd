@@ -1,35 +1,53 @@
 'use client';
 
 import React from 'react';
-import { Bell, Store, Search, UserCheck } from 'lucide-react';
+import Link from 'next/link';
+import { Store, Sparkles, Menu, Bell, Search, ShieldCheck } from 'lucide-react';
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  onMenuToggle?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onMenuToggle }) => {
   return (
-    <header className="h-16 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
-      {/* Store Badge & Search */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-xl">
-          <Store className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs font-semibold text-neutral-200">আলভিন ফ্যাশন হাব (FB Store)</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+    <header className="h-16 border-b border-neutral-800/80 bg-[#090a0f]/80 backdrop-blur-xl px-4 md:px-6 flex items-center justify-between sticky top-0 z-30">
+      {/* Left: Mobile Toggle & Store Badge */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuToggle}
+          className="p-2 lg:hidden bg-neutral-900 border border-neutral-800 rounded-xl text-neutral-300 hover:text-neutral-100 transition-all"
+          aria-label="Toggle Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-2 bg-gradient-to-r from-neutral-900 to-neutral-900/60 border border-neutral-800/80 px-3.5 py-1.5 rounded-xl shadow-sm">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50" />
+          <Store className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="text-xs font-bold text-neutral-100 tracking-tight">
+            Moner Kotha
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-400 rounded-md font-mono hidden sm:inline-block">
+            ID: 1314475555081210
+          </span>
         </div>
       </div>
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">
-        <div className="hidden md:flex items-center gap-2 bg-neutral-900/60 border border-neutral-800 px-3 py-1.5 rounded-xl text-xs text-neutral-400">
-          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-          <span>Webhook: Connected</span>
+        <div className="hidden sm:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl text-xs text-emerald-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          <span className="font-semibold font-mono">24/7 AI Sales Active</span>
         </div>
 
         {/* User Profile */}
-        <div className="flex items-center gap-2.5 pl-3 border-l border-neutral-800">
-          <div className="w-8 h-8 rounded-full bg-emerald-600/30 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xs">
+        <div className="flex items-center gap-2.5 pl-3 border-l border-neutral-800/80">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-neutral-950 font-extrabold text-xs flex items-center justify-center shadow-md shadow-emerald-500/20">
             AM
           </div>
           <div className="hidden sm:block text-left">
-            <p className="text-xs font-semibold text-neutral-200">Alvin Monir</p>
-            <p className="text-[10px] text-neutral-500">Merchant Owner</p>
+            <p className="text-xs font-bold text-neutral-200 leading-tight">Alvin Monir</p>
+            <p className="text-[10px] text-neutral-400 font-medium">Merchant Admin</p>
           </div>
         </div>
       </div>

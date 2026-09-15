@@ -9,6 +9,8 @@ import {
   Save,
   ShieldCheck,
   Zap,
+  Lock,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -46,69 +48,77 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-8 pb-12">
       {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-purple-500/15 border border-purple-500/30 text-purple-400 text-xs font-semibold rounded-full mb-2">
-          <Truck className="w-3.5 h-3.5" />
-          <span>কুরিয়ার ও এসএমএস অটোমেশন</span>
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#121622] via-[#0e1017] to-[#090b10] p-6 sm:p-7 border border-neutral-800/90 shadow-2xl">
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold rounded-full mb-2">
+            <Truck className="w-3.5 h-3.5 text-purple-400" />
+            <span>কুরিয়ার ও এসএমএস অটোমেশন</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-neutral-100 tracking-tight">
+            কুরিয়ার ও এসএমএস গেটওয়ে ইন্টিগ্রেশন
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-2xl leading-relaxed">
+            Steadfast, Pathao এবং বাল্ক এসএমএস সার্ভিস ইন্টিগ্রেশন (প্লাগ অ্যান্ড প্লে — শুধু এপিআই কি বসালেই চলবে)।
+          </p>
         </div>
-        <h2 className="text-2xl font-bold text-neutral-100 tracking-tight">
-          কুরিয়ার ও এসএমএস গেটওয়ে ইন্টিগ্রেশন
-        </h2>
-        <p className="text-sm text-neutral-400 mt-1">
-          Steadfast, Pathao এবং বাল্ক এসএমএস সার্ভিস ইন্টিগ্রেশন (প্লাগ অ্যান্ড প্লে — শুধু এপিআই কি বসালেই চলবে)
-        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Steadfast Courier Integration */}
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 space-y-4 shadow-xl flex flex-col justify-between">
+        <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 font-bold">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white font-black shadow-md shadow-purple-600/30 text-sm">
                   SF
                 </div>
                 <div>
-                  <h3 className="font-bold text-neutral-100 text-base">Steadfast Courier API</h3>
-                  <p className="text-xs text-neutral-400">বাংলাদেশের সবচেয়ে জনপ্রিয় এফ-কমার্স কুরিয়ার</p>
+                  <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">Steadfast Courier API</h3>
+                  <p className="text-xs text-neutral-400">বাংলাদেশের শীর্ষস্থানীয় এফ-কমার্স কুরিয়ার</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">
-                সংযুক্ত
+              <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl">
+                ● সংযুক্ত
               </span>
             </div>
 
-            <form onSubmit={handleSaveSteadfast} className="space-y-3 pt-2">
+            <form onSubmit={handleSaveSteadfast} className="space-y-4 pt-1">
               <div>
-                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                   Steadfast API Key *
                 </label>
-                <input
-                  type="password"
-                  value={steadfastApiKey}
-                  onChange={(e) => setSteadfastApiKey(e.target.value)}
-                  placeholder="Api-Key..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-purple-500"
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                  <input
+                    type="password"
+                    value={steadfastApiKey}
+                    onChange={(e) => setSteadfastApiKey(e.target.value)}
+                    placeholder="Api-Key..."
+                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-purple-500 shadow-inner"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                   Steadfast Secret Key *
                 </label>
-                <input
-                  type="password"
-                  value={steadfastSecret}
-                  onChange={(e) => setSteadfastSecret(e.target.value)}
-                  placeholder="Secret-Key..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-purple-500"
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                  <input
+                    type="password"
+                    value={steadfastSecret}
+                    onChange={(e) => setSteadfastSecret(e.target.value)}
+                    placeholder="Secret-Key..."
+                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-purple-500 shadow-inner"
+                  />
+                </div>
               </div>
 
-              <div className="pt-2 flex justify-end">
+              <div className="pt-1 flex justify-end">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl text-sm font-bold shadow-md shadow-purple-600/25 active:scale-95 transition-all"
                 >
                   <Save className="w-4 h-4" />
                   Steadfast সেভ করুন
@@ -117,60 +127,66 @@ export default function IntegrationsPage() {
             </form>
           </div>
 
-          <div className="p-3 bg-neutral-950/60 border border-neutral-850 rounded-xl text-[11px] text-neutral-400">
-            💡 ড্যাশবোর্ডে "Steadfast বুকিং" বাটনে চাপ দিলেই স্বয়ংক্রিয়ভাবে পার্সেল এন্ট্রি হয়ে ট্র্যাকিং কোড তৈরি হবে।
+          <div className="p-3.5 bg-[#0a0c12] border border-neutral-800 rounded-2xl text-xs text-neutral-400">
+            💡 ড্যাশবোর্ডে <strong>"Steadfast"</strong> বাটনে চাপ দিলেই স্বয়ংক্রিয়ভাবে পার্সেল এন্ট্রি হয়ে ট্র্যাকিং কোড তৈরি হবে।
           </div>
         </div>
 
         {/* Pathao Courier Integration */}
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 space-y-4 shadow-xl flex flex-col justify-between">
+        <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 font-bold">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-600 flex items-center justify-center text-white font-black shadow-md shadow-rose-600/30 text-sm">
                   PT
                 </div>
                 <div>
-                  <h3 className="font-bold text-neutral-100 text-base">Pathao Courier API</h3>
-                  <p className="text-xs text-neutral-400">পাঠাও এক্সপ্রেস ডেলিভারি ও রিয়েল-টাইম ট্র্যাকিং</p>
+                  <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">Pathao Courier API</h3>
+                  <p className="text-xs text-neutral-400">পাঠাও এক্সপ্রেস ডেলিভারি ও লাইভ ট্র্যাকিং</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-neutral-800 text-neutral-400 rounded-full">
+              <span className="px-2.5 py-1 text-xs font-bold bg-neutral-800 text-neutral-400 border border-neutral-700 rounded-xl">
                 রেডি
               </span>
             </div>
 
-            <form onSubmit={handleSavePathao} className="space-y-3 pt-2">
+            <form onSubmit={handleSavePathao} className="space-y-4 pt-1">
               <div>
-                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                   Pathao Client ID / API Key
                 </label>
-                <input
-                  type="text"
-                  value={pathaoApiKey}
-                  onChange={(e) => setPathaoApiKey(e.target.value)}
-                  placeholder="যেমন: pathao_client_id_..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-rose-500"
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                  <input
+                    type="text"
+                    value={pathaoApiKey}
+                    onChange={(e) => setPathaoApiKey(e.target.value)}
+                    placeholder="যেমন: pathao_client_id_..."
+                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-rose-500 shadow-inner"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                   Pathao Client Secret
                 </label>
-                <input
-                  type="password"
-                  value={pathaoSecret}
-                  onChange={(e) => setPathaoSecret(e.target.value)}
-                  placeholder="যেমন: pathao_client_secret_..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-rose-500"
-                />
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                  <input
+                    type="password"
+                    value={pathaoSecret}
+                    onChange={(e) => setPathaoSecret(e.target.value)}
+                    placeholder="যেমন: pathao_client_secret_..."
+                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-rose-500 shadow-inner"
+                  />
+                </div>
               </div>
 
-              <div className="pt-2 flex justify-end">
+              <div className="pt-1 flex justify-end">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white rounded-2xl text-sm font-bold shadow-md shadow-rose-600/25 active:scale-95 transition-all"
                 >
                   <Save className="w-4 h-4" />
                   Pathao সেভ করুন
@@ -179,20 +195,20 @@ export default function IntegrationsPage() {
             </form>
           </div>
 
-          <div className="p-3 bg-neutral-950/60 border border-neutral-850 rounded-xl text-[11px] text-neutral-400">
-            💡 পাঠাও এর মার্চেন্ট একাউন্ট থেকে এপিআই ক্রেডেনশিয়াল দিলে পাঠাও পার্সেল বুকিং সক্রিয় হবে।
+          <div className="p-3.5 bg-[#0a0c12] border border-neutral-800 rounded-2xl text-xs text-neutral-400">
+            💡 পাঠাও মার্চেন্ট অ্যাকাউন্ট থেকে ক্রেডেনশিয়াল বসালে পাঠাও পার্সেল অটো বুকিং সক্রিয় হবে।
           </div>
         </div>
 
         {/* Bangladeshi SMS Gateway Integration (Spanning 2 cols) */}
-        <div className="md:col-span-2 bg-neutral-900 border border-neutral-800 rounded-2xl p-6 space-y-4 shadow-xl">
+        <div className="md:col-span-2 bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-600/30">
                 <MessageSquare className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-neutral-100 text-base">
+                <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
                   Bangladeshi SMS Gateway (Greenweb / BulkSMSBD)
                 </h3>
                 <p className="text-xs text-neutral-400">
@@ -200,27 +216,30 @@ export default function IntegrationsPage() {
                 </p>
               </div>
             </div>
-            <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">
-              সক্রিয়
+            <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl">
+              ● সক্রিয়
             </span>
           </div>
 
-          <form onSubmit={handleSaveSMS} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <form onSubmit={handleSaveSMS} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+              <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                 SMS Provider API Token *
               </label>
-              <input
-                type="password"
-                value={smsApiKey}
-                onChange={(e) => setSmsApiKey(e.target.value)}
-                placeholder="Greenweb Token..."
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-emerald-500"
-              />
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                <input
+                  type="password"
+                  value={smsApiKey}
+                  onChange={(e) => setSmsApiKey(e.target.value)}
+                  placeholder="Greenweb Token..."
+                  className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-emerald-500 shadow-inner"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+              <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                 Sender ID / Masking Name *
               </label>
               <input
@@ -228,29 +247,29 @@ export default function IntegrationsPage() {
                 value={smsSenderId}
                 onChange={(e) => setSmsSenderId(e.target.value)}
                 placeholder="যেমন: OrderFlowBD"
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl px-4 py-2.5 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500 shadow-inner"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+              <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                 অর্ডার কনফার্মেশন SMS টেমপ্লেট:
               </label>
               <textarea
                 value={smsTemplate}
                 onChange={(e) => setSmsTemplate(e.target.value)}
                 rows={2}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl p-3 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500 shadow-inner"
               />
-              <p className="text-[11px] text-neutral-500 mt-1">
-                ডায়নামিক ভেরিয়েবল: <code>{'{name}'}</code>, <code>{'{order_id}'}</code>, <code>{'{amount}'}</code>, <code>{'{tracking_id}'}</code>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                ডায়নামিক ভেরিয়েবল: <code className="text-emerald-400">{'{name}'}</code>, <code className="text-emerald-400">{'{order_id}'}</code>, <code className="text-emerald-400">{'{amount}'}</code>, <code className="text-emerald-400">{'{tracking_id}'}</code>
               </p>
             </div>
 
             <div className="md:col-span-2 flex justify-end">
               <button
                 type="submit"
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all"
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-sm font-bold shadow-md shadow-emerald-600/25 active:scale-95 transition-all"
               >
                 <Save className="w-4 h-4" />
                 SMS কনফিগারেশন সেভ করুন

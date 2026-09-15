@@ -14,6 +14,7 @@ import {
   PlusCircle,
   X,
   Layers,
+  ShoppingBag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -28,8 +29,12 @@ export default function ProductsPage() {
   const [newVariants, setNewVariants] = useState('Size: M (38), Size: L (40), Size: XL (42)');
 
   const loadProducts = async () => {
-    const list = await api.getProducts();
-    setProducts(list);
+    try {
+      const list = await api.getProducts();
+      setProducts(list);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -79,50 +84,58 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-8 pb-12">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-neutral-100 tracking-tight">প্রোডাক্ট ও স্টক ম্যানেজমেন্ট</h2>
-          <p className="text-sm text-neutral-400 mt-0.5">
-            স্টক সংখ্যা পরিবর্তন করুন এবং মেসেঞ্জার বটের জন্য নতুন প্রোডাক্ট যুক্ত করুন
-          </p>
-        </div>
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#121622] via-[#0e1017] to-[#090b10] p-6 sm:p-7 border border-neutral-800/90 shadow-2xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-full mb-2">
+              <Boxes className="w-3.5 h-3.5 text-emerald-400" />
+              <span>ইনভেন্টরি ও সাইজ ভ্যারিয়েন্ট</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-neutral-100 tracking-tight">
+              প্রোডাক্ট ও স্টক ম্যানেজমেন্ট
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-xl leading-relaxed">
+              মেসেঞ্জার ও এআই বটের সাথে সরাসরি যুক্ত প্রোডাক্ট ক্যাটালগ ও লাইভ স্টক ব্যালেন্স।
+            </p>
+          </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-emerald-600/20 active:scale-95 self-start md:self-auto"
-        >
-          <PlusCircle className="w-4 h-4" />
-          নতুন প্রোডাক্ট যুক্ত করুন
-        </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-sm font-bold transition-all shadow-lg shadow-emerald-600/25 active:scale-95 self-start md:self-auto"
+          >
+            <PlusCircle className="w-4 h-4" />
+            নতুন প্রোডাক্ট যোগ করুন
+          </button>
+        </div>
       </div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {products.map((prod) => {
           const isLowStock = prod.stock <= 5;
 
           return (
             <div
               key={prod.id}
-              className={`bg-neutral-900 border rounded-2xl p-5 space-y-4 shadow-xl flex flex-col justify-between transition-all hover:border-neutral-700 ${
-                isLowStock ? 'border-amber-500/30' : 'border-neutral-800'
+              className={`bg-[#10131c] border rounded-3xl p-6 space-y-5 shadow-xl flex flex-col justify-between transition-all hover:border-neutral-700/80 group relative overflow-hidden ${
+                isLowStock ? 'border-amber-500/35 bg-gradient-to-b from-[#181310] to-[#10131c]' : 'border-neutral-800/90'
               }`}
             >
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-neutral-100 text-base leading-snug">
+                    <h3 className="font-extrabold text-neutral-100 text-lg leading-snug group-hover:text-emerald-300 transition-colors">
                       {prod.title}
                     </h3>
-                    <p className="font-mono font-bold text-emerald-400 text-lg mt-1">
+                    <p className="font-mono font-black text-emerald-400 text-xl mt-1.5">
                       {formatBDTEn(prod.basePrice)}
                     </p>
                   </div>
                   {isLowStock && (
-                    <span className="px-2 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0">
-                      <AlertCircle className="w-3 h-3" />
+                    <span className="px-2.5 py-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-xl text-[11px] font-bold flex items-center gap-1 shrink-0 shadow-sm">
+                      <AlertCircle className="w-3.5 h-3.5" />
                       লো স্টক
                     </span>
                   )}
@@ -130,16 +143,16 @@ export default function ProductsPage() {
 
                 {/* Variants Preview */}
                 {prod.variants && prod.variants.length > 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-neutral-800/80">
-                    <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
-                      <Layers className="w-3 h-3 text-neutral-500" />
-                      ভ্যারিয়েন্ট / সাইজ:
+                  <div className="space-y-2 pt-3 border-t border-neutral-800/80">
+                    <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-neutral-500" />
+                      উপলব্ধ সাইজ / ভ্যারিয়েন্ট:
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {prod.variants.map((v) => (
                         <span
                           key={v.id}
-                          className="px-2 py-0.5 bg-neutral-800 border border-neutral-700/60 rounded text-xs text-neutral-300 font-medium"
+                          className="px-2.5 py-1 bg-[#161a26] border border-neutral-750/80 rounded-xl text-xs text-neutral-300 font-semibold"
                         >
                           {v.name}
                         </span>
@@ -150,37 +163,37 @@ export default function ProductsPage() {
               </div>
 
               {/* Fast Stock Control Footer */}
-              <div className="pt-4 border-t border-neutral-800 flex items-center justify-between">
+              <div className="pt-4 border-t border-neutral-800/80 flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-neutral-500 uppercase font-semibold">বর্তমান স্টক</p>
+                  <p className="text-[11px] text-neutral-400 uppercase font-bold tracking-wider">বর্তমান স্টক</p>
                   <p
-                    className={`text-xl font-bold font-mono ${
+                    className={`text-2xl font-black font-mono mt-0.5 ${
                       prod.stock === 0
-                        ? 'text-rose-500'
+                        ? 'text-rose-400'
                         : isLowStock
                         ? 'text-amber-400'
                         : 'text-neutral-100'
                     }`}
                   >
-                    {prod.stock} টি
+                    {prod.stock} <span className="text-xs font-sans text-neutral-400 font-normal">টি</span>
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1.5 bg-neutral-800/80 p-1 rounded-xl border border-neutral-700/50">
+                <div className="flex items-center gap-1.5 bg-[#090b10] p-1.5 rounded-2xl border border-neutral-750">
                   <button
                     onClick={() => handleStockAdjust(prod.id, -1)}
                     disabled={prod.stock <= 0}
-                    className="p-1.5 bg-neutral-700/60 hover:bg-neutral-600 disabled:opacity-30 text-neutral-200 rounded-lg transition-all"
+                    className="p-2 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 text-neutral-200 rounded-xl transition-all shadow-sm active:scale-95"
                     title="১ টি কমান"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="w-8 text-center font-mono font-bold text-sm text-neutral-300">
+                  <span className="w-8 text-center font-mono font-bold text-sm text-neutral-200">
                     {prod.stock}
                   </span>
                   <button
                     onClick={() => handleStockAdjust(prod.id, 1)}
-                    className="p-1.5 bg-emerald-600/80 hover:bg-emerald-500 text-white rounded-lg transition-all"
+                    className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-md shadow-emerald-600/20 active:scale-95"
                     title="১ টি বাড়ান"
                   >
                     <Plus className="w-4 h-4" />
@@ -194,16 +207,16 @@ export default function ProductsPage() {
 
       {/* Add Product Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-neutral-800">
-              <h3 className="font-bold text-neutral-100 text-base flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-[#10131c] border border-neutral-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-800 bg-[#0d0f17]">
+              <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-emerald-400" />
                 নতুন প্রোডাক্ট যোগ করুন
               </h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-1.5 text-neutral-400 hover:text-neutral-200 rounded-lg"
+                className="p-2 text-neutral-400 hover:text-neutral-100 rounded-xl hover:bg-neutral-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -211,7 +224,7 @@ export default function ProductsPage() {
 
             <form onSubmit={handleAddProduct} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                   প্রোডাক্টের নাম *
                 </label>
                 <input
@@ -220,13 +233,13 @@ export default function ProductsPage() {
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="যেমন: প্রিমিয়াম লিলেন কুর্তি"
                   required
-                  className="w-full bg-neutral-800/80 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl px-4 py-2.5 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500 shadow-inner"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                     মূল্য (টাকা) *
                   </label>
                   <input
@@ -235,11 +248,11 @@ export default function ProductsPage() {
                     onChange={(e) => setNewPrice(e.target.value)}
                     placeholder="850"
                     required
-                    className="w-full bg-neutral-800/80 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-emerald-500 shadow-inner"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                     স্টক সংখ্যা *
                   </label>
                   <input
@@ -248,13 +261,13 @@ export default function ProductsPage() {
                     onChange={(e) => setNewStock(e.target.value)}
                     placeholder="25"
                     required
-                    className="w-full bg-neutral-800/80 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-emerald-500 shadow-inner"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                   সাইজ বা ভ্যারিয়েন্ট (কমা দিয়ে আলাদা করুন)
                 </label>
                 <input
@@ -262,7 +275,7 @@ export default function ProductsPage() {
                   value={newVariants}
                   onChange={(e) => setNewVariants(e.target.value)}
                   placeholder="Size: M (38), Size: L (40), Size: XL (42)"
-                  className="w-full bg-neutral-800/80 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl px-4 py-2.5 text-sm text-neutral-100 focus:outline-none focus:border-emerald-500 shadow-inner"
                 />
               </div>
 
@@ -270,13 +283,13 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-sm font-medium"
+                  className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 rounded-2xl text-sm font-semibold transition-colors"
                 >
                   বাতিল
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold shadow-md"
+                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-sm font-bold shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
                 >
                   প্রোডাক্ট সেভ করুন
                 </button>

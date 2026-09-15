@@ -11,5 +11,8 @@
     "build": "npm run build:api && npm run build:web",
     "prisma:generate": "npm --prefix apps/api run prisma generate",
     "prisma:push": "npx --prefix apps/api prisma db push"
+  },
+  "dependencies": {
+    "localtunnel": "^2.0.2"
   }
 }
