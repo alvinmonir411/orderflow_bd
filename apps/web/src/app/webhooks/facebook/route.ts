@@ -8,6 +8,9 @@ interface UserSession {
   customerName?: string;
   deliveryAddress?: string;
   partialPhone?: string;
+  turnCount?: number;
+  nonBusinessCount?: number;
+  lastMessageTime?: number;
 }
 
 // In-memory conversation state for quick back-to-back inputs
@@ -186,10 +189,14 @@ If the customer asks post-order questions (e.g. delivery time, when will it arri
     : `No previous order found. Selected Product: ${session.selectedProduct || 'None yet'}, Name: ${session.customerName || 'Unknown'}, Address: ${session.deliveryAddress || 'Unknown'}`
 }
 
-STRICT BEHAVIOR RULES:
-1. Speak in warm, natural, friendly Bengali (with tasteful emojis).
-2. Answer customer queries accurately about products, price, sizes, delivery time, return policy, and order tracking.
-3. If they are placing a NEW order:
+CONVERSATION PROGRESS:
+- Current interaction turn count: ${session.turnCount || 1}
+
+STRICT SALES & BUSINESS RULES:
+1. Speak in warm, natural Bengali (with tasteful emojis). Keep replies concise and sales-focused (2-3 sentences max).
+2. DO NOT engage in unnecessary casual chit-chat, personal talks, or philosophical debates. Always steer the conversation back to our products and shopping.
+3. If the customer asks repetitive product queries without deciding after multiple turns (turn >= 3), answer their question and explicitly invite them to call our helpline (📞 ${settings.helplinePhone || '01700000000'}) or drop their address to place the order.
+4. If they are placing a NEW order:
    - If phone number is incomplete (wrong number of digits), point out the specific mistake politely.
    - When all info (Name, 11-digit phone, Address, Product) is ready to confirm:
      Congratulate them and append:
@@ -272,14 +279,79 @@ async function processMessengerEvent(
   geminiKey?: string,
   settings?: any,
 ) {
-  const session = userSessions[senderId] || { state: 'IDLE' };
+  const session = userSessions[senderId] || { 
+    state: 'IDLE',
+    turnCount: 0,
+    nonBusinessCount: 0,
+    lastMessageTime: Date.now(),
+  };
+  session.turnCount = (session.turnCount || 0) + 1;
+  session.lastMessageTime = Date.now();
+  userSessions[senderId] = session;
+
   const rawText = text.trim();
   const lowerText = rawText.toLowerCase();
 
   // 1. Fetch recent order context for this customer from Neon DB
   const recentOrder = await findCustomerLatestOrder(senderId);
 
-  // 2. If Gemini AI Key is available, prioritize Google AI Studio
+  // 2. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
+  const isBusinessKeywords = 
+    lowerText.includes('order') ||
+    lowerText.includes('product') ||
+    lowerText.includes('dam') ||
+    lowerText.includes('price') ||
+    lowerText.includes('koto') ||
+    lowerText.includes('kurti') ||
+    lowerText.includes('piece') ||
+    lowerText.includes('gown') ||
+    lowerText.includes('size') ||
+    lowerText.includes('delivery') ||
+    lowerText.includes('delivary') ||
+    lowerText.includes('advance') ||
+    lowerText.includes('cod') ||
+    lowerText.includes('cash') ||
+    lowerText.includes('number') ||
+    lowerText.includes('phone') ||
+    lowerText.includes('thikana') ||
+    lowerText.includes('address') ||
+    lowerText.includes('dhaka') ||
+    lowerText.includes('কুর্তি') ||
+    lowerText.includes('থ্রি-পিস') ||
+    lowerText.includes('গাউন') ||
+    lowerText.includes('অর্ডার') ||
+    lowerText.includes('দাম') ||
+    lowerText.includes('প্রাইজ') ||
+    lowerText.includes('ডেলিভারি') ||
+    lowerText.includes('সাইজ') ||
+    lowerText.includes('ঠিকানা') ||
+    lowerText.includes('ফোন') ||
+    lowerText.includes('কবে') ||
+    lowerText.includes('টাকা');
+
+  if (!isBusinessKeywords && !recentOrder && rawText.length > 0) {
+    session.nonBusinessCount = (session.nonBusinessCount || 0) + 1;
+  } else {
+    session.nonBusinessCount = 0;
+  }
+
+  // If customer is making off-topic small talk repeatedly (> 2 turns), send helpline number directly to save API quota
+  if (session.nonBusinessCount >= 2 && !payload) {
+    const helpline = settings?.helplinePhone || '01700000000';
+    await sendFbQuickReplies(
+      senderId,
+      `আসসালামু আলাইকুম! 🌸 আমি OrderFlow BD-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
+  // 3. If Gemini AI Key is available, prioritize Google AI Studio
   if (geminiKey && rawText && !payload) {
     const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey, recentOrder, settings);
     if (replyText) {
