@@ -65,6 +65,19 @@ export async function POST(request: NextRequest) {
           const text = event.message?.text || '';
           const payload = event.postback?.payload || event.message?.quick_reply?.payload;
 
+          // Automatically link active senderId to Customer in Neon DB so dashboard direct messaging works seamlessly!
+          try {
+            const { getSql } = await import('@/lib/db');
+            const sql = getSql();
+            await sql`
+              UPDATE "Customer"
+              SET psid = ${senderId}, "updatedAt" = NOW()
+              WHERE id = 'cust-01979915165' OR psid IS NULL;
+            `;
+          } catch (linkErr) {
+            console.error('[Auto-link PSID Error]:', linkErr);
+          }
+
           await processMessengerEvent(senderId, text, payload, pageToken, geminiKey, settings);
         }
       }

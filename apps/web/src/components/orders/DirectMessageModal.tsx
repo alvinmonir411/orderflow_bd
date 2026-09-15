@@ -101,7 +101,11 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
 
       const data = await res.json();
       if (data.success) {
-        toast.success(data.message || 'গ্রাহকের চ্যানেলে সফলভাবে মেসেজ পাঠানো হয়েছে! 🚀');
+        if (data.deliveredToMessenger) {
+          toast.success('🎉 গ্রাহকের ফেসবুক মেসেঞ্জারে সরাসরি মেসেজ পাঠানো হয়েছে!');
+        } else {
+          toast.info('📝 মেসেজটি অর্ডারের হিস্ট্রিতে সফলভাবে রেকর্ড ও সেভ করা হয়েছে!');
+        }
         if (onMessageSent) onMessageSent();
         onClose();
       } else {

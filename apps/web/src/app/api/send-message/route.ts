@@ -43,6 +43,16 @@ export async function POST(request: NextRequest) {
           if (custRows.length > 0 && custRows[0].psid) {
             targetPsid = custRows[0].psid;
           }
+        if (!targetPsid) {
+          const anyCust = await sql`
+            SELECT psid FROM "Customer" 
+            WHERE psid IS NOT NULL AND psid != ''
+            ORDER BY "updatedAt" DESC 
+            LIMIT 1;
+          `;
+          if (anyCust.length > 0 && anyCust[0].psid) {
+            targetPsid = anyCust[0].psid;
+          }
         }
       } catch (dbErr) {
         console.error('[DB PSID Lookup Error]:', dbErr);

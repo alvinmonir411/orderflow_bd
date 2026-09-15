@@ -351,6 +351,7 @@ export async function getDbOrders() {
         o."createdAt",
         c.name as "c_name",
         c.phone as "c_phone",
+        c.psid as "c_psid",
         c."totalOrders" as "c_totalOrders",
         c."deliveryRate" as "c_deliveryRate"
       FROM "Order" o
@@ -408,6 +409,7 @@ export async function getDbOrders() {
       deliveryCity: o.deliveryCity,
       customerPhone: o.customerPhone,
       customerName: o.customerName,
+      psid: o.c_psid || null,
       courierProvider: o.courierProvider,
       courierTrackingId: o.courierTrackingId,
       consignmentId: o.consignmentId,
