@@ -1,48 +1,48 @@
 <div align="center">
 
-# ⚡ OrderFlow BD
-### Intelligent F-Commerce Order Automation & AI Sales Platform
+# ⚡ OrderFlow BD 2.0
+### Smart Bangladeshi F-Commerce & Social Commerce Automation Platform
+**Facebook Messenger & WhatsApp AI Sales Agent • Live Neon PostgreSQL Sync • Direct Customer Messaging • Courier Logistics**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.3.5-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/Neon_PostgreSQL-Serverless-00E599?style=for-the-badge&logo=postgresql)](https://neon.tech/)
-[![Google Gemini](https://img.shields.io/badge/Google_Gemini-1.5_Flash-8E75B2?style=for-the-badge&logo=google)](https://ai.google.dev/)
+[![Google Gemini](https://img.shields.io/badge/Google_Gemini-3.6_Flash-8E75B2?style=for-the-badge&logo=google)](https://ai.google.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-Modern_Dark-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 [![Meta Webhook](https://img.shields.io/badge/Meta-Messenger_&_WhatsApp-0084FF?style=for-the-badge&logo=messenger)](https://developers.facebook.com/)
+[![Vercel Live](https://img.shields.io/badge/Deployment-Vercel_Production-000000?style=for-the-badge&logo=vercel)](https://orderflowbd.vercel.app)
 
 <p align="center">
-  <b>OrderFlow BD</b> is an enterprise-grade, high-performance order automation and conversational AI sales platform engineered specifically for Bangladeshi social commerce (F-Commerce & WhatsApp businesses). It bridges customer chat interactions directly into an automated ERP with live database synchronization, intelligent NLP validation, courier dispatching, and custom AI training.
+  <b>OrderFlow BD</b> is an enterprise-grade social commerce ERP and conversational AI sales platform engineered specifically for Bangladeshi businesses. It turns Facebook Messenger and WhatsApp conversations into automated orders with live database synchronization, anti-chit-chat quota protection, direct dashboard-to-customer messaging, and 1-click courier dispatching.
 </p>
 
-[🌐 Live Production Website](https://orderflowbd.vercel.app) • [📖 Documentation](#-system-architecture) • [🚀 Quick Start](#-quick-start-guide)
+[🌐 Live Production Website](https://orderflowbd.vercel.app) • [📖 Features](#-key-features) • [🚀 Local Setup Guide](#-local-setup-guide) • [⚙️ Environment Variables](#-environment-variables-env)
 
 </div>
 
 ---
 
-## 🌟 Key Capabilities & Features
+## 🌟 Key Features
 
-### 1. 🤖 Context-Aware Conversational AI (Google Gemini 1.5 Flash)
-- **Natural Bangla & Banglish Understanding**: Automatically understands mixed Bangla/English customer messages (e.g. *"koydin lagbe delivery"*, *"charge koto"*, *"dam koto"*).
-- **Post-Order Memory & Customer Context**: Intelligently identifies returning customers who already placed an order and answers order status/delivery timeline questions with their specific active order number (#OF-XXXX).
-- **Intelligent Phone & Address Extractor**: Extracts and validates 11-digit Bangladeshi mobile numbers (013-019), alerting the customer with polite guidance if digits are missing (e.g. 9 or 10 digits).
+### 1. 🤖 Google Gemini AI Conversational Sales Agent
+- **Natural Bengali & Banglish Understanding**: Autonomously answers queries regarding product details, sizing, pricing, delivery charges (Dhaka ৳120 / Outside ৳150), and store policies in natural, warm Bengali.
+- **Anti-Chit-Chat Quota Protection**: Intelligently deflects random small talk and non-business queries after 2 messages by politely redirecting customers to the store helpline (`01700000000`) without consuming expensive AI API tokens.
+- **Auto Order Extraction**: Automatically parses 11-digit Bangladeshi phone numbers (013-019), delivery addresses, and chosen variants, creating confirmed orders directly in the database.
+- **Smart Model Fallback**: Prioritizes `gemini-3.6-flash` and `gemini-3.5-flash` with graceful failover.
 
-### 2. 📊 Real-Time Order Management & Full-Width ERP
-- **Edge-to-Edge Responsive UI**: Custom dark glassmorphism design optimized for wide screens, laptops, tablets, and smartphones.
-- **Permanent Neon PostgreSQL Sync**: Orders created via Messenger, WhatsApp, or Manual Entry are persisted in PostgreSQL with zero delay.
-- **Bulk Action & Confirmation**: Select multiple orders and confirm them in a single click.
-- **One-Click Invoice Generator**: Print professional customer invoices and packing slips.
-- **Excel/CSV Export**: Export filtered orders with UTF-8 BOM encoding for proper Bengali text rendering in Excel & Google Sheets.
+### 2. 💬 Direct Messenger & WhatsApp Customer Messaging
+- **Send Custom Messages from Dashboard**: Send real-time messages to any customer directly from the OrderFlow BD table without opening Facebook.
+- **1-Click Quick Templates**: Send instant order confirmation, tracking updates, and follow-up templates with a single click.
+- **Meta Business Suite Jump Link**: Direct 1-click button to open the exact conversation thread in Meta Business Suite Inbox (`https://business.facebook.com/latest/inbox/messenger...`).
+- **Live Transcript & Profile Viewer**: View real customer Facebook profile pictures, display names, and live message history.
 
-### 3. 🧠 Merchant AI Knowledge Base & Custom Training Panel
-- **No-Code FAQ Manager**: Add, edit, or delete custom store Q&A topics directly from the dashboard.
-- **Policy Customizer**: Set inside/outside Dhaka delivery timelines, delivery fees (৳120 / ৳150), helpline phone numbers, and return/exchange policies.
-- **Interactive Live Simulator**: Test and preview bot responses in real-time within the dashboard before deploying changes.
+### 3. 📦 Product & Live Inventory Management
+- **Catalog Management**: Add, update, and monitor product stock and size variants (`Size: M, L, XL`).
+- **Real-Time AI Knowledge**: Gemini AI automatically accesses the latest product prices and stock availability when chatting with buyers.
 
 ### 4. 🚚 Courier & Logistics Automation
-- **Plug-and-Play Integrations**: Steadfast Courier and Pathao Courier APIs.
-- **Instant Tracking Code Generation**: Generates consignment IDs and tracking URLs on booking.
-- **Automated SMS & Messenger Notification**: Sends tracking codes to customers automatically upon dispatch.
+- **Steadfast & Pathao Courier**: 1-click parcel entry and tracking code generation.
+- **Automated SMS Notifications**: Send tracking SMS to customers upon order dispatch.
 
 ---
 
@@ -50,120 +50,99 @@
 
 ```mermaid
 graph TD
-    A[Customer on Facebook Messenger / WhatsApp] -->|Webhook Event| B[Next.js Serverless Edge / Webhooks]
-    B -->|Fetch Context & FAQ Knowledge| C[(Neon Serverless PostgreSQL)]
-    B -->|Natural Language Reasoning| D[Google Gemini 1.5 Flash AI]
-    B -->|Auto-Create Verified Order| C
-    E[Merchant Dashboard / Web App] -->|Real-time Poll & Live Sync| C
-    E -->|1-Click Courier Dispatch| F[Steadfast / Pathao Logistics API]
-    E -->|Manage FAQs & System Prompt| C
+    A[Customer on Messenger / WhatsApp] -->|Webhook Event| B[Next.js Serverless API Route]
+    B -->|Fetch Catalog, Policy & Session| C[(Neon PostgreSQL Serverless)]
+    B -->|Contextual Reasoning & NLP| D[Google Gemini 3.6 Flash AI]
+    B -->|Auto-Create Order| C
+    E[Merchant Dashboard] -->|Real-Time Sync| C
+    E -->|Direct Message API| F[Meta Graph API v20.0]
+    E -->|1-Click Courier Dispatch| G[Steadfast / Pathao API]
 ```
 
 ---
 
-## 📂 Repository Structure
+## 🚀 Local Setup Guide
 
-```
-OrderFlow BD/
-├── apps/
-│   ├── web/                     # Next.js 16 (App Router) Frontend & Webhook API
-│   │   ├── src/
-│   │   │   ├── app/
-│   │   │   │   ├── page.tsx               # Main Dashboard with live metrics
-│   │   │   │   ├── orders/page.tsx        # Real-time full-width Order Management
-│   │   │   │   ├── bot-settings/page.tsx  # AI Training & Knowledge Base Manager
-│   │   │   │   ├── api/orders/route.ts    # Serverless Orders CRUD API
-│   │   │   │   ├── api/bot-config/route.ts# Serverless Bot Config & FAQ API
-│   │   │   │   └── webhooks/facebook/     # Meta Messenger Webhook Handler
-│   │   │   ├── components/                # Reusable UI & Modal components
-│   │   │   └── lib/                       # Database, Types, and Helper utilities
-│   │   └── package.json
-│   │
-│   └── api/                     # NestJS Backend & Prisma ORM Service
-│       ├── prisma/
-│       │   └── schema.prisma    # PostgreSQL Schema (Store, Customer, Order, etc.)
-│       └── src/                 # Modular NestJS controllers and services
-│
-├── vercel.json                  # Monorepo Vercel Deployment Configuration
-├── package.json                 # Root monorepo workspace scripts
-└── README.md                    # Project Documentation
-```
+Follow these steps to set up and run OrderFlow BD on your local computer or laptop:
 
----
-
-## 🚀 Quick Start Guide
-
-### Prerequisites
-- **Node.js**: v18.0 or higher
-- **npm** or **pnpm**
-- **Neon PostgreSQL Database** (or any PostgreSQL instance)
-
-### 1. Clone & Install Dependencies
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/alvinmonir411/orderflow_bd.git
 cd orderflow_bd
 npm install
-npm --prefix apps/web install
-npm --prefix apps/api install
 ```
 
 ### 2. Configure Environment Variables
-Create `.env` in `apps/web/` and `apps/api/`:
+Create a file named `.env` in `apps/web/`:
 
+**File Path: `apps/web/.env`**
 ```env
-# Neon PostgreSQL Connection String
-DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@ep-sample.us-east-2.aws.neon.tech/neondb?sslmode=require"
+# Neon PostgreSQL Database Connection
+DATABASE_URL="postgresql://neondb_owner:npg_fVreJN50Kauw@ep-billowing-shadow-a5svvtgn-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
-# Meta Facebook Messenger Setup
-DEFAULT_FACEBOOK_PAGE_ID="1314475555081210"
-DEFAULT_FACEBOOK_PAGE_TOKEN="YOUR_FACEBOOK_PAGE_ACCESS_TOKEN"
+# Meta Webhook Verification Token
 DEFAULT_FACEBOOK_VERIFY_TOKEN="orderflow_bd_verify_token"
 
-# Google AI Studio (Gemini)
-GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+# Live App URL
+NEXT_PUBLIC_APP_URL="https://orderflowbd.vercel.app"
 ```
 
-### 3. Push Database Schema
+### 3. Run the Development Server
 ```bash
-npx --prefix apps/api prisma db push
+npm run dev
 ```
 
-### 4. Run Locally
-```bash
-# Run Next.js Web Dashboard
-npm run dev:web
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-# Run NestJS Backend (Optional)
-npm run dev:api
+---
+
+## ⚙️ Meta (Facebook & WhatsApp) Webhook Configuration
+
+### Facebook Messenger:
+1. Go to [Meta for Developers](https://developers.facebook.com/) ➡️ Your App ➡️ **Messenger > Webhooks**.
+2. **Callback URL**: `https://orderflowbd.vercel.app/webhooks/facebook`
+3. **Verify Token**: `orderflow_bd_verify_token`
+4. Subscribe to `messages` and `messaging_postbacks`.
+
+### WhatsApp Cloud API:
+1. Go to [Meta for Developers](https://developers.facebook.com/) ➡️ Your WhatsApp Business App ➡️ **WhatsApp > Configuration**.
+2. **Callback URL**: `https://orderflowbd.vercel.app/webhooks/whatsapp`
+3. **Verify Token**: `orderflow_bd_verify_token`
+4. Subscribe to `messages`.
+
+---
+
+## 📂 Project Structure
+
 ```
-- Open [http://localhost:3000](http://localhost:3000) to view the live dashboard.
+OrderFlow BD/
+├── apps/
+│   ├── web/                         # Next.js 16 (App Router) Frontend & Webhook API
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── page.tsx                 # Main Analytics & Orders Dashboard
+│   │   │   │   ├── orders/page.tsx          # Real-Time Order Management Table
+│   │   │   │   ├── products/page.tsx        # Product & Stock Management
+│   │   │   │   ├── bot-settings/page.tsx    # Gemini AI Training & API Settings
+│   │   │   │   ├── integrations/page.tsx    # Courier (Steadfast/Pathao) & SMS
+│   │   │   │   ├── api/send-message/        # Meta Graph API Direct Messaging
+│   │   │   │   ├── api/conversation/        # Live Messenger Transcript & Profile
+│   │   │   │   ├── webhooks/facebook/       # Messenger Webhook & Gemini Bot Engine
+│   │   │   │   └── webhooks/whatsapp/       # WhatsApp Cloud API Webhook
+│   │   │   ├── components/orders/           # DirectMessageModal, Invoice, etc.
+│   │   │   └── lib/                         # Neon DB Client, Types & Utilities
+│   │   └── .env.example
+│   └── api/                         # NestJS Backend API & Prisma Schema
+├── vercel.json                      # Vercel Deployment Configuration
+├── package.json                     # Root Workspace Scripts
+└── README.md                        # Documentation
+```
 
 ---
 
-## ⚙️ Meta (Facebook Messenger) Webhook Setup
-
-1. Go to the [Meta for Developers Portal](https://developers.facebook.com/).
-2. Select your App and navigate to **Messenger > Webhooks**.
-3. Enter the webhook details:
-   - **Callback URL**: `https://your-domain.vercel.app/webhooks/facebook`
-   - **Verify Token**: `orderflow_bd_verify_token`
-4. Subscribe to the following webhook fields:
-   - `messages`
-   - `messaging_postbacks`
-5. Copy your **Page Access Token** and save it in the [Bot Settings](https://orderflowbd.vercel.app/bot-settings) page on your dashboard.
-
----
-
-## 🛡️ Security & Reliability
-- **Encrypted Environment Configuration**: All API keys and Database tokens are secured in serverless runtime environments.
-- **UTF-8 Multi-Language Support**: Native support for Bengali (বাংলা) font encoding in both UI, database, CSV export, and PDF invoice printing.
-- **Fail-Safe Fallback**: Automatic rule-based response fallback if AI external API rate limits or latency thresholds are encountered.
-
----
-
-## 📄 License
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+## 🛡️ License
+This project is licensed under the MIT License.
 
 <div align="center">
-  <sub>Developed with ❤️ for Bangladeshi F-Commerce Merchants.</sub>
+  <sub>Crafted with ❤️ for Bangladeshi E-Commerce & F-Commerce Merchants.</sub>
 </div>
