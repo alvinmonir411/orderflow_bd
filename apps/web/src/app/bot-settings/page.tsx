@@ -21,14 +21,26 @@ export default function BotSettingsPage() {
   const [copiedToken, setCopiedToken] = useState(false);
 
   // Form State
-  const [fbPageId, setFbPageId] = useState('109283746501928');
-  const [fbPageToken, setFbPageToken] = useState('EAABwzLp...EAAGM9201948');
+  const [fbPageId, setFbPageId] = useState('1314475555081210');
+  const [fbPageToken, setFbPageToken] = useState('');
   const [verifyToken, setVerifyToken] = useState('orderflow_bd_verify_token');
 
   const [waPhoneId, setWaPhoneId] = useState('105948271630491');
-  const [waToken, setWaToken] = useState('EAAOxk...WA991823');
+  const [waToken, setWaToken] = useState('');
 
-  const webhookUrl = 'https://api.yourdomain.com/webhooks/facebook';
+  const webhookUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/webhooks/facebook`
+    : 'https://web-six-omega-jwewpf4gd5.vercel.app/webhooks/facebook';
+
+  React.useEffect(() => {
+    fetch('/api/bot-config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.fbPageId) setFbPageId(data.fbPageId);
+        if (data.fbPageToken) setFbPageToken(data.fbPageToken);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleCopy = (text: string, type: 'webhook' | 'token') => {
     navigator.clipboard.writeText(text);
@@ -42,9 +54,18 @@ export default function BotSettingsPage() {
     toast.success('ক্লিপবোর্ডে কপি করা হয়েছে!');
   };
 
-  const handleSaveFacebook = (e: React.FormEvent) => {
+  const handleSaveFacebook = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Facebook Messenger কনফিগারেশন সফলভাবে সেভ হয়েছে!');
+    try {
+      await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fbPageId, fbPageToken }),
+      });
+      toast.success('Facebook Messenger কনফিগারেশন সফলভাবে সেভ হয়েছে!');
+    } catch {
+      toast.error('সেভ করতে সমস্যা হয়েছে');
+    }
   };
 
   const handleSaveWhatsApp = (e: React.FormEvent) => {
