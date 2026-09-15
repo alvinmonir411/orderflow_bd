@@ -195,32 +195,47 @@ STRICT BEHAVIOR RULES:
      Congratulate them and append:
      JSON_START{"orderConfirmed":true,"product":"...","price":850,"customerName":"...","phone":"...","address":"..."}JSON_END`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `${systemPrompt}\n\nCustomer message: "${userText}"` }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 600,
-        },
-      }),
-    });
+    // Try modern models in priority order
+    const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+    let rawReply = '';
+    let lastError: any = null;
 
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      console.error('[Gemini API Call Failed]:', data.error || data);
-      return { replyText: '' };
+    for (const modelName of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey.trim()}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `${systemPrompt}\n\nCustomer message: "${userText}"` }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 600,
+            },
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          rawReply = data.candidates[0].content.parts[0].text;
+          break; // Successful generation
+        } else {
+          lastError = data.error || data;
+        }
+      } catch (mErr) {
+        lastError = mErr;
+      }
     }
 
-    const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if (!rawReply) return { replyText: '' };
+    if (!rawReply) {
+      console.error('[Gemini API All Models Failed]:', lastError);
+      return { replyText: '' };
+    }
 
     let orderData = null;
     let cleanReply = rawReply;
