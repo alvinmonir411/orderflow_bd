@@ -46,6 +46,12 @@ export async function POST(request: NextRequest) {
         process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
         HARDCODED_TOKEN;
 
+      const geminiKey =
+        (global as any).__BOT_CONFIG__?.geminiApiKey ||
+        process.env.GEMINI_API_KEY ||
+        process.env.GOOGLE_AI_API_KEY ||
+        '';
+
       for (const entry of body.entry || []) {
         for (const event of entry.messaging || []) {
           const senderId = event.sender?.id;
@@ -54,7 +60,7 @@ export async function POST(request: NextRequest) {
           const text = event.message?.text || '';
           const payload = event.postback?.payload || event.message?.quick_reply?.payload;
 
-          await processMessengerEvent(senderId, text, payload, pageToken);
+          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey);
         }
       }
 
@@ -83,7 +89,7 @@ function toEnglishDigits(str: string): string {
 // Intelligent Bangladeshi Phone Extractor
 function extractBangladeshiPhone(rawText: string): { phone?: string; partialPhone?: string } {
   const normalized = toEnglishDigits(rawText);
-  
+
   // 1. Perfect 11 digit Bangladeshi number (013 - 019) or with +88/88 prefix
   const exactMatch = normalized.match(/(?:\+?88)?(01[3-9]\d{8})\b/);
   if (exactMatch) {
@@ -125,14 +131,12 @@ function extractNameAndAddress(text: string, phone?: string): { name: string; ad
 
   for (const line of lines) {
     const cleanLine = toEnglishDigits(line);
-    // If line is just the phone number, skip
     if (phone && cleanLine.includes(phone)) {
       const remaining = line.replace(phone, '').trim();
       if (remaining.length > 0) addressParts.push(remaining);
       continue;
     }
 
-    // Check if line looks like a person's name (1-3 words, no area/house keywords)
     const lower = line.toLowerCase();
     const isAreaWord = ['mirpur', 'uttara', 'dhanmondi', 'gulshan', 'banani', 'dhaka', 'chittagong', 'sylhet', 'road', 'house', 'sector', 'block', 'মিরপুর', 'উত্তরা', 'ঢাকা', 'রোড', 'বাসা', 'গ্রাম', 'থানা', 'জেলা'].some(w => lower.includes(w));
 
@@ -150,15 +154,149 @@ function extractNameAndAddress(text: string, phone?: string): { name: string; ad
   return { name, address };
 }
 
+// Google AI Studio (Gemini) Call
+async function callGeminiAI(
+  userText: string,
+  session: UserSession,
+  apiKey: string,
+): Promise<{ replyText: string; orderData?: any }> {
+  try {
+    const systemPrompt = `You are an ultra-intelligent, friendly Bangladeshi F-Commerce AI sales assistant for "OrderFlow BD".
+
+STORE PRODUCTS:
+1. প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০ (সাইজ: M, L, XL, লিলেন সুতি)
+2. জয়পুরি কটন আনস্টিচড থ্রি-পিস - ৳১২৫০ (১০০% পিওর কটন)
+3. ডিজাইনার পার্টি গাউন - ৳১৫০০ (গর্জিয়াস পার্টি গাউন)
+
+DELIVERY POLICY:
+- ডেলিভারি চার্জ: ঢাকা সিটিতে ৳১২০, ঢাকার বাইরে ৳১৫০।
+- ক্যাশ অন ডেলিভারি (পণ্য পেয়ে টাকা)। ডেলিভারি সময় ২-৩ দিন।
+
+CONVERSATION CONTEXT:
+- Currently Selected Product: ${session.selectedProduct || 'None yet'}
+- Customer Name: ${session.customerName || 'Unknown'}
+- Address: ${session.deliveryAddress || 'Unknown'}
+
+STRICT VALIDATION RULES:
+1. Respond in natural, polite, engaging Bengali (with emojis).
+2. If the customer asks questions about products, price, fabric, discounts, or delivery, answer accurately and politely.
+3. If the customer gives incomplete or mistaken input:
+   - If phone number has wrong number of digits (e.g. 9 or 10 digits like 019389098), specifically point out the mistake:
+     "মনির ভাই, আপনার ঠিকানা নোট করেছি। তবে আপনার মোবাইল নম্বরে ৯টি ডিজিট পাওয়া গেছে (019389098)। বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়। দয়া করে আপনার ১১ ডিজিটের সঠিক নম্বরটি দিন।"
+   - If address is missing, politely ask for their specific area/thana/district.
+4. When all info (Name, 11-digit phone, Address, and Product) is completely provided and ready to confirm:
+   Output your congratulatory confirmation message AND at the very bottom include:
+   JSON_START{"orderConfirmed":true,"product":"...","price":1500,"customerName":"...","phone":"...","address":"..."}JSON_END`;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemPrompt}\n\nCustomer message: "${userText}"` }],
+            },
+          ],
+        }),
+      },
+    );
+
+    const data = await res.json();
+    const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    let orderData = null;
+    let cleanReply = rawReply;
+    if (rawReply.includes('JSON_START') && rawReply.includes('JSON_END')) {
+      const jsonStr = rawReply.substring(
+        rawReply.indexOf('JSON_START') + 10,
+        rawReply.indexOf('JSON_END'),
+      );
+      try {
+        orderData = JSON.parse(jsonStr.trim());
+        cleanReply = rawReply.substring(0, rawReply.indexOf('JSON_START')).trim();
+      } catch (e) {}
+    }
+
+    return { replyText: cleanReply, orderData };
+  } catch (err) {
+    console.error('Gemini API Error:', err);
+    return { replyText: '' };
+  }
+}
+
 async function processMessengerEvent(
   senderId: string,
   text: string,
   payload?: string,
   pageToken?: string,
+  geminiKey?: string,
 ) {
   const session = userSessions[senderId] || { state: 'IDLE' };
   const rawText = text.trim();
   const lowerText = rawText.toLowerCase();
+
+  // If Gemini API Key is available, prioritize Google AI Studio
+  if (geminiKey && rawText && !payload) {
+    const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey);
+    if (replyText) {
+      if (orderData && orderData.orderConfirmed) {
+        const orderNum = Math.floor(1000 + Math.random() * 9000);
+        const itemPrice = orderData.price || 1500;
+        const deliveryCharge = 120;
+        const totalPrice = itemPrice + deliveryCharge;
+        const finalName = orderData.customerName || session.customerName || 'সম্মানিত কাস্টমার';
+        const finalPhone = orderData.phone || '01700000000';
+        const finalAddress = orderData.address || session.deliveryAddress || 'ঢাকা';
+        const prodTitle = orderData.product || session.selectedProduct || 'ডিজাইনার পার্টি গাউন';
+
+        const newOrder = {
+          id: `ord-fb-${Date.now()}`,
+          orderNumber: orderNum,
+          storeId: 'store-1',
+          customerId: `cust-fb-${senderId}`,
+          channel: 'FACEBOOK_MESSENGER',
+          status: 'PENDING_CONFIRMATION',
+          itemsPrice: itemPrice,
+          deliveryCharge: deliveryCharge,
+          totalPrice: totalPrice,
+          deliveryAddress: finalAddress,
+          deliveryCity: 'ঢাকা',
+          customerPhone: finalPhone,
+          customerName: finalName,
+          createdAt: new Date().toISOString(),
+          items: [
+            {
+              id: `oi-fb-${Date.now()}`,
+              orderId: `ord-fb-${Date.now()}`,
+              productId: 'prod-3',
+              product: { title: prodTitle, basePrice: itemPrice },
+              variant: { name: 'Standard Size' },
+              quantity: 1,
+              unitPrice: itemPrice,
+            },
+          ],
+          customer: {
+            name: finalName,
+            phone: finalPhone,
+            totalOrders: 1,
+            deliveryRate: 100,
+          },
+        };
+
+        (global as any).__LIVE_ORDERS__ = (global as any).__LIVE_ORDERS__ || [];
+        (global as any).__LIVE_ORDERS__.unshift(newOrder);
+
+        session.state = 'IDLE';
+        userSessions[senderId] = session;
+      }
+
+      await sendFbMessage(senderId, replyText, pageToken);
+      return;
+    }
+  }
 
   // 1. Explicit Payload Button Click
   if (payload) {
@@ -178,14 +316,14 @@ async function processMessengerEvent(
 
       await sendFbMessage(
         senderId,
-        `আপনি '${prodName} (৳${price})' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার:\n১. পুরো নাম\n২. মোবাইল নম্বর\n৩. সম্পূর্ণ ডেলিভারি ঠিকানা\nলিখে মেসেজ পাঠান (যেমন: তানিয়া আক্তার, 01712345678, মিরপুর-১০, ঢাকা)।`,
+        `আপনি '${prodName} (৳${price})' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার:\n১. পুরো নাম\n২. মোবাইল নম্বর (১১ ডিজিট)\n৩. সম্পূর্ণ ডেলিভারি ঠিকানা\nলিখে মেসেজ পাঠান (যেমন: মনির, 01938909812, মিরপুর ১৬, ঢাকা)।`,
         pageToken,
       );
       return;
     }
   }
 
-  // 2. Natural Language Product Mention (e.g. "গাউন নিব", "পার্টি গাউন", "kurti", "3 piece")
+  // 2. Natural Language Product Mention
   if (session.state === 'IDLE' || !session.selectedProduct) {
     if (lowerText.includes('গাউন') || lowerText.includes('gown') || lowerText.includes('party')) {
       session.state = 'AWAITING_ADDRESS';
@@ -207,7 +345,7 @@ async function processMessengerEvent(
 
       await sendFbMessage(
         senderId,
-        `আপনি 'প্রিমিয়াম কাশ্মীরি কুর্তি (৳৮৫০)' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, মোবাইল নম্বর ও সম্পূর্ণ ডেলিভারি ঠিকানা পাঠান।`,
+        `আপনি 'প্রিমিয়াম কাশ্মীরি কুর্তি (৳৮৫০)' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা পাঠান।`,
         pageToken,
       );
       return;
@@ -219,21 +357,21 @@ async function processMessengerEvent(
 
       await sendFbMessage(
         senderId,
-        `আপনি 'জয়পুরি কটন আনস্টিচড থ্রি-পিস (৳১২৫০)' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, মোবাইল নম্বর ও সম্পূর্ণ ডেলিভারি ঠিকানা পাঠান।`,
+        `আপনি 'জয়পুরি কটন আনস্টিচড থ্রি-পিস (৳১২৫০)' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা পাঠান।`,
         pageToken,
       );
       return;
     }
   }
 
-  // 3. Check for phone & address extraction (Handles "monir 019389098 mirpur 16" or valid phone)
+  // 3. Check for phone & address extraction
   const { phone, partialPhone } = extractBangladeshiPhone(rawText);
 
   // If phone is valid (11 digits)
   if (phone) {
     const { name, address } = extractNameAndAddress(rawText, phone);
     const finalName = (name && name !== 'সম্মানিত কাস্টমার') ? name : (session.customerName || 'সম্মানিত কাস্টমার');
-    const finalAddress = address.length > 5 ? address : (session.deliveryAddress || 'ঢাকা');
+    const finalAddress = address.length > 3 ? address : (session.deliveryAddress || 'ঢাকা');
     const prodTitle = session.selectedProduct || 'ডিজাইনার পার্টি গাউন';
     const itemPrice = session.price || 1500;
     const deliveryCharge = 120;

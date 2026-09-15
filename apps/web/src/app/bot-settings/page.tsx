@@ -22,7 +22,8 @@ export default function BotSettingsPage() {
 
   // Form State
   const [fbPageId, setFbPageId] = useState('1314475555081210');
-  const [fbPageToken, setFbPageToken] = useState('');
+  const [fbPageToken, setFbPageToken] = useState('EAAiyNmqJWZCkBSUrjkc4ZCraUnG8t9cXtWDgxkNZCnwd1fmP9LhKDWTr8ApzwweRZA2WHzCFHZBGZCBPmECI15GLqUZAjVyxcnErVjcszH07mdbYU6lA2l2ibDdLKZCLhZADDCXbhQeaP5Bac9xUp7BrR9WnYqMw9hgfl9k7dlxSdaPAcDFTxkqkrSV3X1ZAseJOsFbixCJu4VEgZDZD');
+  const [geminiApiKey, setGeminiApiKey] = useState('');
   const [verifyToken, setVerifyToken] = useState('orderflow_bd_verify_token');
 
   const [waPhoneId, setWaPhoneId] = useState('105948271630491');
@@ -38,6 +39,7 @@ export default function BotSettingsPage() {
       .then((data) => {
         if (data.fbPageId) setFbPageId(data.fbPageId);
         if (data.fbPageToken) setFbPageToken(data.fbPageToken);
+        if (data.geminiApiKey) setGeminiApiKey(data.geminiApiKey);
       })
       .catch(() => {});
   }, []);
@@ -60,9 +62,23 @@ export default function BotSettingsPage() {
       await fetch('/api/bot-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fbPageId, fbPageToken }),
+        body: JSON.stringify({ fbPageId, fbPageToken, geminiApiKey }),
       });
       toast.success('Facebook Messenger কনফিগারেশন সফলভাবে সেভ হয়েছে!');
+    } catch {
+      toast.error('সেভ করতে সমস্যা হয়েছে');
+    }
+  };
+
+  const handleSaveGemini = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fbPageId, fbPageToken, geminiApiKey }),
+      });
+      toast.success('Google Gemini AI Studio API Key সফলভাবে সেভ হয়েছে! বট এখন ফুল AI মোডে চলবে।');
     } catch {
       toast.error('সেভ করতে সমস্যা হয়েছে');
     }
@@ -197,6 +213,65 @@ export default function BotSettingsPage() {
                 >
                   <Save className="w-4 h-4" />
                   Facebook সেটিংস সেভ করুন
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Google AI Studio (Gemini) Intelligence Card */}
+          <div className="bg-gradient-to-br from-neutral-900 via-neutral-900 to-indigo-950/40 border border-indigo-500/30 rounded-2xl p-6 space-y-4 shadow-xl relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-md">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-neutral-100 text-base flex items-center gap-2">
+                    Google AI Studio (Gemini 2.0 / 1.5 Flash)
+                  </h3>
+                  <p className="text-[11px] text-indigo-300/80">সুপার-ইন্টেলিজেন্ট এআই সেলস অ্যাসিস্ট্যান্ট</p>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 rounded-full">
+                {geminiApiKey ? 'AI মোড সক্রিয়' : 'ফ্রি ইন্টিগ্রেশন'}
+              </span>
+            </div>
+
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              Google AI Studio থেকে একটি ফ্রি API Key এনে বসালে বট সম্পূর্ণ মানুষের মতো গ্রাহকের সাথে খাঁটি বাংলায় কথা বলবে, যেকোনো প্রশ্নের উত্তর দেবে এবং ভুল ইনপুট দিলে নিজেই সংশোধন করে চেয়ে নেবে!
+            </p>
+
+            <form onSubmit={handleSaveGemini} className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-neutral-300">
+                    Gemini API Key (Google AI Studio)
+                  </label>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 underline flex items-center gap-1"
+                  >
+                    ফ্রি API Key তৈরি করুন <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <input
+                  type="password"
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Gemini AI সেভ ও চালু করুন
                 </button>
               </div>
             </form>

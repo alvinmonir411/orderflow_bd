@@ -16,6 +16,7 @@ export async function GET() {
   return NextResponse.json({
     fbPageId: process.env.DEFAULT_FACEBOOK_PAGE_ID || '',
     fbPageToken: process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '',
+    geminiApiKey: process.env.GEMINI_API_KEY || (global as any).__BOT_CONFIG__?.geminiApiKey || '',
   });
 }
 
