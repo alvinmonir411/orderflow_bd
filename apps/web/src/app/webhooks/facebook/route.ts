@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBotConfig } from '@/app/api/bot-config/route';
 
 interface UserSession {
   state: 'IDLE' | 'AWAITING_ADDRESS' | 'AWAITING_PHONE';
@@ -39,7 +40,9 @@ export async function POST(request: NextRequest) {
     console.log('[Facebook Webhook Event Received]:', JSON.stringify(body));
 
     if (body.object === 'page') {
+      const config = getBotConfig();
       const pageToken =
+        config.fbPageToken ||
         (global as any).__BOT_CONFIG__?.fbPageToken ||
         process.env.DEFAULT_FACEBOOK_PAGE_TOKEN ||
         process.env.FB_PAGE_TOKEN ||
@@ -47,10 +50,13 @@ export async function POST(request: NextRequest) {
         HARDCODED_TOKEN;
 
       const geminiKey =
+        config.geminiApiKey ||
         (global as any).__BOT_CONFIG__?.geminiApiKey ||
         process.env.GEMINI_API_KEY ||
         process.env.GOOGLE_AI_API_KEY ||
         '';
+
+      console.log(`[Facebook Bot] Config loaded. Gemini Key present: ${Boolean(geminiKey)}`);
 
       for (const entry of body.entry || []) {
         for (const event of entry.messaging || []) {
@@ -188,24 +194,35 @@ STRICT VALIDATION RULES:
    Output your congratulatory confirmation message AND at the very bottom include:
    JSON_START{"orderConfirmed":true,"product":"...","price":1500,"customerName":"...","phone":"...","address":"..."}JSON_END`;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `${systemPrompt}\n\nCustomer message: "${userText}"` }],
-            },
-          ],
-        }),
-      },
-    );
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\nCustomer message: "${userText}"` }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 600,
+        },
+      }),
+    });
 
     const data = await res.json();
+    if (!res.ok || data.error) {
+      console.error('[Gemini API Call Failed]:', data.error || data);
+      return { replyText: '' };
+    }
+
     const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!rawReply) {
+      console.warn('[Gemini API] Empty text in candidate response:', JSON.stringify(data));
+      return { replyText: '' };
+    }
 
     let orderData = null;
     let cleanReply = rawReply;
@@ -222,7 +239,7 @@ STRICT VALIDATION RULES:
 
     return { replyText: cleanReply, orderData };
   } catch (err) {
-    console.error('Gemini API Error:', err);
+    console.error('Gemini API Exception:', err);
     return { replyText: '' };
   }
 }
