@@ -323,7 +323,111 @@ async function processMessengerEvent(
     }
   }
 
-  // 2. Natural Language Product Mention
+  // 2. Intelligent Banglish / Bangla FAQ Matcher
+  const isDeliveryTimeQuery = /(kobe|koy\s*din|koto\s*din|kokhon|time|কবে|কতদিন|কয়দিন|কখন|সময়).*(deliv|pabo|ashbe|পৌঁছাবে|পাব)/i.test(lowerText) ||
+    lowerText.includes('kobe pabo') || lowerText.includes('kobe delivary') || lowerText.includes('kobe delivery') ||
+    lowerText.includes('delivery time') || lowerText.includes('koydin lagbe') || lowerText.includes('koto din lagbe') ||
+    lowerText.includes('কবে পাব') || lowerText.includes('কত দিন লাগবে') || lowerText.includes('কয়দিন লাগবে');
+
+  const isDeliveryChargeQuery = /(charge|fee|cost|টাকা|চার্জ|খরচ).*(deliv|ডেলিভারি)/i.test(lowerText) ||
+    lowerText.includes('delivery charge') || lowerText.includes('charge koto') || lowerText.includes('delivery koto') ||
+    lowerText.includes('ডেলিভারি চার্জ') || lowerText.includes('চার্জ কত') || lowerText.includes('ডেলিভারি খরচ');
+
+  const isPriceQuery = (lowerText.includes('dam koto') || lowerText.includes('price koto') || lowerText.includes('koto dam') || lowerText.includes('দাম কত') || lowerText.includes('প্রাইজ কত')) && !session.selectedProduct;
+
+  const isHowToOrderQuery = lowerText.includes('order korbo kivabe') || lowerText.includes('kivabe order') || lowerText.includes('order kivabe') || lowerText.includes('কিভাবে অর্ডার') || lowerText.includes('অর্ডার করব কিভাবে');
+
+  const isPaymentQuery = lowerText.includes('advance') || lowerText.includes('cod') || lowerText.includes('cash on') || lowerText.includes('taka kivabe') || lowerText.includes('অগ্রিম') || lowerText.includes('ক্যাশ অন ডেলিভারি');
+
+  if (isDeliveryTimeQuery) {
+    await sendFbQuickReplies(
+      senderId,
+      `🚚 আমাদের ডেলিভারি সময় ও নিয়মাবলী:\n\n` +
+      `📍 ঢাকা সিটির মধ্যে: ২৪ থেকে ৪৮ ঘণ্টার মধ্যে (১-২ দিন)।\n` +
+      `📍 ঢাকার বাইরে: ২ থেকে ৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে।\n\n` +
+      `💵 ক্যাশ অন ডেলিভারি (পণ্য হাতে পেয়ে দেখে টাকা পরিশোধ করার সুবিধা)।\n\n` +
+      `আপনি কোন প্রোডাক্টটি অর্ডার করতে চান? নিচে সিলেক্ট করুন 👇`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
+  if (isDeliveryChargeQuery) {
+    await sendFbQuickReplies(
+      senderId,
+      `📦 আমাদের ডেলিভারি চার্জ:\n\n` +
+      `🏠 ঢাকা সিটির ভেতরে: ৳১২০\n` +
+      `🚚 ঢাকার বাইরে যেকোনো জেলায়: ৳১৫০\n\n` +
+      `✅ ১০০% ক্যাশ অন ডেলিভারি (কোনো অগ্রিম টাকা দিতে হবে না)।\n\n` +
+      `কোন প্রোডাক্টটি আপনার পছন্দ হয়েছে? নিচে চাপ দিন 👇`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
+  if (isHowToOrderQuery) {
+    await sendFbQuickReplies(
+      senderId,
+      `🛍️ অর্ডার করার সহজ নিয়ম:\n\n` +
+      `১. আপনার পছন্দের প্রোডাক্টটি সিলেক্ট করুন।\n` +
+      `২. আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠান।\n` +
+      `৩. আপনার অর্ডার কনফার্ম হয়ে যাবে এবং ২-৩ দিনের মধ্যে ডেলিভারি পাবেন।\n\n` +
+      `নিচে আপনার পছন্দের পণ্য নির্বাচন করুন 👇`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
+  if (isPaymentQuery) {
+    await sendFbQuickReplies(
+      senderId,
+      `💳 পেমেন্ট পদ্ধতি:\n\n` +
+      `আমাদের কোনো অগ্রিম (Advance) টাকা দিতে হয় না! সম্পূর্ণ ক্যাশ অন ডেলিভারি (Cash On Delivery) — পার্সেল হাতে পেয়ে ডেলিভারিম্যানকে টাকা দিবেন। 🤝\n\n` +
+      `অর্ডার করতে পছন্দের প্রোডাক্ট চাপুন 👇`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
+  if (isPriceQuery) {
+    await sendFbQuickReplies(
+      senderId,
+      `👗 আমাদের রানিং কালেকশন ও প্রাইস লিস্ট:\n\n` +
+      `১. প্রিমিয়াম কাশ্মীরি কুর্তি — ৳৮৫০ (লিলেন সুতি)\n` +
+      `২. জয়পুরি কটন আনস্টিচড থ্রি-পিস — ৳১২৫০ (১০০% পিওর কটন)\n` +
+      `৩. ডিজাইনার পার্টি গাউন — ৳১৫০০ (গর্জিয়াস পার্টি কালেকশন)\n\n` +
+      `যেটি দেখতে বা অর্ডার করতে চান তা নিচে ক্লিক করুন 👇`,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
+  // 3. Natural Language Product Mention
   if (session.state === 'IDLE' || !session.selectedProduct) {
     if (lowerText.includes('গাউন') || lowerText.includes('gown') || lowerText.includes('party')) {
       session.state = 'AWAITING_ADDRESS';
