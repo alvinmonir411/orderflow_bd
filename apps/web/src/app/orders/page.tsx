@@ -30,8 +30,10 @@ import {
   Square,
   FileSpreadsheet,
   Trash2,
+  MessageCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { DirectMessageModal } from '@/components/orders/DirectMessageModal';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -40,6 +42,7 @@ export default function OrdersPage() {
   const [sortBy, setSortBy] = useState<'NEWEST' | 'OLDEST' | 'PRICE_HIGH' | 'PRICE_LOW'>('NEWEST');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
+  const [selectedMessageOrder, setSelectedMessageOrder] = useState<Order | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
@@ -643,6 +646,15 @@ export default function OrdersPage() {
                           )}
 
                           <button
+                            onClick={() => setSelectedMessageOrder(order)}
+                            title="সরাসরি গ্রাহককে মেসেজ পাঠান (Messenger / WhatsApp / SMS)"
+                            className="px-3 py-1.5 bg-indigo-950/60 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 rounded-xl transition-all shadow-sm flex items-center gap-1.5 text-xs font-semibold"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">মেসেজ</span>
+                          </button>
+
+                          <button
                             onClick={() => setSelectedInvoiceOrder(order)}
                             title="ইনভয়েস প্রিন্ট"
                             className="p-2 bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-750 rounded-xl transition-all shadow-sm"
@@ -843,6 +855,14 @@ export default function OrdersPage() {
       <InvoiceModal
         order={selectedInvoiceOrder}
         onClose={() => setSelectedInvoiceOrder(null)}
+      />
+
+      {/* Direct Customer Message Modal */}
+      <DirectMessageModal
+        isOpen={!!selectedMessageOrder}
+        onClose={() => setSelectedMessageOrder(null)}
+        order={selectedMessageOrder}
+        onMessageSent={loadOrders}
       />
     </div>
   );

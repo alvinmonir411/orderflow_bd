@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getBotSettings, getSql } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { orderId, customerPhone, psid, message, channel } = body;
+
+    if (!message || !message.trim()) {
+      return NextResponse.json({ success: false, error: 'মেসেজ খালি হতে পারবে না' }, { status: 400 });
+    }
+
+    const settings = await getBotSettings();
+    const pageToken = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN;
+
+    const sql = getSql();
+    let targetPsid = psid;
+
+    // If PSID not provided directly, lookup from Database by orderId or customerPhone
+    if (!targetPsid && (orderId || customerPhone)) {
+      try {
+        if (orderId) {
+          const rows = await sql`
+            SELECT c.psid 
+            FROM "Order" o
+            LEFT JOIN "Customer" c ON o."customerId" = c.id
+            WHERE o.id = ${orderId} OR o."orderNumber"::text = ${String(orderId)}
+            LIMIT 1;
+          `;
+          if (rows.length > 0 && rows[0].psid) {
+            targetPsid = rows[0].psid;
+          }
+        }
+
+        if (!targetPsid && customerPhone) {
+          const custRows = await sql`
+            SELECT psid FROM "Customer" 
+            WHERE phone = ${customerPhone} AND psid IS NOT NULL AND psid != ''
+            LIMIT 1;
+          `;
+          if (custRows.length > 0 && custRows[0].psid) {
+            targetPsid = custRows[0].psid;
+          }
+        }
+      } catch (dbErr) {
+        console.error('[DB PSID Lookup Error]:', dbErr);
+      }
+    }
+
+    let fbSent = false;
+    let fbError = null;
+
+    // Send via Facebook Messenger Graph API
+    if (targetPsid && pageToken) {
+      try {
+        const url = `https://graph.facebook.com/v19.0/me/messages?access_token=${pageToken.trim()}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient: { id: targetPsid },
+            message: { text: message.trim() },
+            messaging_type: 'RESPONSE',
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.message_id) {
+          fbSent = true;
+        } else {
+          fbError = data.error?.message || 'Meta API returned error';
+          console.error('[FB Send Message Error]:', data);
+        }
+      } catch (err: any) {
+        fbError = err.message;
+        console.error('[FB Fetch Error]:', err);
+      }
+    }
+
+    // Save note to Order in database
+    if (orderId) {
+      try {
+        const noteEntry = `[${new Date().toLocaleTimeString('bn-BD')}] সেন্ট মেসেজ (${channel || 'Messenger'}): "${message.trim()}"`;
+        await sql`
+          UPDATE "Order"
+          SET notes = COALESCE(notes || E'\n', '') || ${noteEntry},
+              "updatedAt" = NOW()
+          WHERE id = ${orderId} OR "orderNumber"::text = ${String(orderId)};
+        `;
+      } catch (noteErr) {
+        console.error('[Save Note Error]:', noteErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      deliveredToMessenger: fbSent,
+      targetPsid: targetPsid || null,
+      message: fbSent 
+        ? 'গ্রাহকের মেসেঞ্জারে সফলভাবে মেসেজ পাঠানো হয়েছে! 🚀'
+        : 'মেসেজটি সফলভাবে রেকর্ড করা হয়েছে এবং গ্রাহকের অর্ডারে সেভ হয়েছে!',
+      warning: !targetPsid ? 'গ্রাহকের সরাসরি PSID পাওয়া যায়নি, মেসেজটি অর্ডার হিস্ট্রিতে সেভ করা হয়েছে।' : fbError,
+    });
+  } catch (error: any) {
+    console.error('[API /api/send-message Error]:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
