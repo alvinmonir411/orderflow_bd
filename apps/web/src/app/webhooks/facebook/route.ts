@@ -21,28 +21,20 @@ export async function GET(request: NextRequest) {
   return new NextResponse('Verification failed', { status: 403 });
 }
 
+const HARDCODED_TOKEN = 'EAAiyNmqJWZCkBSUrjkc4ZCraUnG8t9cXtWDgxkNZCnwd1fmP9LhKDWTr8ApzwweRZA2WHzCFHZBGZCBPmECI15GLqUZAjVyxcnErVjcszH07mdbYU6lA2l2ibDdLKZCLhZADDCXbhQeaP5Bac9xUp7BrR9WnYqMw9hgfl9k7dlxSdaPAcDFTxkqkrSV3X1ZAseJOsFbixCJu4VEgZDZD';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('[Facebook Webhook Event Received]:', JSON.stringify(body));
 
     if (body.object === 'page') {
       let pageToken =
         (global as any).__BOT_CONFIG__?.fbPageToken ||
         process.env.DEFAULT_FACEBOOK_PAGE_TOKEN ||
         process.env.FB_PAGE_TOKEN ||
-        process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
-
-      if (!pageToken) {
-        try {
-          const fs = await import('fs');
-          const path = await import('path');
-          const configPath = path.join(process.cwd(), '.bot-config.json');
-          if (fs.existsSync(configPath)) {
-            const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            pageToken = cfg.fbPageToken;
-          }
-        } catch (e) {}
-      }
+        process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
+        HARDCODED_TOKEN;
 
       for (const entry of body.entry || []) {
         for (const event of entry.messaging || []) {
@@ -136,13 +128,14 @@ async function processMessengerEvent(
 }
 
 async function sendFbMessage(recipientId: string, text: string, token?: string) {
-  if (!token) {
+  const activeToken = token || HARDCODED_TOKEN;
+  if (!activeToken) {
     console.warn('[Facebook Webhook] Warning: No Page Access Token configured yet to send reply.');
     return;
   }
 
   try {
-    const res = await fetch(`https://graph.facebook.com/v20.0/me/messages?access_token=${token}`, {
+    const res = await fetch(`https://graph.facebook.com/v20.0/me/messages?access_token=${activeToken}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -163,13 +156,14 @@ async function sendFbQuickReplies(
   quickReplies: Array<{ title: string; payload: string }>,
   token?: string,
 ) {
-  if (!token) {
+  const activeToken = token || HARDCODED_TOKEN;
+  if (!activeToken) {
     console.warn('[Facebook Webhook] Warning: No Page Access Token configured yet to send reply.');
     return;
   }
 
   try {
-    const res = await fetch(`https://graph.facebook.com/v20.0/me/messages?access_token=${token}`, {
+    const res = await fetch(`https://graph.facebook.com/v20.0/me/messages?access_token=${activeToken}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
