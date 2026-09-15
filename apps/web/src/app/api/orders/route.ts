@@ -3,6 +3,39 @@ import { NextRequest, NextResponse } from 'next/server';
 // Global server memory store for live orders (survives requests)
 let liveOrders: any[] = [
   {
+    id: 'ord-fb-7953',
+    orderNumber: 7953,
+    storeId: 'store-1',
+    customerId: 'cust-fb-tania',
+    channel: 'FACEBOOK_MESSENGER',
+    status: 'PENDING_CONFIRMATION',
+    itemsPrice: 1250,
+    deliveryCharge: 120,
+    totalPrice: 1370,
+    deliveryAddress: 'মিরপুর-১০, ঢাকা',
+    deliveryCity: 'ঢাকা',
+    customerPhone: '01712345678',
+    customerName: 'তানিয়া আক্তার',
+    createdAt: new Date().toISOString(),
+    items: [
+      {
+        id: 'oi-fb-7953',
+        orderId: 'ord-fb-7953',
+        productId: 'prod-2',
+        product: { title: 'জয়পুরি কটন আনস্টিচড থ্রি-পিস', basePrice: 1250 },
+        variant: { name: 'Free Size' },
+        quantity: 1,
+        unitPrice: 1250,
+      },
+    ],
+    customer: {
+      name: 'তানিয়া আক্তার',
+      phone: '01712345678',
+      totalOrders: 1,
+      deliveryRate: 100,
+    },
+  },
+  {
     id: 'ord-1',
     orderNumber: 101,
     storeId: 'store-1',

@@ -60,11 +60,17 @@ export default function OrdersPage() {
   const filteredOrders = orders.filter((order) => {
     if (activeTab !== 'ALL' && order.status !== activeTab) return false;
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchName = order.customerName.toLowerCase().includes(term);
-      const matchPhone = order.customerPhone.includes(term);
-      const matchOrderNum = String(order.orderNumber).includes(term);
-      return matchName || matchPhone || matchOrderNum;
+      const term = searchTerm.toLowerCase().trim();
+      const numStr = String(order.orderNumber);
+      const matchName = (order.customerName || '').toLowerCase().includes(term);
+      const matchPhone = (order.customerPhone || '').includes(term);
+      const matchAddress = (order.deliveryAddress || '').toLowerCase().includes(term);
+      const matchOrderNum =
+        numStr.includes(term) ||
+        `of-${numStr}`.includes(term) ||
+        `#of-${numStr}`.includes(term) ||
+        `#${numStr}`.includes(term);
+      return matchName || matchPhone || matchAddress || matchOrderNum;
     }
     return true;
   });
