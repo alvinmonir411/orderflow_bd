@@ -80,7 +80,7 @@ export default function BotSettingsPage() {
   const webhookUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/webhooks/facebook`
-      : 'https://web-six-omega-jwewpf4gd5.vercel.app/webhooks/facebook';
+      : 'https://orderflowbd.vercel.app/webhooks/facebook';
 
   useEffect(() => {
     fetch('/api/bot-config')

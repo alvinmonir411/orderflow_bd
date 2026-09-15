@@ -14,7 +14,7 @@
   <b>OrderFlow BD</b> is an enterprise-grade, high-performance order automation and conversational AI sales platform engineered specifically for Bangladeshi social commerce (F-Commerce & WhatsApp businesses). It bridges customer chat interactions directly into an automated ERP with live database synchronization, intelligent NLP validation, courier dispatching, and custom AI training.
 </p>
 
-[🌐 Live Production Website](https://web-six-omega-jwewpf4gd5.vercel.app) • [📖 Documentation](#-system-architecture) • [🚀 Quick Start](#-quick-start-guide)
+[🌐 Live Production Website](https://orderflowbd.vercel.app) • [📖 Documentation](#-system-architecture) • [🚀 Quick Start](#-quick-start-guide)
 
 </div>
 
@@ -150,7 +150,7 @@ npm run dev:api
 4. Subscribe to the following webhook fields:
    - `messages`
    - `messaging_postbacks`
-5. Copy your **Page Access Token** and save it in the [Bot Settings](https://web-six-omega-jwewpf4gd5.vercel.app/bot-settings) page on your dashboard.
+5. Copy your **Page Access Token** and save it in the [Bot Settings](https://orderflowbd.vercel.app/bot-settings) page on your dashboard.
 
 ---
 
