@@ -32,6 +32,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS Files
+# OS Files & Binaries
 .DS_Store
 Thumbs.db
+*.exe
+cloudflared.exe
