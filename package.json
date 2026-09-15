@@ -3,16 +3,22 @@
   "version": "1.0.0",
   "description": "Smart F-Commerce Order Management Platform with Facebook Messenger & WhatsApp Automation",
   "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev:api": "npm --prefix apps/api run start:dev",
     "dev:web": "npm --prefix apps/web run dev",
     "build:api": "npm --prefix apps/api run build",
     "build:web": "npm --prefix apps/web run build",
-    "build": "npm run build:api && npm run build:web",
+    "build": "npm --prefix apps/web run build",
     "prisma:generate": "npm --prefix apps/api run prisma generate",
     "prisma:push": "npx --prefix apps/api prisma db push"
   },
   "dependencies": {
+    "next": "16.3.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "localtunnel": "^2.0.2"
   }
 }
