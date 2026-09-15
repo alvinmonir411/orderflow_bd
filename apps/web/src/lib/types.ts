@@ -68,11 +68,13 @@ export interface Order {
   courierTrackingId?: string;
   consignmentId?: string;
   courierStatus?: string;
+  psid?: string;
   items: OrderItem[];
   createdAt: string;
   customer?: {
     name: string;
     phone: string;
+    psid?: string;
     totalOrders: number;
     deliveryRate: number;
   };
