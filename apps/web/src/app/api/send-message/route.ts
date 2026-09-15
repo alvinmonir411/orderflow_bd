@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
           if (custRows.length > 0 && custRows[0].psid) {
             targetPsid = custRows[0].psid;
           }
+        }
+
         if (!targetPsid) {
           const anyCust = await sql`
             SELECT psid FROM "Customer" 
@@ -65,7 +67,7 @@ export async function POST(request: NextRequest) {
     // Send via Facebook Messenger Graph API
     if (targetPsid && pageToken) {
       try {
-        const url = `https://graph.facebook.com/v19.0/me/messages?access_token=${pageToken.trim()}`;
+        const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken.trim()}`;
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
