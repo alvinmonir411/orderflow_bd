@@ -409,6 +409,7 @@ export async function getDbOrders() {
       deliveryCity: o.deliveryCity,
       customerPhone: o.customerPhone,
       customerName: o.customerName,
+      notes: o.notes || undefined,
       psid: o.c_psid || null,
       courierProvider: o.courierProvider,
       courierTrackingId: o.courierTrackingId,
