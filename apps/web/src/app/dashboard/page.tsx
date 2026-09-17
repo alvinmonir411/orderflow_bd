@@ -47,6 +47,7 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 import { DirectMessageModal } from '@/components/orders/DirectMessageModal';
+import { StoreSetupWizardModal } from '@/components/onboarding/StoreSetupWizardModal';
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -55,6 +56,7 @@ export default function DashboardPage() {
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
   const [selectedMessageOrder, setSelectedMessageOrder] = useState<Order | null>(null);
   const [showBotTester, setShowBotTester] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadData = async () => {
@@ -196,6 +198,14 @@ export default function DashboardPage() {
 
           {/* Quick Actions */}
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowSetupWizard(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 rounded-2xl text-sm font-black shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
+            >
+              <Zap className="w-4 h-4 fill-neutral-950 text-neutral-950" />
+              <span>৩-স্টেপ সেটআপ উইজার্ড</span>
+            </button>
+
             <button
               onClick={handleManualRefresh}
               className="p-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 rounded-2xl transition-all active:scale-95 shadow-md"
@@ -682,6 +692,16 @@ export default function DashboardPage() {
         onClose={() => setSelectedMessageOrder(null)}
         order={selectedMessageOrder}
         onMessageSent={loadData}
+      />
+
+      {/* Store Setup Wizard Modal */}
+      <StoreSetupWizardModal
+        isOpen={showSetupWizard}
+        onClose={() => setShowSetupWizard(false)}
+        onComplete={() => {
+          loadData();
+          setShowSetupWizard(false);
+        }}
       />
     </div>
   );
