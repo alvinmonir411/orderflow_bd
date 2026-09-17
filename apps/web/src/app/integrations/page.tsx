@@ -181,6 +181,39 @@ export default function IntegrationsPage() {
     }
   };
 
+  const [isDisconnectingWa, setIsDisconnectingWa] = useState(false);
+
+  const handleDisconnectWhatsApp = async () => {
+    setIsDisconnectingWa(true);
+    try {
+      const res = await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsappConnected: false,
+          whatsappPhoneId: '',
+          whatsappToken: '',
+          waapiInstanceId: '',
+          waapiApiToken: '',
+        }),
+      });
+      if (res.ok) {
+        setMetaPhoneId('');
+        setMetaBusinessId('');
+        setMetaToken('');
+        setWaapiInstanceId('');
+        setWaapiApiToken('');
+        setWaConnected(false);
+        toast.success('WhatsApp সফলভাবে ডিসকানেক্ট করা হয়েছে!');
+        await loadConfig();
+      }
+    } catch (e) {
+      toast.error('ডিসকানেক্ট করতে সমস্যা হয়েছে');
+    } finally {
+      setIsDisconnectingWa(false);
+    }
+  };
+
   const handleSaveSteadfast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!steadfastApiKey.trim() || !steadfastSecret.trim()) {
@@ -361,17 +394,30 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              {(waProviderTab === 'META' ? metaWaConnected : waConnected) ? (
-                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{waProviderTab === 'META' ? 'মেটা এপিআই সংযুক্ত' : `Instance #${waapiInstanceId} সংযুক্ত`}</span>
-                </span>
-              ) : (
-                <span className="px-2.5 py-1 text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-xl flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-                  <span>সেটআপ প্রয়োজন</span>
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {(waProviderTab === 'META' ? metaWaConnected : waConnected) ? (
+                  <>
+                    <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{waProviderTab === 'META' ? 'মেটা এপিআই সংযুক্ত' : `Instance #${waapiInstanceId} সংযুক্ত`}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleDisconnectWhatsApp}
+                      disabled={isDisconnectingWa}
+                      className="px-2.5 py-1 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 rounded-xl transition-all active:scale-95"
+                      title="WhatsApp কানেকশন বিচ্ছিন্ন করুন"
+                    >
+                      {isDisconnectingWa ? 'বিচ্ছিন্ন হচ্ছে...' : 'ডিসকানেক্ট'}
+                    </button>
+                  </>
+                ) : (
+                  <span className="px-2.5 py-1 text-xs font-bold bg-neutral-800 text-neutral-400 border border-neutral-700 rounded-xl flex items-center gap-1">
+                    <XCircle className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>কানেক্ট করা হয়নি</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Provider Switch Tabs */}

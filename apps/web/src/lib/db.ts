@@ -153,28 +153,16 @@ export async function initDatabase() {
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "steadfastSecretKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoClientId" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoSecretKey" TEXT DEFAULT '';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappConnected" BOOLEAN DEFAULT TRUE;`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappConnected" BOOLEAN DEFAULT FALSE;`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhone" TEXT DEFAULT '';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhoneId" TEXT DEFAULT '1340571927';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappToken" TEXT DEFAULT 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhoneId" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappToken" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappBusinessId" TEXT DEFAULT '';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiInstanceId" TEXT DEFAULT '104344';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiApiToken" TEXT DEFAULT 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappProvider" TEXT DEFAULT 'WAAPI';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiInstanceId" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiApiToken" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappProvider" TEXT DEFAULT 'META';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsApiKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsSenderId" TEXT DEFAULT '';`;
-
-    // Ensure settings row is updated with user's verified Waapi credentials
-    await sql`
-      UPDATE "BotSettings"
-      SET 
-        "waapiInstanceId" = '104344',
-        "waapiApiToken" = 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
-        "whatsappToken" = 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
-        "whatsappConnected" = TRUE,
-        "whatsappProvider" = 'WAAPI'
-      WHERE "id" = 'settings-1';
-    `;
 
     // Insert default bot settings if empty
     const settingsExist = await sql`SELECT COUNT(*)::int as count FROM "BotSettings" WHERE "id" = 'settings-1'`;
