@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getBotSettings, insertDbOrder, getDbProducts, saveDbChatMessage, getSql } from '@/lib/db';
 
 const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'orderflow_bd_secure_verify_2026';
+const DEFAULT_WAAPI_TOKEN = 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';
+const DEFAULT_INSTANCE_ID = '104344';
 
 // Meta Verification Endpoint
 export async function GET(request: NextRequest) {
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('[WhatsApp Webhook POST Event]:', JSON.stringify(body));
+    console.log('[WhatsApp Webhook POST Event Received]:', JSON.stringify(body));
 
     const settings = await getBotSettings();
     const geminiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY || '';
@@ -35,34 +37,43 @@ export async function POST(request: NextRequest) {
     // ==========================================
     if (body.event === 'message_create' || body.event === 'message' || body.event === 'messages.upsert') {
       const msg = body.data?.message || body.data?.messages?.[0] || body.message;
+      
+      // Ignore outgoing messages sent by the bot owner to avoid infinite loops
       if (msg && !msg.fromMe) {
-        const fromRaw = msg.from || '';
-        const fromPhone = fromRaw.replace('@c.us', '').replace('@s.whatsapp.net', '');
-        const customerName = msg._data?.notifyName || msg.notifyName || `WhatsApp User (${fromPhone.slice(-4)})`;
+        const fromRaw = msg.from || msg.chatId || msg._data?.id?.remote || '';
+        
+        // Ignore WhatsApp newsletters / channels
+        if (fromRaw.includes('@newsletter') || fromRaw.includes('@broadcast')) {
+          return NextResponse.json({ ignored: true, reason: 'newsletter_event' });
+        }
+
+        const fromPhone = fromRaw.replace('@c.us', '').replace('@s.whatsapp.net', '').replace('@lid', '');
+        const customerName = msg._data?.notifyName || msg.notifyName || `Customer (${fromPhone.slice(-4)})`;
         const text = (msg.body || msg.text || '').trim();
 
-        if (text && fromPhone) {
+        if (text && fromRaw) {
           // 1. Save customer message to Neon PostgreSQL
           await saveDbChatMessage({
-            senderId: fromPhone,
+            senderId: fromRaw,
             customerName,
             sender: 'customer',
             text,
             channel: 'WHATSAPP',
           });
 
-          // 2. Generate AI Reply
+          // 2. Generate intelligent AI reply
           const replyText = await generateAiReply(text, customerName, settings, geminiKey);
 
           // 3. Send AI response via Waapi Instance API
-          const instanceId = settings.waapiInstanceId || '104344';
-          const token = settings.waapiApiToken || 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73';
+          const instanceId = settings.waapiInstanceId || DEFAULT_INSTANCE_ID;
+          const token = settings.waapiApiToken || settings.whatsappToken || DEFAULT_WAAPI_TOKEN;
 
-          await sendWaapiMessage(instanceId, token, fromRaw.includes('@') ? fromRaw : `${fromPhone}@c.us`, replyText);
+          const sendResult = await sendWaapiMessage(instanceId, token, fromRaw, replyText);
+          console.log('[Waapi Send Success]:', sendResult);
 
           // 4. Save AI Reply to Neon PostgreSQL
           await saveDbChatMessage({
-            senderId: fromPhone,
+            senderId: fromRaw,
             customerName,
             sender: 'ai',
             text: replyText,
@@ -180,21 +191,34 @@ async function sendMetaWhatsAppMessage(phoneId: string, token: string, toPhone: 
 }
 
 async function generateAiReply(userText: string, customerName: string, settings: any, geminiKey: string): Promise<string> {
+  const products = await getDbProducts();
+  const productListStr = products.map((p: any) => `• ${p.title} - ৳${p.basePrice}`).join('\n');
+
   if (!geminiKey) {
-    return `নমস্কার ${customerName}! OrderFlow BD-তে আপনাকে স্বাগতম। আমাদের প্রতিনিধি শীঘ্রই আপনার সাথে যোগাযোগ করবেন। যেকোনো প্রয়োজনে আমাদের ডেলিভারি চার্জ: ঢাকা ৳${settings.deliveryFeeDhaka || 120}, ঢাকার বাইরে ৳${settings.deliveryFeeOutside || 150}।`;
+    return `নমস্কার ${customerName}! OrderFlow BD-তে আপনাকে স্বাগতম। 😊\n\nআমাদের সেরা কালেকশনসমূহ:\n${productListStr}\n\nডেলিভারি চার্জ: ঢাকা সিটিতে ৳${settings.deliveryFeeDhaka || 120}, ঢাকার বাইরে ৳${settings.deliveryFeeOutside || 150}।\n\nঅর্ডার করতে বা কোনো প্রোডাক্ট সম্পর্কে জানতে আমাদের জানান! 🤝`;
   }
 
   try {
     const prompt = `
-You are a friendly, polite Bengali F-Commerce AI sales representative for OrderFlow BD on WhatsApp.
+You are a friendly, polite, smart Bangladeshi F-Commerce AI sales representative for OrderFlow BD on WhatsApp.
 Customer Name: ${customerName}
-Delivery in Dhaka: ৳${settings.deliveryFeeDhaka || 120} (${settings.deliveryTimeDhaka || '1-2 days'})
-Delivery outside Dhaka: ৳${settings.deliveryFeeOutside || 150} (${settings.deliveryTimeOutside || '2-3 days'})
-Helpline: ${settings.helplinePhone || '01700000000'}
+
+Store Products Catalog:
+${productListStr}
+
+Delivery Details:
+- Dhaka City: ৳${settings.deliveryFeeDhaka || 120} (${settings.deliveryTimeDhaka || '1-2 days'})
+- Outside Dhaka: ৳${settings.deliveryFeeOutside || 150} (${settings.deliveryTimeOutside || '2-3 days'})
+- Payment: 100% Cash On Delivery (ক্যাশ অন ডেলিভারি)
+- Helpline: ${settings.helplinePhone || '01700000000'}
 
 Customer Message: "${userText}"
 
-Reply politely in natural conversational Bengali (বাংলা). Answer their query clearly and offer to take their order with name, delivery address, and phone number.
+Instructions:
+1. Reply politely in natural, attractive Bengali (বাংলা).
+2. Answer the customer's question directly with product names, prices, and delivery terms.
+3. If they want to order, ask for their full name, complete delivery address, and 11-digit mobile number.
+4. Keep the message clean, organized, and friendly with emojis.
 `;
 
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
@@ -214,5 +238,5 @@ Reply politely in natural conversational Bengali (বাংলা). Answer their
     console.error('[Gemini WhatsApp Generation Error]:', err);
   }
 
-  return `ধন্যবাদ ${customerName}! আমরা আপনার মেসেজ পেয়েছি। আমাদের টিম অতি দ্রুত আপনার সাথে যোগাযোগ করবে।`;
+  return `ধন্যবাদ ${customerName}! OrderFlow BD-তে আপনাকে স্বাগতম। 😊\n\nআমাদের কালেকশনসমূহ:\n${productListStr}\n\nআপনার পছন্দের প্রোডাক্টটি অর্ডার করতে ঠিকানা ও ফোন নাম্বার লিখে পাঠান। 🚚`;
 }

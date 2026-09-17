@@ -140,7 +140,7 @@ export async function initDatabase() {
         "whatsappToken" TEXT DEFAULT '',
         "whatsappBusinessId" TEXT DEFAULT '',
         "waapiInstanceId" TEXT DEFAULT '104344',
-        "waapiApiToken" TEXT DEFAULT 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+        "waapiApiToken" TEXT DEFAULT 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
         "whatsappProvider" TEXT DEFAULT 'WAAPI',
         "smsApiKey" TEXT DEFAULT '',
         "smsSenderId" TEXT DEFAULT '',
@@ -155,24 +155,25 @@ export async function initDatabase() {
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoSecretKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappConnected" BOOLEAN DEFAULT TRUE;`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhone" TEXT DEFAULT '';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhoneId" TEXT DEFAULT '';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappToken" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhoneId" TEXT DEFAULT '1340571927';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappToken" TEXT DEFAULT 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappBusinessId" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiInstanceId" TEXT DEFAULT '104344';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiApiToken" TEXT DEFAULT 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiApiToken" TEXT DEFAULT 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappProvider" TEXT DEFAULT 'WAAPI';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsApiKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsSenderId" TEXT DEFAULT '';`;
 
-    // Ensure default settings row is updated with user's Waapi credentials
+    // Ensure settings row is updated with user's verified Waapi credentials
     await sql`
       UPDATE "BotSettings"
       SET 
         "waapiInstanceId" = '104344',
-        "waapiApiToken" = 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+        "waapiApiToken" = 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
+        "whatsappToken" = 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
         "whatsappConnected" = TRUE,
         "whatsappProvider" = 'WAAPI'
-      WHERE "id" = 'settings-1' AND ("waapiInstanceId" IS NULL OR "waapiInstanceId" = '' OR "waapiInstanceId" = '104344');
+      WHERE "id" = 'settings-1';
     `;
 
     // Insert default bot settings if empty
@@ -272,7 +273,7 @@ export async function getBotSettings() {
         whatsappToken: row.whatsappToken || '',
         whatsappBusinessId: row.whatsappBusinessId || '',
         waapiInstanceId: row.waapiInstanceId || '104344',
-        waapiApiToken: row.waapiApiToken || 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+        waapiApiToken: row.waapiApiToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
         whatsappProvider: row.whatsappProvider || 'WAAPI',
         smsApiKey: row.smsApiKey || '',
         smsSenderId: row.smsSenderId || 'OrderFlowBD',
@@ -301,11 +302,11 @@ export async function getBotSettings() {
     pathaoSecretKey: '',
     whatsappConnected: true,
     whatsappPhone: '',
-    whatsappPhoneId: '',
-    whatsappToken: '',
+    whatsappPhoneId: '1340571927',
+    whatsappToken: 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
     whatsappBusinessId: '',
     waapiInstanceId: '104344',
-    waapiApiToken: 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+    waapiApiToken: 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
     whatsappProvider: 'WAAPI',
     smsApiKey: '',
     smsSenderId: 'OrderFlowBD',
