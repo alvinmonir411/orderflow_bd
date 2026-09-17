@@ -559,3 +559,29 @@ export async function updateDbOrderStatus(
     return false;
   }
 }
+
+export async function getDbProducts() {
+  const sql = getSql();
+  try {
+    const products = await sql`
+      SELECT 
+        id,
+        "storeId",
+        title,
+        COALESCE(category, 'সাধারণ') as category,
+        description,
+        "basePrice"::float as "basePrice",
+        stock,
+        "isActive",
+        images
+      FROM "Product"
+      WHERE "isActive" = true
+      ORDER BY "createdAt" DESC;
+    `;
+    return products;
+  } catch (err) {
+    console.error('[DB Get Products Error]:', err);
+    return [];
+  }
+}
+
