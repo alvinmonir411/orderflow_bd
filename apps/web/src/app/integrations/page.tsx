@@ -34,9 +34,16 @@ export default function IntegrationsPage() {
   const [fbPageId, setFbPageId] = useState('');
   const [isConnectingFb, setIsConnectingFb] = useState(false);
 
-  // WhatsApp Waapi State (Dynamic from DB)
+  // WhatsApp State (Supports Official Meta Cloud API & Waapi)
+  const [waProviderTab, setWaProviderTab] = useState<'META' | 'WAAPI'>('META');
+  const [metaPhoneId, setMetaPhoneId] = useState('');
+  const [metaBusinessId, setMetaBusinessId] = useState('');
+  const [metaToken, setMetaToken] = useState('');
+  const [isSavingMeta, setIsSavingMeta] = useState(false);
+
+  // Waapi State (Dynamic from DB)
   const [waapiInstanceId, setWaapiInstanceId] = useState('104344');
-  const [waapiApiToken, setWaapiApiToken] = useState('MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73');
+  const [waapiApiToken, setWaapiApiToken] = useState('KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca');
   const [waConnected, setWaConnected] = useState(true);
   const [isSavingWaapi, setIsSavingWaapi] = useState(false);
 
@@ -63,9 +70,21 @@ export default function IntegrationsPage() {
         setSteadfastSecret(data.steadfastSecretKey || '');
         setPathaoApiKey(data.pathaoClientId || '');
         setPathaoSecret(data.pathaoSecretKey || '');
+        
+        setMetaPhoneId(data.whatsappPhoneId || '');
+        setMetaBusinessId(data.whatsappBusinessId || '');
+        setMetaToken(data.whatsappToken || '');
+
         setWaapiInstanceId(data.waapiInstanceId || '104344');
-        setWaapiApiToken(data.waapiApiToken || 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73');
-        setWaConnected(Boolean(data.waapiInstanceId && data.waapiApiToken));
+        setWaapiApiToken(data.waapiApiToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca');
+        
+        if (data.whatsappProvider === 'META' || (data.whatsappPhoneId && data.whatsappToken?.startsWith('EAA'))) {
+          setWaProviderTab('META');
+          setWaConnected(Boolean(data.whatsappPhoneId && data.whatsappToken));
+        } else {
+          setWaProviderTab('META'); // Default to Meta Cloud API tab
+          setWaConnected(Boolean(data.whatsappConnected || (data.waapiInstanceId && data.waapiApiToken)));
+        }
       }
     } catch (e) {
       console.error('Failed to load integration config:', e);
@@ -79,6 +98,7 @@ export default function IntegrationsPage() {
   }, []);
 
   const fbConnected = Boolean(fbPageToken && fbPageToken.length > 10);
+  const metaWaConnected = Boolean(metaPhoneId && metaToken && metaToken.length > 10);
   const steadfastConnected = Boolean(steadfastApiKey && steadfastApiKey.trim().length > 0);
   const pathaoConnected = Boolean(pathaoApiKey && pathaoApiKey.trim().length > 0);
 
@@ -95,6 +115,38 @@ export default function IntegrationsPage() {
       toast.success('ফেসবুক পেজ কানেকশন স্ট্যাটাস রিফ্রেশ হয়েছে!');
     } finally {
       setIsConnectingFb(false);
+    }
+  };
+
+  const handleSaveMetaWhatsApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!metaPhoneId.trim() || !metaToken.trim()) {
+      toast.error('দয়া করে Meta Phone Number ID এবং Access Token দিন');
+      return;
+    }
+    setIsSavingMeta(true);
+    try {
+      const res = await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsappPhoneId: metaPhoneId.trim(),
+          whatsappBusinessId: metaBusinessId.trim(),
+          whatsappToken: metaToken.trim(),
+          whatsappConnected: true,
+          whatsappProvider: 'META',
+        }),
+      });
+      if (res.ok) {
+        toast.success('🎉 Official Meta WhatsApp Cloud API সফলভাবে সেভ ও সংযুক্ত হয়েছে!');
+        await loadConfig();
+      } else {
+        toast.error('Meta WhatsApp ক্রেডেনশিয়াল সেভ করা যায়নি');
+      }
+    } catch (e) {
+      toast.error('সার্ভারে সমস্যা হয়েছে');
+    } finally {
+      setIsSavingMeta(false);
     }
   };
 
@@ -293,7 +345,7 @@ export default function IntegrationsPage() {
           </button>
         </div>
 
-        {/* 2. WhatsApp Waapi.app Live Integration */}
+        {/* 2. WhatsApp Integration (Official Meta Cloud API & Waapi) */}
         <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -303,16 +355,16 @@ export default function IntegrationsPage() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
-                    WhatsApp Automation (Waapi)
+                    WhatsApp Automation
                   </h3>
-                  <p className="text-xs text-neutral-400">হোয়াটসঅ্যাপ চ্যাট ও AI অর্ডার সিঙ্ক</p>
+                  <p className="text-xs text-neutral-400">অফিশিয়াল মেটা ক্লাউড এপিআই ও চ্যাটবট</p>
                 </div>
               </div>
 
-              {waConnected ? (
+              {(waProviderTab === 'META' ? metaWaConnected : waConnected) ? (
                 <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Instance #{waapiInstanceId} সংযুক্ত</span>
+                  <span>{waProviderTab === 'META' ? 'মেটা এপিআই সংযুক্ত' : `Instance #${waapiInstanceId} সংযুক্ত`}</span>
                 </span>
               ) : (
                 <span className="px-2.5 py-1 text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-xl flex items-center gap-1">
@@ -322,76 +374,216 @@ export default function IntegrationsPage() {
               )}
             </div>
 
-            {/* Webhook Instruction Box */}
-            <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-2.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-neutral-300 font-bold">Waapi Webhook URL (আপনার প্যানেলে দিন):</span>
-                <button
-                  type="button"
-                  onClick={() => handleCopyText('https://orderflowbd.vercel.app/webhooks/whatsapp', 'Webhook URL')}
-                  className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
-                >
-                  <Copy className="w-3 h-3" />
-                  <span>কপি করুন</span>
-                </button>
-              </div>
-              <p className="text-xs font-mono text-emerald-400 bg-neutral-950 px-3 py-2 rounded-xl border border-neutral-800 break-all select-all">
-                https://orderflowbd.vercel.app/webhooks/whatsapp
-              </p>
-              <p className="text-[11px] text-neutral-400 leading-relaxed">
-                👉 Waapi-তে আপনার Instance #{waapiInstanceId}-এর <strong>Webhooks</strong> অপশনে গিয়ে এই URL-টি পেস্ট করে সেভ করুন।
-              </p>
+            {/* Provider Switch Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-900/90 border border-neutral-800 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setWaProviderTab('META')}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  waProviderTab === 'META'
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60'
+                }`}
+              >
+                <span>🌐 মেটা অফিশিয়াল API</span>
+                <span className="text-[10px] px-1.5 py-0.2 bg-white/20 rounded font-medium">Recommended</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWaProviderTab('WAAPI')}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  waProviderTab === 'WAAPI'
+                    ? 'bg-neutral-800 text-neutral-100 shadow-md border border-neutral-700'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60'
+                }`}
+              >
+                <span>📱 Waapi QR-Scan</span>
+              </button>
             </div>
 
-            {/* Waapi Form */}
-            <form onSubmit={handleSaveWaapi} className="space-y-3 pt-1">
-              <div>
-                <label className="block text-xs font-bold text-neutral-300 mb-1">
-                  Waapi Instance ID
-                </label>
-                <div className="relative">
-                  <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                  <input
-                    type="text"
-                    value={waapiInstanceId}
-                    onChange={(e) => setWaapiInstanceId(e.target.value)}
-                    placeholder="104344"
-                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
-                  />
-                </div>
-              </div>
+            {/* TAB 1: OFFICIAL META WHATSAPP CLOUD API */}
+            {waProviderTab === 'META' && (
+              <div className="space-y-3.5">
+                {/* Webhook Details for Meta */}
+                <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-300 font-bold">১. Meta Webhook Callback URL:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('https://orderflowbd.vercel.app/webhooks/whatsapp', 'Callback URL')}
+                      className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>কপি করুন</span>
+                    </button>
+                  </div>
+                  <p className="text-xs font-mono text-emerald-400 bg-neutral-950 px-3 py-2 rounded-xl border border-neutral-800 break-all select-all">
+                    https://orderflowbd.vercel.app/webhooks/whatsapp
+                  </p>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-300 mb-1">
-                  Waapi API Token
-                </label>
-                <div className="relative">
-                  <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                  <input
-                    type="password"
-                    value={waapiApiToken}
-                    onChange={(e) => setWaapiApiToken(e.target.value)}
-                    placeholder="MY60stKi..."
-                    className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
-                  />
-                </div>
-              </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-neutral-300 font-bold">২. Verify Token:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('orderflow_bd_secure_verify_2026', 'Verify Token')}
+                      className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>কপি করুন</span>
+                    </button>
+                  </div>
+                  <p className="text-xs font-mono text-emerald-400 bg-neutral-950 px-3 py-2 rounded-xl border border-neutral-800 break-all select-all">
+                    orderflow_bd_secure_verify_2026
+                  </p>
 
-              <button
-                type="submit"
-                disabled={isSavingWaapi}
-                className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
-                {isSavingWaapi ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Waapi সেটিংস সেভ করুন</span>
-                  </>
-                )}
-              </button>
-            </form>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed border-t border-neutral-800/80 pt-2">
+                    👉 <strong>Meta Developers</strong> (<a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-green-400 underline">developers.facebook.com</a>) ➔ আপনার App ➔ WhatsApp ➔ <strong>Configuration</strong>-এ গিয়ে উপরের URL ও Verify Token দিয়ে ভেরিফাই করুন এবং <strong>messages</strong> সাবস্ক্রাইব করুন।
+                  </p>
+                </div>
+
+                {/* Form: Meta Cloud API Credentials */}
+                <form onSubmit={handleSaveMetaWhatsApp} className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 mb-1">
+                      WhatsApp Phone Number ID <span className="text-neutral-500 font-normal">(Meta App ➔ WhatsApp ➔ API Setup)</span>
+                    </label>
+                    <div className="relative">
+                      <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        type="text"
+                        value={metaPhoneId}
+                        onChange={(e) => setMetaPhoneId(e.target.value)}
+                        placeholder="যেমন: 105938492019485"
+                        className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 mb-1">
+                      WhatsApp Business Account ID (WABA ID)
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        type="text"
+                        value={metaBusinessId}
+                        onChange={(e) => setMetaBusinessId(e.target.value)}
+                        placeholder="যেমন: 102948573920194"
+                        className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 mb-1">
+                      Meta Permanent Access Token <span className="text-neutral-500 font-normal">(System User Token: EAA...)</span>
+                    </label>
+                    <div className="relative">
+                      <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        type="password"
+                        value={metaToken}
+                        onChange={(e) => setMetaToken(e.target.value)}
+                        placeholder="EAA..."
+                        className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingMeta}
+                    className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    {isSavingMeta ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>অফিশিয়াল মেটা হোয়াটসঅ্যাপ সেটিংস সেভ করুন</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* TAB 2: WAAPI QR-SCAN INTEGRATION */}
+            {waProviderTab === 'WAAPI' && (
+              <div className="space-y-3.5">
+                {/* Webhook Instruction Box */}
+                <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-300 font-bold">Waapi Webhook URL (আপনার প্যানেলে দিন):</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('https://orderflowbd.vercel.app/webhooks/whatsapp', 'Webhook URL')}
+                      className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>কপি করুন</span>
+                    </button>
+                  </div>
+                  <p className="text-xs font-mono text-emerald-400 bg-neutral-950 px-3 py-2 rounded-xl border border-neutral-800 break-all select-all">
+                    https://orderflowbd.vercel.app/webhooks/whatsapp
+                  </p>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    👉 Waapi-তে আপনার Instance #{waapiInstanceId}-এর <strong>Webhooks</strong> অপশনে গিয়ে এই URL-টি পেস্ট করে সেভ করুন।
+                  </p>
+                </div>
+
+                {/* Waapi Form */}
+                <form onSubmit={handleSaveWaapi} className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 mb-1">
+                      Waapi Instance ID
+                    </label>
+                    <div className="relative">
+                      <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        type="text"
+                        value={waapiInstanceId}
+                        onChange={(e) => setWaapiInstanceId(e.target.value)}
+                        placeholder="104344"
+                        className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 mb-1">
+                      Waapi API Token
+                    </label>
+                    <div className="relative">
+                      <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        type="password"
+                        value={waapiApiToken}
+                        onChange={(e) => setWaapiApiToken(e.target.value)}
+                        placeholder="MY60stKi..."
+                        className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingWaapi}
+                    className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    {isSavingWaapi ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Waapi সেটিংস সেভ করুন</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       </div>

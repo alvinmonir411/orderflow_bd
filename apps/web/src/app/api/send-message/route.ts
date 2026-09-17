@@ -91,54 +91,90 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send via WhatsApp (Waapi)
+    // Send via WhatsApp (Official Meta WhatsApp Cloud API or Waapi)
     let waSent = false;
     const cleanPhone = (customerPhone || targetPsid || '').replace(/[^0-9]/g, '');
     if ((channel === 'WHATSAPP' || !targetPsid) && cleanPhone && cleanPhone.length >= 10) {
-      const instanceId = settings.waapiInstanceId || '104344';
-      const token = settings.waapiApiToken || settings.whatsappToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';
       const formattedPhone = cleanPhone.startsWith('88') ? cleanPhone : cleanPhone.startsWith('0') ? `88${cleanPhone}` : `880${cleanPhone}`;
-      let chatId = `${formattedPhone}@c.us`;
+      
+      // 1. Check if Meta WhatsApp Cloud API is configured
+      const metaPhoneId = settings.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+      const metaToken = settings.whatsappToken || process.env.WHATSAPP_ACCESS_TOKEN || '';
+      const isMetaProvider = settings.whatsappProvider === 'META' || (metaPhoneId && metaToken?.startsWith('EAA'));
 
-      if (instanceId && token) {
+      if (isMetaProvider && metaPhoneId && metaToken) {
         try {
-          const url = `https://waapi.app/api/v1/instances/${instanceId}/client/action/send-message`;
-          let waRes = await fetch(url, {
+          const metaRes = await fetch(`https://graph.facebook.com/v21.0/${metaPhoneId}/messages`, {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${metaToken.trim()}`,
               'Content-Type': 'application/json',
-              accept: 'application/json',
             },
             body: JSON.stringify({
-              chatId,
-              message: message.trim(),
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: formattedPhone,
+              type: 'text',
+              text: { preview_url: false, body: message.trim() },
             }),
           });
-          let waData = await waRes.json();
-          if (waRes.ok) {
+          const metaData = await metaRes.json();
+          if (metaRes.ok && metaData.messages?.[0]?.id) {
             waSent = true;
-          } else if (waData.message && waData.message.includes('Your trial instance is only able to send actions to')) {
-            const match = waData.message.match(/([0-9]+@c\.us)/);
-            if (match && match[1]) {
-              waRes = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                  accept: 'application/json',
-                },
-                body: JSON.stringify({
-                  chatId: match[1],
-                  message: message.trim(),
-                }),
-              });
-              waData = await waRes.json();
-              if (waRes.ok) waSent = true;
-            }
+          } else {
+            console.error('[Meta WhatsApp Cloud API Error]:', metaData);
           }
-        } catch (waErr) {
-          console.error('[Waapi Manual Send Error]:', waErr);
+        } catch (metaErr) {
+          console.error('[Meta WhatsApp Send Fetch Error]:', metaErr);
+        }
+      }
+
+      // 2. Fallback to Waapi if Meta Cloud API wasn't used or succeeded
+      if (!waSent) {
+        const instanceId = settings.waapiInstanceId || '104344';
+        const token = settings.waapiApiToken || settings.whatsappToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';
+        const chatId = `${formattedPhone}@c.us`;
+
+        if (instanceId && token) {
+          try {
+            const url = `https://waapi.app/api/v1/instances/${instanceId}/client/action/send-message`;
+            let waRes = await fetch(url, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                accept: 'application/json',
+              },
+              body: JSON.stringify({
+                chatId,
+                message: message.trim(),
+              }),
+            });
+            let waData = await waRes.json();
+            if (waRes.ok) {
+              waSent = true;
+            } else if (waData.message && waData.message.includes('Your trial instance is only able to send actions to')) {
+              const match = waData.message.match(/([0-9]+@c\.us)/);
+              if (match && match[1]) {
+                waRes = await fetch(url, {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    accept: 'application/json',
+                  },
+                  body: JSON.stringify({
+                    chatId: match[1],
+                    message: message.trim(),
+                  }),
+                });
+                waData = await waRes.json();
+                if (waRes.ok) waSent = true;
+              }
+            }
+          } catch (waErr) {
+            console.error('[Waapi Manual Send Error]:', waErr);
+          }
         }
       }
     }
