@@ -451,7 +451,89 @@ async function processMessengerEvent(
     ];
   };
 
-  // 5. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
+  // 5. IF USER ASKS TO SEE PHOTOS / PICTURES (IMAGE QUERY):
+  const isImageRequest =
+    lowerText.includes('image') ||
+    lowerText.includes('photo') ||
+    lowerText.includes('picture') ||
+    lowerText.includes('pic') ||
+    lowerText.includes('chobi') ||
+    lowerText.includes('ছবি') ||
+    lowerText.includes('পিকচার') ||
+    lowerText.includes('পিক') ||
+    lowerText.includes('ফটো') ||
+    lowerText.includes('image dan') ||
+    lowerText.includes('pic dan') ||
+    lowerText.includes('chobi dan') ||
+    lowerText.includes('age dekhi') ||
+    lowerText.includes('dan age dekhi') ||
+    lowerText.includes('আগে দেখি') ||
+    lowerText.includes('ছবি দিন') ||
+    lowerText.includes('ছবি দেন') ||
+    lowerText.includes('ছবি দেখতে') ||
+    lowerText.includes('ছবি দেখান') ||
+    lowerText.includes('পিক দিন') ||
+    lowerText.includes('পিক দেন') ||
+    (lowerText.includes('dekhi') && (lowerText.includes('age') || lowerText.includes('dan') || lowerText.includes('dress') || lowerText.includes('product') || lowerText.includes('thikana') || lowerText.includes('collection')));
+
+  if (isImageRequest) {
+    // Check if user mentioned a specific product (e.g. Joypuri, kurti, saree, gown) or has one selected in session
+    let targetProducts = liveProducts.filter((p: any) => p.images && p.images.length > 0 && p.images[0]);
+    if (targetProducts.length === 0) targetProducts = liveProducts;
+
+    let matchedSpecificProds = targetProducts.filter((p: any) => {
+      const pTitle = p.title.toLowerCase();
+      const pCat = (p.category || '').toLowerCase();
+      const words = pTitle.split(/\s+/).filter((w: string) => w.length >= 3);
+      return (
+        (session.selectedProduct && pTitle.includes(session.selectedProduct.toLowerCase())) ||
+        lowerText.includes(pTitle) ||
+        lowerText.includes(pCat) ||
+        words.some((w: string) => lowerText.includes(w))
+      );
+    });
+
+    let displayList = matchedSpecificProds.length > 0 ? matchedSpecificProds : targetProducts;
+    // Ensure we send a rich collection (up to 10 products)
+    if (displayList.length < 5) {
+      const others = targetProducts.filter((p: any) => !displayList.some((d: any) => d.id === p.id));
+      displayList = [...displayList, ...others];
+    }
+
+    const elements = displayList.slice(0, 10).map((p: any) => {
+      const imgUrl =
+        p.images && p.images[0]?.startsWith('http')
+          ? p.images[0]
+          : 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80';
+
+      return {
+        title: p.title.slice(0, 80),
+        subtitle: `${p.category || 'কালেকশন'} | দাম: ৳${p.basePrice}${p.stock ? ` | স্টক: ${p.stock}` : ''}`.slice(0, 80),
+        image_url: imgUrl,
+        buttons: [
+          {
+            type: 'postback' as const,
+            title: `🛍️ অর্ডার (৳${p.basePrice})`.slice(0, 20),
+            payload: `PROD_${p.id}`,
+          },
+        ],
+      };
+    });
+
+    const leadText = matchedSpecificProds.length > 0
+      ? `জি অবশ্যই! 🌸 নিচে '${matchedSpecificProds[0].title}'-সহ আমাদের রানিং কালেকশনের আসল ছবি ও মূল্য দেওয়া হলো:\n\nপছন্দের ড্রেসের নিচের '🛍️ অর্ডার করুন' বাটনে চাপ দিয়ে অথবা আপনার নাম ও ঠিকানা পাঠিয়ে সরাসরি অর্ডার কনফার্ম করতে পারেন! ✨`
+      : `জি অবশ্যই! 🌸 নিচে আমাদের স্টোরের রানিং কালেকশনের আসল ছবি ও মূল্য তালিকা দেওয়া হলো:\n\nপছন্দের ড্রেসের নিচের '🛍️ অর্ডার করুন' বাটনে চাপ দিয়ে সরাসরি অর্ডার করতে পারেন! ✨`;
+
+    recordChatTurn(senderId, rawText, `[Sent Product Images Carousel]`);
+
+    // 1. Send text intro
+    await sendFbMessage(senderId, leadText, pageToken);
+    // 2. Send Facebook Generic Template Carousel with images & order buttons
+    await sendFbGenericTemplate(senderId, elements, pageToken);
+    return;
+  }
+
+  // 6. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
   const isBusinessKeywords = 
     lowerText.includes('order') ||
     lowerText.includes('product') ||
@@ -511,7 +593,7 @@ async function processMessengerEvent(
     return;
   }
 
-  // 6. If Gemini AI Key is available, prioritize Google AI Studio with LIVE DB Products
+  // 7. If Gemini AI Key is available, prioritize Google AI Studio with LIVE DB Products
   if (geminiKey && rawText && !payload) {
     const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey, recentOrder, settings, liveProducts);
     if (replyText) {
@@ -964,46 +1046,6 @@ async function processMessengerEvent(
     }
   }
 
-  // IF USER ASKS TO SEE PHOTOS / PICTURES (IMAGE QUERY):
-  const isImageRequest =
-    lowerText.includes('chobi') ||
-    lowerText.includes('picture') ||
-    lowerText.includes('photo') ||
-    lowerText.includes('pic') ||
-    lowerText.includes('ছবি') ||
-    lowerText.includes('পিকচার') ||
-    lowerText.includes('পিক');
-
-  if (isImageRequest) {
-    recordChatTurn(senderId, rawText, '[Sent Dynamic Product Photo Carousel]');
-
-    // Filter products that have images
-    let productsWithImages = liveProducts.filter((p: any) => p.images && p.images.length > 0 && p.images[0]);
-    if (productsWithImages.length === 0) productsWithImages = liveProducts;
-
-    // Build rich Facebook Generic Template carousel (up to 10 items)
-    const elements = productsWithImages.slice(0, 10).map((p: any) => {
-      const imgUrl = (p.images && p.images[0]?.startsWith('http')) 
-        ? p.images[0] 
-        : 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80';
-
-      return {
-        title: p.title.slice(0, 80),
-        subtitle: `${p.category || 'কালেকশন'} | দাম: ৳${p.basePrice}${p.stock ? ` | স্টক: ${p.stock}` : ''}`.slice(0, 80),
-        image_url: imgUrl,
-        buttons: [
-          {
-            type: 'postback' as const,
-            title: `🛍️ অর্ডার (৳${p.basePrice})`.slice(0, 20),
-            payload: `PROD_${p.id}`,
-          },
-        ],
-      };
-    });
-
-    await sendFbGenericTemplate(senderId, elements, pageToken);
-    return;
-  }
 
   // IF USER ASKS WHAT PRODUCTS ARE AVAILABLE (CATALOG QUERY):
   if (isCatalogQuery || isPriceQuery) {
