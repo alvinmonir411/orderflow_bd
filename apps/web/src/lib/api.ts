@@ -407,6 +407,42 @@ class StorageApi {
     return newProduct;
   }
 
+  async updateProduct(productData: Partial<Product> & { id: string }): Promise<Product> {
+    try {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productData),
+        });
+      }
+    } catch (e) {}
+
+    const products = this.getProductsFromStorage();
+    const index = products.findIndex((p) => p.id === productData.id);
+    if (index !== -1) {
+      products[index] = { ...products[index], ...productData };
+      this.saveProductsToStorage(products);
+      return products[index];
+    }
+    return productData as Product;
+  }
+
+  async deleteProduct(productId: string): Promise<boolean> {
+    try {
+      if (typeof window !== 'undefined') {
+        await fetch(`/api/products?id=${productId}`, {
+          method: 'DELETE',
+        });
+      }
+    } catch (e) {}
+
+    const products = this.getProductsFromStorage();
+    const filtered = products.filter((p) => p.id !== productId);
+    this.saveProductsToStorage(filtered);
+    return true;
+  }
+
   async getMetrics(): Promise<DashboardMetrics> {
     const orders = await this.getOrders();
     const products = this.getProductsFromStorage();
