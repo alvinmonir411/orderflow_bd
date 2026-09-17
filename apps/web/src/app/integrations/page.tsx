@@ -200,6 +200,48 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
+        {/* WhatsApp Business Cloud API Integration */}
+        <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-green-600 flex items-center justify-center text-white font-black shadow-md shadow-emerald-600/30">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">WhatsApp Cloud API</h3>
+                  <p className="text-xs text-neutral-400">মেসেঞ্জারের মতো হোয়াটসঅ্যাপেও ২৪/৭ অটো সেলস বট</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl">
+                সক্রিয়
+              </span>
+            </div>
+
+            <div className="space-y-3 pt-1 text-xs text-neutral-300">
+              <div className="p-3 bg-[#0a0c12] border border-neutral-800 rounded-2xl space-y-2">
+                <p className="font-semibold text-neutral-200">Meta Developers Webhook সেটিংস:</p>
+                <div className="space-y-1">
+                  <p className="text-[11px] text-neutral-400 font-mono">Callback URL:</p>
+                  <code className="block p-2 bg-neutral-900 border border-neutral-750 rounded-xl text-emerald-400 select-all break-all">
+                    https://orderflowbd.vercel.app/webhooks/whatsapp
+                  </code>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] text-neutral-400 font-mono">Verify Token:</p>
+                  <code className="block p-2 bg-neutral-900 border border-neutral-750 rounded-xl text-emerald-400 select-all">
+                    orderflow_bd_verify_token
+                  </code>
+                </div>
+              </div>
+
+              <p className="text-neutral-400 leading-relaxed">
+                💡 এছাড়াও ড্যাশবোর্ডের প্রতিটি অর্ডারে <strong>"মেসেজ"</strong> বাটনে চাপ দিয়ে সরাসরি ১-ক্লিকেই কাস্টমারকে হোয়াটসঅ্যাপে অর্ডার রিসিট ও ট্র্যাকিং কোড পাঠাতে পারবেন।
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Bangladeshi SMS Gateway Integration (Spanning 2 cols) */}
         <div className="md:col-span-2 bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl">
           <div className="flex items-center justify-between">
