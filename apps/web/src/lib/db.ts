@@ -152,13 +152,29 @@ export async function initDatabase() {
           '২ থেকে ৩ কার্যদিবস',
           120,
           150,
-          '01700000000',
-          'পণ্য হাতে পেয়ে চেক করে নেওয়ার সুবিধা এবং ৩ দিনের মধ্যে ফ্রি সাইজ পরিবর্তন।',
           ${JSON.stringify(DEFAULT_FAQS)}::jsonb,
           NOW()
         );
       `;
     }
+
+    // 4. Ensure ChatMessage table exists for persistent live chat across serverless instances
+    await sql`
+      CREATE TABLE IF NOT EXISTS "ChatMessage" (
+        "id" TEXT PRIMARY KEY,
+        "senderId" TEXT NOT NULL,
+        "customerName" TEXT,
+        "sender" TEXT NOT NULL,
+        "text" TEXT NOT NULL,
+        "channel" TEXT DEFAULT 'FACEBOOK_MESSENGER',
+        "productTitle" TEXT,
+        "productPrice" NUMERIC,
+        "productImage" TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS "idx_chat_senderId" ON "ChatMessage" ("senderId");`;
+    await sql`CREATE INDEX IF NOT EXISTS "idx_chat_createdAt" ON "ChatMessage" ("createdAt" DESC);`;
   } catch (err) {
     console.error('[DB Init Error]:', err);
   }
@@ -582,6 +598,88 @@ export async function getDbProducts() {
     return products;
   } catch (err) {
     console.error('[DB Get Products Error]:', err);
+    return [];
+  }
+}
+
+export async function saveDbChatMessage(data: {
+  senderId: string;
+  customerName?: string;
+  sender: 'customer' | 'ai' | 'admin';
+  text: string;
+  channel?: string;
+  productTitle?: string;
+  productPrice?: number;
+  productImage?: string;
+}) {
+  const sql = getSql();
+  try {
+    await initDatabase();
+    const id = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    await sql`
+      INSERT INTO "ChatMessage" (
+        "id", "senderId", "customerName", "sender", "text", "channel",
+        "productTitle", "productPrice", "productImage", "createdAt"
+      ) VALUES (
+        ${id}, ${data.senderId}, ${data.customerName || null}, ${data.sender}, ${data.text},
+        ${data.channel || 'FACEBOOK_MESSENGER'}, ${data.productTitle || null},
+        ${data.productPrice || null}, ${data.productImage || null}, NOW()
+      );
+    `;
+    return true;
+  } catch (err) {
+    console.error('[DB Save Chat Message Error]:', err);
+    return false;
+  }
+}
+
+export async function getDbChatMessagesBySender(senderId: string) {
+  const sql = getSql();
+  try {
+    await initDatabase();
+    const rows = await sql`
+      SELECT id, "senderId", "customerName", sender, text, channel, "productTitle", "productPrice"::float as "productPrice", "productImage", "createdAt"
+      FROM "ChatMessage"
+      WHERE "senderId" = ${senderId}
+      ORDER BY "createdAt" ASC;
+    `;
+    return rows;
+  } catch (err) {
+    console.error('[DB Get Chat Messages Error]:', err);
+    return [];
+  }
+}
+
+export async function getDbChatThreads() {
+  const sql = getSql();
+  try {
+    await initDatabase();
+    const rows = await sql`
+      SELECT 
+        m."senderId",
+        m.sender,
+        m.text as "lastText",
+        m.channel,
+        m."productTitle",
+        m."productPrice"::float as "productPrice",
+        m."productImage",
+        m."createdAt" as "lastTime",
+        c.name as "c_name",
+        c.phone as "c_phone",
+        c.address as "c_address"
+      FROM "ChatMessage" m
+      LEFT JOIN "Customer" c ON (m."senderId" = c.psid OR m."senderId" = c.phone)
+      WHERE m.id IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (PARTITION BY "senderId" ORDER BY "createdAt" DESC) as rn
+          FROM "ChatMessage"
+        ) sub WHERE sub.rn = 1
+      )
+      ORDER BY m."createdAt" DESC;
+    `;
+    return rows;
+  } catch (err) {
+    console.error('[DB Get Chat Threads Error]:', err);
     return [];
   }
 }

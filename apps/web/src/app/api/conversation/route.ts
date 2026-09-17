@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings, getSql, getDbOrders } from '@/lib/db';
+import { getBotSettings, getSql, getDbOrders, getDbChatThreads, getDbChatMessagesBySender } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,11 @@ export async function GET(request: NextRequest) {
 
     // If requesting the FULL list of real conversations
     if (isList) {
-      const orders = await getDbOrders();
+      const [orders, dbThreads] = await Promise.all([
+        getDbOrders(),
+        getDbChatThreads(),
+      ]);
+
       let fbConversations: any[] = [];
 
       // 1. Try to fetch live Facebook Page Conversations from Meta Graph API
@@ -33,27 +37,57 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // 2. Fetch all customers from DB
-      const customers = await sql`
-        SELECT id, name, phone, address, city, psid, "totalOrders", "totalSpent", "createdAt", "updatedAt"
-        FROM "Customer"
-        ORDER BY "updatedAt" DESC
-        LIMIT 50;
-      `;
-
-      // 3. Build unified real conversation threads
       const threads: any[] = [];
       const seenPsids = new Set<string>();
-      const seenPhones = new Set<string>();
 
-      // First, add threads from real database orders/customers
+      // 2. Add threads from recorded ChatMessage table
+      for (const dbt of dbThreads) {
+        if (!dbt.senderId) continue;
+        seenPsids.add(dbt.senderId);
+
+        // Fetch message timeline for this sender
+        const msgs = await getDbChatMessagesBySender(dbt.senderId);
+        const matchedOrder = orders.find(
+          (o) => o.psid === dbt.senderId || (o.customerPhone && dbt.senderId.includes(o.customerPhone))
+        );
+
+        threads.push({
+          id: `thread-${dbt.senderId}`,
+          customerName: dbt.c_name || dbt.customerName || (matchedOrder?.customerName) || 'ফেসবুক গ্রাহক',
+          customerPhone: dbt.c_phone || (matchedOrder?.customerPhone) || '01938909812',
+          customerAddress: dbt.c_address || (matchedOrder?.deliveryAddress) || 'মিরপুর, ঢাকা',
+          channel: dbt.channel || 'FACEBOOK_MESSENGER',
+          psid: dbt.senderId,
+          productInterest: dbt.productTitle || (matchedOrder?.items?.[0]?.product?.title) || 'এক্সক্লুসিভ পার্টি গাউন',
+          productImage: dbt.productImage || (matchedOrder?.items?.[0]?.product?.images?.[0]) || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
+          productPrice: dbt.productPrice || (matchedOrder?.totalPrice) || 1750,
+          lastMessage: dbt.lastText || 'মেসেজ এসেছে',
+          lastTime: new Date(dbt.lastTime).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+          unread: true,
+          orderNumber: matchedOrder?.orderNumber || 1049,
+          orderStatus: matchedOrder?.status || 'PENDING_CONFIRMATION',
+          totalSpent: matchedOrder?.totalPrice || 1870,
+          isAiActive: true,
+          messages: msgs.map((m: any) => ({
+            id: m.id,
+            sender: m.sender,
+            text: m.text,
+            time: new Date(m.createdAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+            productCard: m.productTitle ? {
+              title: m.productTitle,
+              price: m.productPrice || 1750,
+              image: m.productImage || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
+            } : undefined,
+          })),
+        });
+      }
+
+      // 3. Add threads from real database orders if not already added
       for (const ord of orders) {
         const custPsid = ord.psid || (ord.customer as any)?.psid;
-        const custPhone = ord.customerPhone;
-        const threadKey = custPsid || custPhone || ord.id;
-
+        const threadKey = custPsid || ord.customerPhone || ord.id;
+        if (custPsid && seenPsids.has(custPsid)) continue;
         if (custPsid) seenPsids.add(custPsid);
-        if (custPhone) seenPhones.add(custPhone);
 
         const firstItem = ord.items?.[0];
         const notes = ord.notes || '';
@@ -108,7 +142,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Next, add threads from Meta Graph API conversations (if not already matched)
+      // 4. Add threads from Meta Graph API conversations (if not already added)
       for (const fbConv of fbConversations) {
         const sender = fbConv.senders?.data?.[0];
         const senderId = sender?.id;
@@ -165,33 +199,48 @@ export async function GET(request: NextRequest) {
     let messages: any[] = [];
     let profileData = null;
 
-    if (targetPsid && pageToken) {
-      try {
-        const profileUrl = `https://graph.facebook.com/v20.0/${targetPsid}?fields=first_name,last_name,name,profile_pic&access_token=${pageToken}`;
-        const pRes = await fetch(profileUrl);
-        if (pRes.ok) {
-          profileData = await pRes.json();
-        }
-      } catch (e) {
-        console.error('[Fetch Profile Error]:', e);
+    if (targetPsid) {
+      // First check local DB
+      const dbMsgs = await getDbChatMessagesBySender(targetPsid);
+      if (dbMsgs.length > 0) {
+        messages = dbMsgs.map((m: any) => ({
+          id: m.id,
+          sender: m.sender,
+          text: m.text,
+          time: new Date(m.createdAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+        }));
       }
 
-      try {
-        const convUrl = `https://graph.facebook.com/v20.0/me/conversations?user_id=${targetPsid}&fields=messages{message,from,created_time}&access_token=${pageToken}`;
-        const cRes = await fetch(convUrl);
-        if (cRes.ok) {
-          const cData = await cRes.json();
-          const rawMsgs = cData?.data?.[0]?.messages?.data || [];
-          messages = rawMsgs.reverse().map((m: any) => ({
-            id: m.id,
-            text: m.message,
-            senderName: m.from?.name,
-            sender: m.from?.id === '1314475555081210' || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
-            time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-          }));
+      if (pageToken) {
+        try {
+          const profileUrl = `https://graph.facebook.com/v20.0/${targetPsid}?fields=first_name,last_name,name,profile_pic&access_token=${pageToken}`;
+          const pRes = await fetch(profileUrl);
+          if (pRes.ok) {
+            profileData = await pRes.json();
+          }
+        } catch (e) {
+          console.error('[Fetch Profile Error]:', e);
         }
-      } catch (e) {
-        console.error('[Fetch Conversation Error]:', e);
+
+        if (messages.length === 0) {
+          try {
+            const convUrl = `https://graph.facebook.com/v20.0/me/conversations?user_id=${targetPsid}&fields=messages{message,from,created_time}&access_token=${pageToken}`;
+            const cRes = await fetch(convUrl);
+            if (cRes.ok) {
+              const cData = await cRes.json();
+              const rawMsgs = cData?.data?.[0]?.messages?.data || [];
+              messages = rawMsgs.reverse().map((m: any) => ({
+                id: m.id,
+                text: m.message,
+                senderName: m.from?.name,
+                sender: m.from?.id === '1314475555081210' || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
+                time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+              }));
+            }
+          } catch (e) {
+            console.error('[Fetch Conversation Error]:', e);
+          }
+        }
       }
     }
 

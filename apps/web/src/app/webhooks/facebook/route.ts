@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings, insertDbOrder, findCustomerLatestOrder, getDbProducts, BotFaqItem } from '@/lib/db';
+import { getBotSettings, insertDbOrder, findCustomerLatestOrder, getDbProducts, saveDbChatMessage, BotFaqItem } from '@/lib/db';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -181,15 +181,47 @@ function extractNameAndAddress(text: string, phone?: string): { name: string; ad
   return { name, address };
 }
 
-// Record chat turn in session memory
-function recordChatTurn(senderId: string, userText: string, botText: string) {
+// Record chat turn in session memory and PostgreSQL database
+async function recordChatTurn(
+  senderId: string,
+  userText: string,
+  botText: string,
+  extra?: { productTitle?: string; productPrice?: number; customerName?: string }
+) {
   const session = userSessions[senderId];
-  if (!session) return;
-  if (!session.history) session.history = [];
-  session.history.push({ role: 'user', text: userText });
-  session.history.push({ role: 'model', text: botText });
-  if (session.history.length > 14) {
-    session.history = session.history.slice(-14);
+  if (session) {
+    if (!session.history) session.history = [];
+    session.history.push({ role: 'user', text: userText });
+    session.history.push({ role: 'model', text: botText });
+    if (session.history.length > 14) {
+      session.history = session.history.slice(-14);
+    }
+  }
+
+  // Persist to Neon PostgreSQL ChatMessage table
+  try {
+    if (userText) {
+      await saveDbChatMessage({
+        senderId,
+        customerName: extra?.customerName || session?.customerName,
+        sender: 'customer',
+        text: userText,
+        channel: 'FACEBOOK_MESSENGER',
+      });
+    }
+    if (botText) {
+      await saveDbChatMessage({
+        senderId,
+        customerName: extra?.customerName || session?.customerName,
+        sender: 'ai',
+        text: botText,
+        channel: 'FACEBOOK_MESSENGER',
+        productTitle: extra?.productTitle || session?.selectedProduct,
+        productPrice: extra?.productPrice || session?.price,
+      });
+    }
+  } catch (dbErr) {
+    console.error('[Persist Chat Message Error]:', dbErr);
   }
 }
 
