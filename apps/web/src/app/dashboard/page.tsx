@@ -93,63 +93,72 @@ export default function DashboardPage() {
     loadData();
   };
 
-  // Compute 7-day sales chart data
+  // Compute 7-day sales chart data based purely on real database orders
   const chartData = useMemo(() => {
-    const today = new Date().getDay();
+    const dayNames = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+    const today = new Date();
     const orderedDays: Array<{ name: string; sales: number; orders: number }> = [];
 
     for (let i = 6; i >= 0; i--) {
-      const dayIdx = (today - i + 7) % 7;
-      // Day names mapping in Bangla
-      const dayNames = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
-      const dName = dayNames[dayIdx];
-      
-      // Calculate realistic day distribution based on all orders
-      const dayOrders = allOrders.filter((_, idx) => (idx + i) % 7 === 0);
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dName = dayNames[d.getDay()];
+      const dString = d.toISOString().split('T')[0];
+
+      // Find actual real orders created on this exact date
+      const dayOrders = allOrders.filter((o) => {
+        if (!o.createdAt) return false;
+        try {
+          const oDate = new Date(o.createdAt).toISOString().split('T')[0];
+          return oDate === dString;
+        } catch {
+          return false;
+        }
+      });
+
       const daySales = dayOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-      
+
       orderedDays.push({
         name: dName,
-        sales: daySales > 0 ? daySales : (i === 0 ? (metrics?.todayOrders ? metrics.todayOrders * 1250 : 2500) : (i * 1150 + 850)),
-        orders: dayOrders.length > 0 ? dayOrders.length : (i === 0 ? (metrics?.todayOrders || 2) : (i % 3 + 1)),
+        sales: daySales,
+        orders: dayOrders.length,
       });
     }
     return orderedDays;
-  }, [allOrders, metrics]);
+  }, [allOrders]);
 
-  // Compute Top Selling Products
+  // Compute Top Selling Products from purely real orders
   const topProducts = useMemo(() => {
     const map: Record<string, { title: string; count: number; revenue: number; category: string }> = {};
     for (const ord of allOrders) {
-      for (const it of ord.items) {
+      for (const it of ord.items || []) {
         const title = it.product?.title || 'প্রিমিয়াম কালেকশন';
         if (!map[title]) {
           map[title] = {
             title,
             count: 0,
             revenue: 0,
-            category: title.includes('থ্রি-পিস') ? 'থ্রি-পিস' : title.includes('কুর্তি') ? 'কুর্তি' : title.includes('শাড়ি') ? 'শাড়ি' : 'পার্টি গাউন',
+            category: title.includes('থ্রি-পিস') ? 'থ্রি-পিস' : title.includes('কুর্তি') ? 'কুর্তি' : title.includes('শাড়ি') ? 'শাড়ি' : 'কালেকশন',
           };
         }
         map[title].count += it.quantity || 1;
-        map[title].revenue += (it.unitPrice || 1250) * (it.quantity || 1);
+        map[title].revenue += (it.unitPrice || 0) * (it.quantity || 1);
       }
     }
 
     const list = Object.values(map).sort((a, b) => b.count - a.count);
-    if (list.length === 0) {
-      return [
-        { title: 'জয়পুরি কটন আনস্টিচড থ্রি-পিস', count: 18, revenue: 22500, category: 'থ্রি-পিস' },
-        { title: 'প্রিমিয়াম কাশ্মীরি কুর্তি', count: 14, revenue: 11900, category: 'কুর্তি' },
-        { title: 'ডিজাইনার সিল্ক পার্টি গাউন', count: 9, revenue: 13500, category: 'গাউন' },
-        { title: 'অরগানজা ডিজিটাল প্রিন্ট লাক্সারি থ্রি-পিস', count: 7, revenue: 11550, category: 'থ্রি-পিস' },
-      ];
-    }
     return list.slice(0, 4);
   }, [allOrders]);
 
   const totalSalesAmount = metrics?.totalRevenue ?? 0;
-  const aov = allOrders.length > 0 ? Math.round(totalSalesAmount / allOrders.length) : 1250;
+  const aov = allOrders.length > 0 ? Math.round(totalSalesAmount / allOrders.length) : 0;
+  const successRate = allOrders.length > 0
+    ? Math.round(
+        (allOrders.filter((o) => o.status === 'DELIVERED' || o.status === 'CONFIRMED' || o.status === 'DISPATCHED_TO_COURIER').length /
+          allOrders.length) *
+          100
+      )
+    : 0;
 
   return (
     <div className="space-y-8 pb-16">
@@ -338,7 +347,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
-              ৯৮.৪%
+              {successRate > 0 ? `${successRate}%` : '০%'}
             </div>
             <p className="text-[11px] text-neutral-400 mt-1">কম রিটার্ন রিস্ক</p>
           </div>
@@ -432,33 +441,39 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-3 my-2">
-            {topProducts.map((prod, idx) => (
-              <div
-                key={idx}
-                className="p-3 bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800/80 rounded-2xl flex items-center justify-between gap-3 transition-all"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 h-6 rounded-lg bg-neutral-800 text-neutral-300 font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-neutral-200 truncate">{prod.title}</p>
-                    <span className="text-[10px] px-2 py-0.5 bg-neutral-800 text-neutral-400 rounded-md">
-                      {prod.category}
+            {topProducts.length === 0 ? (
+              <div className="py-8 text-center text-neutral-500 text-xs">
+                এখনও কোনো পণ্য বিক্রয় হয়নি।
+              </div>
+            ) : (
+              topProducts.map((prod, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800/80 rounded-2xl flex items-center justify-between gap-3 transition-all"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 h-6 rounded-lg bg-neutral-800 text-neutral-300 font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
                     </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-neutral-200 truncate">{prod.title}</p>
+                      <span className="text-[10px] px-2 py-0.5 bg-neutral-800 text-neutral-400 rounded-md">
+                        {prod.category}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <p className="text-xs font-black text-emerald-400 font-mono">
+                      ৳{prod.revenue.toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-neutral-400 font-medium">
+                      {prod.count} টি বিক্রয়
+                    </p>
                   </div>
                 </div>
-
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-black text-emerald-400 font-mono">
-                    ৳{prod.revenue.toLocaleString()}
-                  </p>
-                  <p className="text-[10px] text-neutral-400 font-medium">
-                    {prod.count} টি বিক্রয়
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           <div className="p-3 bg-gradient-to-r from-emerald-950/30 to-teal-950/20 border border-emerald-500/20 rounded-2xl flex items-center justify-between text-xs">
