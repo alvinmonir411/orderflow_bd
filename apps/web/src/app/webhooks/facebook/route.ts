@@ -510,7 +510,17 @@ async function processMessengerEvent(
         title: p.title.slice(0, 80),
         subtitle: `${p.category || 'কালেকশন'} | দাম: ৳${p.basePrice}${p.stock ? ` | স্টক: ${p.stock}` : ''}`.slice(0, 80),
         image_url: imgUrl,
+        default_action: {
+          type: 'web_url' as const,
+          url: imgUrl,
+          webview_height_ratio: 'full' as const,
+        },
         buttons: [
+          {
+            type: 'web_url' as const,
+            url: imgUrl,
+            title: '🔍 ফুল ছবি দেখুন',
+          },
           {
             type: 'postback' as const,
             title: `🛍️ অর্ডার (৳${p.basePrice})`.slice(0, 20),
@@ -521,15 +531,23 @@ async function processMessengerEvent(
     });
 
     const leadText = matchedSpecificProds.length > 0
-      ? `জি অবশ্যই! 🌸 নিচে '${matchedSpecificProds[0].title}'-সহ আমাদের রানিং কালেকশনের আসল ছবি ও মূল্য দেওয়া হলো:\n\nপছন্দের ড্রেসের নিচের '🛍️ অর্ডার করুন' বাটনে চাপ দিয়ে অথবা আপনার নাম ও ঠিকানা পাঠিয়ে সরাসরি অর্ডার কনফার্ম করতে পারেন! ✨`
-      : `জি অবশ্যই! 🌸 নিচে আমাদের স্টোরের রানিং কালেকশনের আসল ছবি ও মূল্য তালিকা দেওয়া হলো:\n\nপছন্দের ড্রেসের নিচের '🛍️ অর্ডার করুন' বাটনে চাপ দিয়ে সরাসরি অর্ডার করতে পারেন! ✨`;
+      ? `জি অবশ্যই! 🌸 নিচে '${matchedSpecificProds[0].title}'-সহ আমাদের রানিং কালেকশনের বড় ছবি দেওয়া হলো।\n\n💡 ছবিতে অথবা '🔍 ফুল ছবি দেখুন' বাটনে চাপ দিলে সম্পূর্ণ ফুল-সাইজ HD ছবি দেখতে পাবেন! অর্ডার করতে '🛍️ অর্ডার করুন' বাটনে চাপ দিন। ✨`
+      : `জি অবশ্যই! 🌸 নিচে আমাদের স্টোরের রানিং কালেকশনের বড় ছবি ও মূল্য তালিকা দেওয়া হলো।\n\n💡 ছবিতে অথবা '🔍 ফুল ছবি দেখুন' বাটনে চাপ দিলে সম্পূর্ণ ফুল-সাইজ HD ছবি দেখতে পাবেন! ✨`;
 
-    recordChatTurn(senderId, rawText, `[Sent Product Images Carousel]`);
+    recordChatTurn(senderId, rawText, `[Sent High-Res Product Images Carousel]`);
 
-    // 1. Send text intro
+    // 1. If specific product matched, also send native full-width image attachment for huge view
+    if (matchedSpecificProds.length > 0 && matchedSpecificProds[0].images?.[0]) {
+      const topImg = matchedSpecificProds[0].images[0];
+      if (topImg.startsWith('http')) {
+        await sendFbImageAttachment(senderId, topImg, pageToken);
+      }
+    }
+
+    // 2. Send text intro
     await sendFbMessage(senderId, leadText, pageToken);
-    // 2. Send Facebook Generic Template Carousel with images & order buttons
-    await sendFbGenericTemplate(senderId, elements, pageToken);
+    // 3. Send Facebook Generic Template Carousel with square 1:1 ratio and default_action full-image view
+    await sendFbGenericTemplate(senderId, elements, pageToken, 'square');
     return;
   }
 
@@ -1226,15 +1244,52 @@ async function sendFbQuickReplies(
   }
 }
 
+async function sendFbImageAttachment(recipientId: string, imageUrl: string, token?: string) {
+  const activeToken = token || HARDCODED_TOKEN;
+  if (!activeToken || !imageUrl) return;
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v20.0/me/messages?access_token=${activeToken}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: {
+          attachment: {
+            type: 'image',
+            payload: {
+              url: imageUrl,
+              is_reusable: true,
+            },
+          },
+        },
+      }),
+    });
+    const data = await res.json();
+    console.log('[Facebook Direct Image Attachment Result]:', data);
+  } catch (err) {
+    console.error('[Facebook Direct Image Attachment Error]:', err);
+  }
+}
+
 async function sendFbGenericTemplate(
   recipientId: string,
   elements: Array<{
     title: string;
     subtitle?: string;
     image_url?: string;
-    buttons?: Array<{ type: 'postback'; title: string; payload: string }>;
+    default_action?: {
+      type: 'web_url';
+      url: string;
+      webview_height_ratio?: 'compact' | 'tall' | 'full';
+    };
+    buttons?: Array<
+      | { type: 'postback'; title: string; payload: string }
+      | { type: 'web_url'; title: string; url: string; webview_height_ratio?: string }
+    >;
   }>,
   token?: string,
+  imageAspectRatio: 'square' | 'horizontal' = 'square',
 ) {
   const activeToken = token || HARDCODED_TOKEN;
   if (!activeToken) {
@@ -1253,6 +1308,7 @@ async function sendFbGenericTemplate(
             type: 'template',
             payload: {
               template_type: 'generic',
+              image_aspect_ratio: imageAspectRatio,
               elements: elements.slice(0, 10),
             },
           },
@@ -1265,5 +1321,6 @@ async function sendFbGenericTemplate(
     console.error('[Facebook Generic Template Error]:', err);
   }
 }
+
 
 
