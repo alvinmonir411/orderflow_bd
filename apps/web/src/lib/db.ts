@@ -139,6 +139,9 @@ export async function initDatabase() {
         "whatsappPhoneId" TEXT DEFAULT '',
         "whatsappToken" TEXT DEFAULT '',
         "whatsappBusinessId" TEXT DEFAULT '',
+        "waapiInstanceId" TEXT DEFAULT '104344',
+        "waapiApiToken" TEXT DEFAULT 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+        "whatsappProvider" TEXT DEFAULT 'WAAPI',
         "smsApiKey" TEXT DEFAULT '',
         "smsSenderId" TEXT DEFAULT '',
         "updatedAt" TIMESTAMP DEFAULT NOW()
@@ -150,13 +153,27 @@ export async function initDatabase() {
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "steadfastSecretKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoClientId" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoSecretKey" TEXT DEFAULT '';`;
-    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappConnected" BOOLEAN DEFAULT FALSE;`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappConnected" BOOLEAN DEFAULT TRUE;`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhone" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhoneId" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappToken" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappBusinessId" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiInstanceId" TEXT DEFAULT '104344';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "waapiApiToken" TEXT DEFAULT 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappProvider" TEXT DEFAULT 'WAAPI';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsApiKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsSenderId" TEXT DEFAULT '';`;
+
+    // Ensure default settings row is updated with user's Waapi credentials
+    await sql`
+      UPDATE "BotSettings"
+      SET 
+        "waapiInstanceId" = '104344',
+        "waapiApiToken" = 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+        "whatsappConnected" = TRUE,
+        "whatsappProvider" = 'WAAPI'
+      WHERE "id" = 'settings-1' AND ("waapiInstanceId" IS NULL OR "waapiInstanceId" = '' OR "waapiInstanceId" = '104344');
+    `;
 
     // Insert default bot settings if empty
     const settingsExist = await sql`SELECT COUNT(*)::int as count FROM "BotSettings" WHERE "id" = 'settings-1'`;
@@ -168,6 +185,7 @@ export async function initDatabase() {
           "helplinePhone", "returnPolicy", "faqs", "steadfastApiKey", "steadfastSecretKey",
           "pathaoClientId", "pathaoSecretKey", "whatsappConnected", "whatsappPhone",
           "whatsappPhoneId", "whatsappToken", "whatsappBusinessId",
+          "waapiInstanceId", "waapiApiToken", "whatsappProvider",
           "smsApiKey", "smsSenderId", "updatedAt"
         ) VALUES (
           'settings-1', 'store-1',
@@ -186,11 +204,14 @@ export async function initDatabase() {
           '',
           '',
           '',
-          false,
+          true,
           '',
           '',
           '',
           '',
+          '104344',
+          'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+          'WAAPI',
           '',
           'OrderFlowBD',
           NOW()
@@ -245,11 +266,14 @@ export async function getBotSettings() {
         steadfastSecretKey: row.steadfastSecretKey || '',
         pathaoClientId: row.pathaoClientId || '',
         pathaoSecretKey: row.pathaoSecretKey || '',
-        whatsappConnected: Boolean(row.whatsappConnected),
+        whatsappConnected: row.whatsappConnected !== undefined ? Boolean(row.whatsappConnected) : Boolean(row.waapiInstanceId),
         whatsappPhone: row.whatsappPhone || '',
         whatsappPhoneId: row.whatsappPhoneId || '',
         whatsappToken: row.whatsappToken || '',
         whatsappBusinessId: row.whatsappBusinessId || '',
+        waapiInstanceId: row.waapiInstanceId || '104344',
+        waapiApiToken: row.waapiApiToken || 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+        whatsappProvider: row.whatsappProvider || 'WAAPI',
         smsApiKey: row.smsApiKey || '',
         smsSenderId: row.smsSenderId || 'OrderFlowBD',
       };
@@ -275,11 +299,14 @@ export async function getBotSettings() {
     steadfastSecretKey: '',
     pathaoClientId: '',
     pathaoSecretKey: '',
-    whatsappConnected: false,
+    whatsappConnected: true,
     whatsappPhone: '',
     whatsappPhoneId: '',
     whatsappToken: '',
     whatsappBusinessId: '',
+    waapiInstanceId: '104344',
+    waapiApiToken: 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+    whatsappProvider: 'WAAPI',
     smsApiKey: '',
     smsSenderId: 'OrderFlowBD',
   };
@@ -306,6 +333,9 @@ export async function updateBotSettings(data: {
   whatsappPhoneId?: string;
   whatsappToken?: string;
   whatsappBusinessId?: string;
+  waapiInstanceId?: string;
+  waapiApiToken?: string;
+  whatsappProvider?: string;
   smsApiKey?: string;
   smsSenderId?: string;
 }) {
@@ -334,6 +364,9 @@ export async function updateBotSettings(data: {
     const whatsappPhoneId = data.whatsappPhoneId !== undefined ? data.whatsappPhoneId : current.whatsappPhoneId;
     const whatsappToken = data.whatsappToken !== undefined ? data.whatsappToken : current.whatsappToken;
     const whatsappBusinessId = data.whatsappBusinessId !== undefined ? data.whatsappBusinessId : current.whatsappBusinessId;
+    const waapiInstanceId = data.waapiInstanceId !== undefined ? data.waapiInstanceId : current.waapiInstanceId;
+    const waapiApiToken = data.waapiApiToken !== undefined ? data.waapiApiToken : current.waapiApiToken;
+    const whatsappProvider = data.whatsappProvider !== undefined ? data.whatsappProvider : current.whatsappProvider;
     const smsApiKey = data.smsApiKey !== undefined ? data.smsApiKey : current.smsApiKey;
     const smsSenderId = data.smsSenderId !== undefined ? data.smsSenderId : current.smsSenderId;
 
@@ -344,6 +377,7 @@ export async function updateBotSettings(data: {
         "helplinePhone", "returnPolicy", "faqs",
         "steadfastApiKey", "steadfastSecretKey", "pathaoClientId", "pathaoSecretKey",
         "whatsappConnected", "whatsappPhone", "whatsappPhoneId", "whatsappToken", "whatsappBusinessId",
+        "waapiInstanceId", "waapiApiToken", "whatsappProvider",
         "smsApiKey", "smsSenderId", "updatedAt"
       ) VALUES (
         'settings-1', 'store-1', ${systemPrompt}, ${geminiApiKey}, ${fbPageToken}, ${fbPageId},
@@ -351,6 +385,7 @@ export async function updateBotSettings(data: {
         ${helplinePhone}, ${returnPolicy}, ${JSON.stringify(faqs)}::jsonb,
         ${steadfastApiKey}, ${steadfastSecretKey}, ${pathaoClientId}, ${pathaoSecretKey},
         ${whatsappConnected}, ${whatsappPhone}, ${whatsappPhoneId}, ${whatsappToken}, ${whatsappBusinessId},
+        ${waapiInstanceId}, ${waapiApiToken}, ${whatsappProvider},
         ${smsApiKey}, ${smsSenderId}, NOW()
       )
       ON CONFLICT ("id") DO UPDATE SET
@@ -374,6 +409,9 @@ export async function updateBotSettings(data: {
         "whatsappPhoneId" = EXCLUDED."whatsappPhoneId",
         "whatsappToken" = EXCLUDED."whatsappToken",
         "whatsappBusinessId" = EXCLUDED."whatsappBusinessId",
+        "waapiInstanceId" = EXCLUDED."waapiInstanceId",
+        "waapiApiToken" = EXCLUDED."waapiApiToken",
+        "whatsappProvider" = EXCLUDED."whatsappProvider",
         "smsApiKey" = EXCLUDED."smsApiKey",
         "smsSenderId" = EXCLUDED."smsSenderId",
         "updatedAt" = NOW();
