@@ -613,21 +613,50 @@ export default function IntegrationsPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={isSavingWaapi}
-                    className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    {isSavingWaapi ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Waapi সেটিংস সেভ করুন</span>
-                      </>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={isSavingWaapi}
+                      className="flex-1 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      {isSavingWaapi ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Waapi সেটিংস সেভ করুন</span>
+                        </>
+                      )}
+                    </button>
+                    {(waapiInstanceId || waConnected) && (
+                      <button
+                        type="button"
+                        onClick={handleDisconnectWhatsApp}
+                        disabled={isDisconnectingWa}
+                        className="px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/25 font-bold text-xs rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>{isDisconnectingWa ? 'ক্লিয়ার হচ্ছে...' : 'ডিসকানেক্ট'}</span>
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </form>
+              </div>
+            )}
+
+            {/* Global Disconnect Footer if any WhatsApp credentials exist */}
+            {(metaPhoneId || waapiInstanceId || waConnected || metaWaConnected) && (
+              <div className="pt-2 border-t border-neutral-850 flex items-center justify-between">
+                <span className="text-[11px] text-neutral-500">হোয়াটসঅ্যাপ সংযোগ বন্ধ রাখতে চান?</span>
+                <button
+                  type="button"
+                  onClick={handleDisconnectWhatsApp}
+                  disabled={isDisconnectingWa}
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/25 font-bold text-[11px] rounded-xl transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <XCircle className="w-3.5 h-3.5 text-red-400" />
+                  <span>{isDisconnectingWa ? 'বিচ্ছিন্ন হচ্ছে...' : 'WhatsApp সম্পূর্ণ ডিসকানেক্ট করুন'}</span>
+                </button>
               </div>
             )}
           </div>
