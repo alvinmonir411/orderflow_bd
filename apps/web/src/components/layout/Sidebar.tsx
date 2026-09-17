@@ -29,7 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     {
       name: 'ড্যাশবোর্ড',
       sub: 'Overview & Metrics',
-      href: '/',
+      href: '/dashboard',
       icon: LayoutDashboard,
       gradient: 'from-emerald-500/20 to-teal-500/10',
     },

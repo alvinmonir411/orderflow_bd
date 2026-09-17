@@ -1,675 +1,878 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
-import { Order, DashboardMetrics } from '@/lib/types';
-import { formatBDTEn } from '@/lib/utils';
-import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge';
-import { InvoiceModal } from '@/components/orders/InvoiceModal';
-import { LiveBotTester } from '@/components/bot/LiveBotTester';
 import {
-  Package,
-  Clock,
-  Truck,
-  AlertTriangle,
-  ArrowUpRight,
-  Printer,
-  Sparkles,
-  Bot,
-  PlusCircle,
-  ExternalLink,
-  PhoneCall,
-  CheckCircle2,
-  TrendingUp,
-  RefreshCw,
-  ShoppingBag,
   Zap,
+  Bot,
+  Sparkles,
+  ShoppingBag,
+  Truck,
+  ArrowRight,
+  CheckCircle2,
+  PhoneCall,
   MessageCircle,
   ShieldCheck,
-  Users,
-  DollarSign,
   BarChart3,
   Layers,
-  ArrowRight,
-  Percent,
+  Clock,
+  Printer,
+  ChevronRight,
+  ExternalLink,
+  Star,
+  Users,
+  TrendingUp,
+  HelpCircle,
+  Play,
+  Lock,
+  ArrowUpRight,
+  Send,
+  Eye,
+  Check,
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-} from 'recharts';
-import { toast } from 'sonner';
-import { DirectMessageModal } from '@/components/orders/DirectMessageModal';
+import { formatBDTEn } from '@/lib/utils';
 
-export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
-  const [selectedMessageOrder, setSelectedMessageOrder] = useState<Order | null>(null);
-  const [showBotTester, setShowBotTester] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+export default function LandingPage() {
+  const [activeStep, setActiveStep] = useState(0);
+  const [dailyOrders, setDailyOrders] = useState(25);
+  const [simulatedChatMessages, setSimulatedChatMessages] = useState<
+    Array<{ sender: 'user' | 'bot'; text: string; time: string; image?: string }>
+  >([]);
+  const [simInput, setSimInput] = useState('');
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
-  const loadData = async () => {
-    try {
-      const [m, orders] = await Promise.all([api.getMetrics(), api.getOrders()]);
-      setMetrics(m);
-      setAllOrders(orders);
-      setRecentOrders(orders.slice(0, 6));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleManualRefresh = async () => {
-    setIsRefreshing(true);
-    await loadData();
-    setTimeout(() => setIsRefreshing(false), 500);
-    toast.success('ড্যাশবোর্ড ডেটা সফলভাবে রিফ্রেশ হয়েছে!');
-  };
-
+  // Auto-advance step demo every 5 seconds
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 4000);
-    return () => clearInterval(interval);
+    const timer = setInterval(() => {
+      setActiveStep((prev) => (prev + 1) % 6);
+    }, 6000);
+    return () => clearInterval(timer);
   }, []);
 
-  const handleConfirmOrder = async (orderId: string) => {
-    await api.updateOrderStatus(orderId, 'CONFIRMED');
-    toast.success('অর্ডারটি কনফার্ম করা হয়েছে! কাস্টমারকে এসএমএস ও মেসেজ পাঠানো হয়েছে।');
-    loadData();
-  };
+  // Calculator calculations
+  const monthlyOrders = dailyOrders * 30;
+  const hoursSavedPerMonth = Math.round((dailyOrders * 8 * 30) / 60); // 8 mins per order manual chat/entry
+  const estimatedSavingsBDT = dailyOrders * 350; // extra staff & time cost
+  const potentialExtraSales = Math.round(monthlyOrders * 0.22); // 22% conversion bump due to instant reply
 
-  const handleDispatchSteadfast = async (orderId: string) => {
-    const updated = await api.dispatchSteadfast(orderId);
-    toast.success(`Steadfast কুরিয়ারে বুকিং সম্পন্ন! ট্র্যাকিং কোড: ${updated.courierTrackingId}`);
-    loadData();
-  };
+  const steps = [
+    {
+      id: 0,
+      title: '১. কাস্টমার মেসেঞ্জারে নক করে',
+      shortTitle: 'মেসেজ শুরু',
+      subtitle: 'রাত ২টা বা ছুটির দিন—কাস্টমার যে কোনো সময়ে দাম বা ছবি দেখতে চায়',
+      icon: MessageCircle,
+      badge: 'Step 1: Inquiry',
+      color: 'from-blue-500/20 to-cyan-500/10 text-blue-400 border-blue-500/30',
+      demo: {
+        type: 'chat',
+        userMsg: 'আসসালামু আলাইকুম ভাইয়া, জয়পুরি কটন থ্রি-পিসের ছবি আর দাম কত?',
+        aiMsg: 'ওয়ালাইকুম আসসালাম! আমাদের কাছে জয়পুরি কটন আনস্টিচড থ্রি-পিস এভেইলেবল আছে। অফার প্রাইস মাত্র ১২৫০ টাকা। নিচে ছবি দেখে নিন 👇',
+        image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop&q=80',
+        actionText: '📷 ১:১ ফুল এইচডি ছবি ও দাম লোড হয়েছে',
+      },
+    },
+    {
+      id: 1,
+      title: '২. Gemini AI লাইভ ছবি ও ভ্যারিয়েন্ট দেখায়',
+      shortTitle: 'AI ক্যাটালগ',
+      subtitle: 'ডাটাবেজ থেকে রিয়েলটাইম দাম, ডিসকাউন্ট ও ছবি দেখিয়ে কাস্টমার কনভিন্স করে',
+      icon: Bot,
+      badge: 'Step 2: Intelligent Showroom',
+      color: 'from-indigo-500/20 to-purple-500/10 text-indigo-300 border-indigo-500/30',
+      demo: {
+        type: 'product_showcase',
+        productName: 'জয়পুরি কটন আনস্টিচড থ্রি-পিস',
+        price: '৳১,২৫০',
+        regularPrice: '৳১,৫০০',
+        features: ['১০০% পিওর কটন ফেব্রিক', 'ম্যাচিং ওড়না ও সেলোয়ার', 'কালার গ্যারান্টি'],
+        stockText: 'স্টক সীমিত (১২ পিস বাকি)',
+      },
+    },
+    {
+      id: 2,
+      title: '৩. ফোন ও ফুল ঠিকানা ভেরিফিকেশন',
+      shortTitle: 'অর্ডার ক্যাপচার',
+      subtitle: 'AI নিখুঁত ১১ ডিজিটের ফোন নাম্বার এবং সম্পূর্ণ ঠিকানা সংগ্রহ করে',
+      icon: ShieldCheck,
+      badge: 'Step 3: Fraud Shield',
+      color: 'from-emerald-500/20 to-teal-500/10 text-emerald-300 border-emerald-500/30',
+      demo: {
+        type: 'verification',
+        name: 'সাবিহা চৌধুরী',
+        phone: '01712-345678',
+        phoneStatus: 'ভেরিফায়েড ১১ ডিজিট নম্বর ✅',
+        address: 'বাড়ি নং ১২, রোড ৪, ধানমন্ডি, ঢাকা',
+        deliveryCharge: 'ঢাকার ভিতর ৳৭০',
+      },
+    },
+    {
+      id: 3,
+      title: '৪. লাইভ ড্যাশবোর্ডে ইনস্ট্যান্ট সিঙ্ক',
+      shortTitle: 'ড্যাশবোর্ড সিঙ্ক',
+      subtitle: 'কোনো এক্সেল শিটের ঝামেলা নেই, সেকেন্ডের মধ্যে ড্যাশবোর্ডে নতুন অর্ডার চলে আসে',
+      icon: Layers,
+      badge: 'Step 4: Live Inventory',
+      color: 'from-teal-500/20 to-emerald-500/10 text-teal-300 border-teal-500/30',
+      demo: {
+        type: 'dashboard_item',
+        orderNo: '#OF-1048',
+        amount: '৳১,৩২০ (COD)',
+        channel: 'Facebook Messenger AI',
+        status: 'PENDING_CONFIRMATION',
+      },
+    },
+    {
+      id: 4,
+      title: '৫. ১-ক্লিকে Steadfast কুরিয়ার বুকিং',
+      shortTitle: 'কুরিয়ার বুকিং',
+      subtitle: 'একটি বাটন চাপলেই Steadfast API-তে পার্সেল এন্ট্রি ও ট্র্যাকিং কোড জেনারেট',
+      icon: Truck,
+      badge: 'Step 5: 1-Click Courier',
+      color: 'from-purple-500/20 to-pink-500/10 text-purple-300 border-purple-500/30',
+      demo: {
+        type: 'courier_dispatch',
+        courier: 'Steadfast Courier API',
+        consignmentId: 'CID-984210',
+        trackingCode: 'STDF984210',
+        status: 'ইন ট্রানজিট / পার্সেল বুকড',
+      },
+    },
+    {
+      id: 5,
+      title: '৬. ১-ক্লিকে সরাসরি WhatsApp চ্যাট',
+      shortTitle: 'কাস্টমার কানেক্ট',
+      subtitle: 'মোবাইলে নম্বর সেভ করা ছাড়াই ড্যাশবোর্ড থেকে ১-ক্লিকে WhatsApp বা কল ওপেন',
+      icon: MessageCircle,
+      badge: 'Step 6: Omnichannel Connect',
+      color: 'from-emerald-500/20 to-green-500/10 text-emerald-300 border-emerald-500/30',
+      demo: {
+        type: 'whatsapp_connect',
+        customerPhone: '+8801712345678',
+        directAction: '১-ক্লিকে অফিসিয়াল WhatsApp চ্যাট চালু',
+        smsPreview: 'আপনার অর্ডার #OF-1048 Steadfast কুরিয়ারে পাঠানো হয়েছে।',
+      },
+    },
+  ];
 
-  // Compute 7-day sales chart data
-  const chartData = useMemo(() => {
-    const days = ['শনি', 'রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র'];
-    const today = new Date().getDay();
-    const orderedDays: Array<{ name: string; sales: number; orders: number }> = [];
-
-    for (let i = 6; i >= 0; i--) {
-      const dayIdx = (today - i + 7) % 7;
-      // Day names mapping in Bangla
-      const dayNames = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
-      const dName = dayNames[dayIdx];
-      
-      // Calculate realistic day distribution based on all orders
-      const dayOrders = allOrders.filter((_, idx) => (idx + i) % 7 === 0);
-      const daySales = dayOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-      
-      orderedDays.push({
-        name: dName,
-        sales: daySales > 0 ? daySales : (i === 0 ? (metrics?.todayOrders ? metrics.todayOrders * 1250 : 2500) : (i * 1150 + 850)),
-        orders: dayOrders.length > 0 ? dayOrders.length : (i === 0 ? (metrics?.todayOrders || 2) : (i % 3 + 1)),
-      });
-    }
-    return orderedDays;
-  }, [allOrders, metrics]);
-
-  // Compute Top Selling Products
-  const topProducts = useMemo(() => {
-    const map: Record<string, { title: string; count: number; revenue: number; category: string }> = {};
-    for (const ord of allOrders) {
-      for (const it of ord.items) {
-        const title = it.product?.title || 'প্রিমিয়াম কালেকশন';
-        if (!map[title]) {
-          map[title] = {
-            title,
-            count: 0,
-            revenue: 0,
-            category: title.includes('থ্রি-পিস') ? 'থ্রি-পিস' : title.includes('কুর্তি') ? 'কুর্তি' : title.includes('শাড়ি') ? 'শাড়ি' : 'পার্টি গাউন',
-          };
-        }
-        map[title].count += it.quantity || 1;
-        map[title].revenue += (it.unitPrice || 1250) * (it.quantity || 1);
-      }
-    }
-
-    const list = Object.values(map).sort((a, b) => b.count - a.count);
-    if (list.length === 0) {
-      return [
-        { title: 'জয়পুরি কটন আনস্টিচড থ্রি-পিস', count: 18, revenue: 22500, category: 'থ্রি-পিস' },
-        { title: 'প্রিমিয়াম কাশ্মীরি কুর্তি', count: 14, revenue: 11900, category: 'কুর্তি' },
-        { title: 'ডিজাইনার সিল্ক পার্টি গাউন', count: 9, revenue: 13500, category: 'গাউন' },
-        { title: 'অরগানজা ডিজিটাল প্রিন্ট লাক্সারি থ্রি-পিস', count: 7, revenue: 11550, category: 'থ্রি-পিস' },
-      ];
-    }
-    return list.slice(0, 4);
-  }, [allOrders]);
-
-  const totalSalesAmount = metrics?.totalRevenue ?? 0;
-  const aov = allOrders.length > 0 ? Math.round(totalSalesAmount / allOrders.length) : 1250;
+  const faqs = [
+    {
+      q: 'AI কি আসলেই সাধারণ চ্যাটবট নাকি মানুষের মতো বাংলায় কথা বলতে পারে?',
+      a: 'OrderFlow BD চালিত হচ্ছে Google Gemini AI দিয়ে। এটি সাধারণ বাটন-ভিত্তিক বোকা বট নয়। কাস্টমার যেভাবেই বাংলায় বা বাংলিশে প্রশ্ন করুক না কেন—সাইজ, কালার, স্টক বা ডেলিভারির নিয়ম নিয়ে মানুষের মতোই মিষ্টি ও সাবলীল বাংলায় কথা বলে ডিল ক্লোজ করে।',
+    },
+    {
+      q: 'Steadfast এ ১-ক্লিকে পার্সেল বুকিং কীভাবে কাজ করে?',
+      a: 'আমরা Steadfast কুরিয়ারের অফিসিয়াল মার্চেন্ট API ব্যবহার করি। ড্যাশবোর্ডে "Steadfast" বাটনে চাপ দিলেই কাস্টমারের নাম, ফোন, ঠিকানা ও টাকার পরিমাণ স্বয়ংক্রিয়ভাবে Steadfast সার্ভারে জমা হয়ে যায় এবং সাথে সাথে একটি অফিসিয়াল ট্র্যাকিং কোড (CID) জেনারেট হয়।',
+    },
+    {
+      q: 'আমি নতুন প্রোডাক্ট অ্যাড করলে AI কীভাবে জানতে পারবে?',
+      a: 'আপনার কাজ শুধু ড্যাশবোর্ডে গিয়ে প্রোডাক্টের ছবি, দাম ও বিবরণ সেভ করা। কোনো ম্যানুয়াল ট্রেনিং দরকার নেই—ডাটাবেজে যুক্ত হওয়া মাত্রই AI সেই নতুন প্রডাক্টের ছবি ও তথ্য কাস্টমারদের দেখানো শুরু করে।',
+    },
+    {
+      q: 'ফেসবুক মেসেঞ্জার এবং হোয়াটসঅ্যাপ কি এক জায়গা থেকেই হ্যান্ডেল করা যাবে?',
+      a: 'হ্যাঁ! কাস্টমার মেসেঞ্জারে কথা বলুক বা হোয়াটসঅ্যাপে অর্ডার দিক—সব মেসেজ ও অর্ডার আপনার একটাই OrderFlow BD ড্যাশবোর্ডে চলে আসবে। আপনি ড্যাশবোর্ড থেকেই লাইভ মনিটরিং এবং ১-ক্লিকে কাস্টমারের সাথে যোগাযোগ করতে পারবেন।',
+    },
+  ];
 
   return (
-    <div className="space-y-8 pb-16">
-      {/* Top Banner / Hero */}
-      <div className="relative overflow-hidden rounded-3xl border border-neutral-800/90 bg-gradient-to-br from-[#121622] via-[#0e1017] to-[#0a0c12] p-6 sm:p-8 shadow-2xl">
-        {/* Ambient Glows */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-20 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-full shadow-sm">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>AI সেলস অটোমেশন লাইভ</span>
-              </div>
-
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/25 text-blue-300 text-xs font-semibold rounded-full">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-                <span>ফ্রড প্রটেকশন এক্টিভ</span>
-              </div>
+    <div className="min-h-screen bg-[#07080c] text-neutral-100 flex flex-col selection:bg-emerald-500/30 selection:text-emerald-200">
+      {/* 1. Header / Navigation */}
+      <header className="sticky top-0 z-50 bg-[#07080c]/85 backdrop-blur-2xl border-b border-neutral-800/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          {/* Brand Logo */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center text-neutral-950 font-black shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-transform duration-300">
+              <Zap className="w-6 h-6 fill-neutral-950 text-neutral-950" />
             </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-xl sm:text-2xl text-neutral-100 tracking-tight">
+                  OrderFlow
+                </span>
+                <span className="px-2 py-0.5 text-[11px] font-black bg-gradient-to-r from-emerald-400 to-teal-300 text-neutral-950 rounded-md shadow-sm">
+                  BD 2.0
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 font-medium">
+                AI F-Commerce Automation Platform
+              </p>
+            </div>
+          </Link>
 
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-neutral-100 tracking-tight">
-              স্বাগতম, <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">OrderFlow BD!</span> 👋
-            </h2>
-            <p className="text-sm text-neutral-400 max-w-2xl leading-relaxed">
-              মেসেঞ্জার ও হোয়াটসঅ্যাপে আপনার স্মার্ট AI সেলস এজেন্ট ২৪ ঘণ্টা কাস্টমারদের সাথে চ্যাট করছে, ছবি দেখাচ্ছে এবং সঠিক তথ্য নিয়ে সরাসরি অর্ডার বুক করছে।
-            </p>
-          </div>
+          {/* Desktop Nav Links */}
+          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-neutral-300">
+            <a href="#how-it-works" className="hover:text-emerald-400 transition-colors">
+              কীভাবে কাজ করে
+            </a>
+            <a href="#features" className="hover:text-emerald-400 transition-colors">
+              ফিচারসমূহ
+            </a>
+            <a href="#calculator" className="hover:text-emerald-400 transition-colors">
+              খরচ ও সময় ক্যালকুলেটর
+            </a>
+            <a href="#faq" className="hover:text-emerald-400 transition-colors">
+              FAQ
+            </a>
+          </nav>
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={handleManualRefresh}
-              className="p-2.5 bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/80 rounded-2xl transition-all active:scale-95 shadow-md"
-              title="রিফ্রেশ করুন"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
-            </button>
-
-            <button
-              onClick={() => setShowBotTester(!showBotTester)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-600/25 active:scale-95 transition-all"
-            >
-              <Bot className="w-4 h-4" />
-              {showBotTester ? 'সিমুলেটর বন্ধ করুন' : 'লাইভ চ্যাট সিমুলেটর'}
-            </button>
-
+          {/* Action CTAs */}
+          <div className="flex items-center gap-3">
             <Link
-              href="/orders"
-              className="flex items-center gap-2 px-4 py-2.5 bg-neutral-850/80 hover:bg-neutral-800 text-neutral-200 border border-neutral-700/80 rounded-2xl text-sm font-semibold transition-all hover:border-neutral-600 shadow-md"
+              href="/dashboard"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
             >
-              <span>সকল অর্ডার</span>
-              <ArrowUpRight className="w-4 h-4 text-neutral-400" />
+              <span>ড্যাশবোর্ড ডেমো দেখুন</span>
+              <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Live Interactive Messenger Bot Simulator Card (Collapsible) */}
-      {showBotTester && (
-        <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-base font-bold text-neutral-200 flex items-center gap-2">
-              <Bot className="w-5 h-5 text-blue-400" />
-              লাইভ কাস্টমার চ্যাট ও অর্ডার সিমুলেটর
-            </h3>
-            <span className="text-xs text-neutral-400">মেসেজ লিখে বা বাটন চেপে টেস্ট করুন, ড্যাশবোর্ডে লাইভ আসবে</span>
-          </div>
-          <LiveBotTester onOrderCreated={loadData} />
-        </div>
-      )}
+      {/* 2. Hero Section */}
+      <section className="relative pt-12 pb-20 md:pt-20 md:pb-32 overflow-hidden">
+        {/* Background ambient lighting */}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[650px] h-[350px] bg-gradient-to-tr from-emerald-500/15 via-teal-500/10 to-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 -right-20 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* 6 Key Business Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {/* 1. Today's Orders */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#121820] to-[#0c1015] border border-emerald-500/25 p-4 space-y-2 shadow-xl hover:border-emerald-500/40 transition-all group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-              আজকের অর্ডার
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-8">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs sm:text-sm font-bold rounded-full shadow-lg shadow-emerald-500/10 backdrop-blur-md">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <div className="p-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-xl">
-              <Package className="w-4 h-4" />
-            </div>
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <span>Google Gemini 2.5 AI চালিত বাংলাদেশের ১ম এফ-কমার্স অটোমেশন</span>
           </div>
-          <div>
-            <div className="text-2xl font-black text-neutral-100 font-mono tracking-tight flex items-baseline gap-1">
-              <span>{metrics?.todayOrders ?? 0}</span>
-              <span className="text-xs font-semibold text-neutral-400 font-sans">টি</span>
-            </div>
-            <p className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>রিয়েল-টাইম সিঙ্ক</span>
+
+          {/* Main Headline */}
+          <div className="space-y-4 max-w-4xl mx-auto">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-neutral-100 tracking-tight leading-[1.2]">
+              মেসেঞ্জারে অটোমেটিক সেলস,{' '}
+              <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
+                ১-ক্লিকে Steadfast কুরিয়ার বুকিং
+              </span>{' '}
+              ও সেন্ট্রালাইজড ড্যাশবোর্ড!
+            </h1>
+            <p className="text-base sm:text-xl text-neutral-300 leading-relaxed max-w-3xl mx-auto font-normal">
+              পেজে শত শত কাস্টমার মেসেজ দিলেও আর একটি সেলও মিস হবে না। Google Gemini AI মানুষের মতো
+              মিষ্টি বাংলায় কথা বলে ১:১ সাইজে ছবি দেখিয়ে অর্ডার নিবে এবং সরাসরি Steadfast কুরিয়ারে বুকিং করবে।
             </p>
           </div>
-        </div>
 
-        {/* 2. Pending Confirmation */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1b1712] to-[#0f0e0c] border border-amber-500/25 p-4 space-y-2 shadow-xl hover:border-amber-500/40 transition-all group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-              পেন্ডিং অর্ডার
-            </span>
-            <div className="p-2 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-amber-400 font-mono tracking-tight flex items-baseline gap-1">
-              <span>{metrics?.pendingCount ?? 0}</span>
-              <span className="text-xs font-semibold text-neutral-400 font-sans">টি</span>
-            </div>
-            <p className="text-[11px] text-neutral-400 mt-1">১-ক্লিক কনফার্ম করুন</p>
-          </div>
-        </div>
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+            <Link
+              href="/dashboard"
+              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center gap-2.5 group"
+            >
+              <span>🚀 লাইভ ড্যাশবোর্ড ওপেন করুন</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Link>
 
-        {/* 3. Dispatched / In Courier */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#181320] to-[#0e0c15] border border-purple-500/25 p-4 space-y-2 shadow-xl hover:border-purple-500/40 transition-all group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-              কুরিয়ারে ডেলিভারি
-            </span>
-            <div className="p-2 bg-purple-500/15 border border-purple-500/30 text-purple-400 rounded-xl">
-              <Truck className="w-4 h-4" />
-            </div>
+            <a
+              href="#how-it-works"
+              className="w-full sm:w-auto px-7 py-4 bg-neutral-900/90 hover:bg-neutral-850 text-neutral-200 hover:text-white border border-neutral-750 hover:border-neutral-600 font-bold text-base rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
+              <span>স্টেপ-বাই-স্টেপ সিমুলেশন দেখুন</span>
+            </a>
           </div>
-          <div>
-            <div className="text-2xl font-black text-neutral-100 font-mono tracking-tight flex items-baseline gap-1">
-              <span>{metrics?.dispatchedCount ?? 0}</span>
-              <span className="text-xs font-semibold text-neutral-400 font-sans">টি</span>
-            </div>
-            <p className="text-[11px] text-purple-300 mt-1">Steadfast / Pathao</p>
-          </div>
-        </div>
 
-        {/* 4. Total Revenue */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#101b17] to-[#0c1210] border border-teal-500/25 p-4 space-y-2 shadow-xl hover:border-teal-500/40 transition-all group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-              মোট বিক্রয়
-            </span>
-            <div className="p-2 bg-teal-500/15 border border-teal-500/30 text-teal-400 rounded-xl font-bold text-xs">
-              ৳
-            </div>
-          </div>
-          <div>
-            <div className="text-xl font-black text-emerald-400 font-mono tracking-tight truncate">
-              {formatBDTEn(totalSalesAmount)}
-            </div>
-            <p className="text-[11px] text-neutral-400 mt-1">ক্যাশ অন ডেলিভারি</p>
-          </div>
-        </div>
-
-        {/* 5. Average Order Value (AOV) */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#141526] to-[#0d0e1a] border border-indigo-500/25 p-4 space-y-2 shadow-xl hover:border-indigo-500/40 transition-all group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-              গড় অর্ডার মূল্য
-            </span>
-            <div className="p-2 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-xl">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-xl font-black text-indigo-300 font-mono tracking-tight">
-              ৳{aov.toLocaleString()}
-            </div>
-            <p className="text-[11px] text-indigo-400/80 mt-1">প্রতি অর্ডারে এভারেজ</p>
-          </div>
-        </div>
-
-        {/* 6. Delivery Success Rate */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#121c1a] to-[#0a1210] border border-emerald-500/30 p-4 space-y-2 shadow-xl hover:border-emerald-500/50 transition-all group">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-              সাকসেস রেট
-            </span>
-            <div className="p-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-xl">
-              <Percent className="w-4 h-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
-              ৯৮.৪%
-            </div>
-            <p className="text-[11px] text-neutral-400 mt-1">কম রিটার্ন রিস্ক</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Visual Analytics & AI Performance Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sales & Orders Weekly Chart (Takes 2 Columns on large screens) */}
-        <div className="lg:col-span-2 bg-[#10121a] border border-neutral-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
-                  সাপ্তাহিক বিক্রয় ও অর্ডারের গ্রাফ
-                </h3>
+          {/* Quick Metrics Pills */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto pt-6 text-left">
+            <div className="p-3.5 bg-neutral-900/60 border border-neutral-800/80 rounded-2xl flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/15 text-emerald-400 rounded-xl">
+                <Clock className="w-4 h-4" />
               </div>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                প্রতিদিনের মোট বিক্রয় এবং অর্ডারের লাইভ পরিসংখ্যান
-              </p>
+              <div>
+                <p className="text-xs text-neutral-400">রেসপন্স টাইম</p>
+                <p className="text-sm font-bold text-neutral-100 font-mono">০.৫ সেকেন্ড</p>
+              </div>
             </div>
-            <div className="flex items-center gap-3 self-start sm:self-auto text-xs font-bold text-neutral-400">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span>বিক্রয় (টাকা)</span>
+
+            <div className="p-3.5 bg-neutral-900/60 border border-neutral-800/80 rounded-2xl flex items-center gap-3">
+              <div className="p-2 bg-purple-500/15 text-purple-400 rounded-xl">
+                <Truck className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs text-neutral-400">কুরিয়ার ইন্টিগ্রেশন</p>
+                <p className="text-sm font-bold text-purple-300 font-mono">১-ক্লিক Steadfast</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-neutral-900/60 border border-neutral-800/80 rounded-2xl flex items-center gap-3">
+              <div className="p-2 bg-blue-500/15 text-blue-400 rounded-xl">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs text-neutral-400">চ্যাট এআই</p>
+                <p className="text-sm font-bold text-blue-300 font-mono">Gemini 2.5 Flash</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-neutral-900/60 border border-neutral-800/80 rounded-2xl flex items-center gap-3">
+              <div className="p-2 bg-teal-500/15 text-teal-400 rounded-xl">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs text-neutral-400">সেলস গ্রোথ</p>
+                <p className="text-sm font-bold text-emerald-400 font-mono">+৩০% কনভার্সন</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Interactive 6-Step Visual Workflow Demonstration */}
+      <section id="how-it-works" className="py-20 bg-[#0a0c13] border-y border-neutral-800/80 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          {/* Section Header */}
+          <div className="text-center space-y-3 max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold rounded-full">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>রিয়েল-ওয়ার্ল্ড ইন্টারেক্টিভ সিমুলেটর</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-neutral-100 tracking-tight">
+              ইনবক্স থেকে কুরিয়ার ডেলিভারি —{' '}
+              <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                স্টেপ বাই স্টেপ কীভাবে কাজ করে?
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
-                <span>অর্ডার সংখ্যা</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="h-64 sm:h-72 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
-                <XAxis dataKey="name" stroke="#737373" fontSize={12} tickLine={false} />
-                <YAxis stroke="#737373" fontSize={11} tickLine={false} tickFormatter={(val) => `৳${val}`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#171717',
-                    borderColor: '#404040',
-                    borderRadius: '12px',
-                    color: '#fff',
-                    fontSize: '12px',
-                  }}
-                  formatter={(value: any, name: any) => [
-                    name === 'sales' ? `৳${Number(value).toLocaleString()}` : `${value} টি`,
-                    name === 'sales' ? 'মোট বিক্রয়' : 'অর্ডার সংখ্যা',
-                  ]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="sales"
-                  stroke="#10b981"
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#salesGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Top Selling Products Leaderboard */}
-        <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-indigo-400" />
-                <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
-                  বেস্ট সেলিং কালেকশন
-                </h3>
-              </div>
-              <Link
-                href="/products"
-                className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
-              >
-                সব পণ্য →
-              </Link>
-            </div>
-            <p className="text-xs text-neutral-400 mt-0.5">সবচেয়ে বেশি অর্ডার হওয়া ড্রেসসমূহ</p>
-          </div>
-
-          <div className="space-y-3 my-2">
-            {topProducts.map((prod, idx) => (
-              <div
-                key={idx}
-                className="p-3 bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800/80 rounded-2xl flex items-center justify-between gap-3 transition-all"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 h-6 rounded-lg bg-neutral-800 text-neutral-300 font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-neutral-200 truncate">{prod.title}</p>
-                    <span className="text-[10px] px-2 py-0.5 bg-neutral-800 text-neutral-400 rounded-md">
-                      {prod.category}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-black text-emerald-400 font-mono">
-                    ৳{prod.revenue.toLocaleString()}
-                  </p>
-                  <p className="text-[10px] text-neutral-400 font-medium">
-                    {prod.count} টি বিক্রয়
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="p-3 bg-gradient-to-r from-emerald-950/30 to-teal-950/20 border border-emerald-500/20 rounded-2xl flex items-center justify-between text-xs">
-            <span className="text-neutral-300 font-medium">AI সেলস পারফর্ম্যান্স</span>
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <Zap className="w-3.5 h-3.5 fill-emerald-400" />
-              ২৪/৭ অটোমেটেড
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Business Growth & Automation Highlights */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Highlight 1: AI Instant Sales */}
-        <div className="p-5 bg-gradient-to-br from-[#121820] to-[#0c1015] border border-neutral-800/80 rounded-2xl space-y-2">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
-            <Zap className="w-5 h-5" />
-          </div>
-          <h4 className="text-sm font-bold text-neutral-200">১.২ সেকেন্ডে অটোমেটিক সেলস</h4>
-          <p className="text-xs text-neutral-400 leading-relaxed">
-            কাস্টমার মাঝরাতে নক দিলেও কোনো দেরি ছাড়াই মিষ্টি ভাষায় কথা বলে ছবি ও দাম দেখিয়ে অর্ডার বুক করে নেয়।
-          </p>
-        </div>
-
-        {/* Highlight 2: Fraud & Return Protection */}
-        <div className="p-5 bg-gradient-to-br from-[#181424] to-[#0e0c17] border border-neutral-800/80 rounded-2xl space-y-2">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <h4 className="text-sm font-bold text-neutral-200">নিখুঁত ১১ ডিজিট ভেরিফিকেশন</h4>
-          <p className="text-xs text-neutral-400 leading-relaxed">
-            ভুল বা অসম্পূর্ণ ফোন নাম্বার থাকলে বট নিজে ভুল ধরিয়ে দিয়ে সঠিক ১১ ডিজিটের নাম্বার ও ঠিকানা নিশ্চিত করে।
-          </p>
-        </div>
-
-        {/* Highlight 3: 1-Click Courier Sync */}
-        <div className="p-5 bg-gradient-to-br from-[#161d28] to-[#0d121c] border border-neutral-800/80 rounded-2xl space-y-2">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
-            <Truck className="w-5 h-5" />
-          </div>
-          <h4 className="text-sm font-bold text-neutral-200">Steadfast ও Pathao অটো বুকিং</h4>
-          <p className="text-xs text-neutral-400 leading-relaxed">
-            এক্সেল শিটে হাত দিয়ে লেখার দরকার নেই। কনফার্ম চাপার সাথে সাথে কুরিয়ারে বুকিং হয়ে ট্র্যাকিং কোড জেনারেট হয়।
-          </p>
-        </div>
-      </div>
-
-      {/* Low Stock Warning Alert */}
-      {(metrics?.lowStockAlerts ?? 0) > 0 && (
-        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-950/40 via-neutral-900 to-neutral-900 border border-amber-500/30 rounded-2xl text-amber-300 text-sm shadow-lg">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-            <span>
-              <strong>সতর্কতা:</strong> {metrics?.lowStockAlerts} টি প্রোডাক্টের স্টক ৫ টির নিচে নেমে এসেছে!
-            </span>
-          </div>
-          <Link
-            href="/products"
-            className="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-200 font-bold text-xs rounded-xl transition-all shadow-sm"
-          >
-            স্টক আপডেট করুন →
-          </Link>
-        </div>
-      )}
-
-      {/* Recent Live Orders Table */}
-      <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-5 sm:p-6 border-b border-neutral-800/80 gap-3 bg-neutral-900/40">
-          <div>
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-emerald-400" />
-              <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
-                সাম্প্রতিক লাইভ অর্ডার সমূহ
-              </h3>
-            </div>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              ১-ক্লিক কনফার্মেশন, কুরিয়ার বুকিং ও ক্যাশ মেমো প্রিন্ট
+            </h2>
+            <p className="text-sm sm:text-base text-neutral-400">
+              যেকোনো একটি স্টেপে ক্লিক করে লাইভ দেখুন OrderFlow BD কীভাবে আপনার ব্যবসার প্রতিটি স্তর একা পরিচালনা করে।
             </p>
           </div>
-          <Link
-            href="/orders"
-            className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1.5 self-start sm:self-auto bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 rounded-xl"
-          >
-            <span>সকল অর্ডার দেখুন ({allOrders.length})</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#0b0d14] text-neutral-400 font-semibold border-b border-neutral-800 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="py-4 px-5">অর্ডার নং</th>
-                <th className="py-4 px-5">গ্রাহক ও ফোন</th>
-                <th className="py-4 px-5">প্রোডাক্ট বিবরণ</th>
-                <th className="py-4 px-5">মোট টাকা</th>
-                <th className="py-4 px-5">স্ট্যাটাস</th>
-                <th className="py-4 px-5 text-right">১-ক্লিক অ্যাকশন</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-800/60">
-              {recentOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-neutral-400">
-                    <p className="text-base font-semibold text-neutral-300">কোনো নতুন অর্ডার নেই</p>
-                    <p className="text-xs text-neutral-500 mt-1">ফেসবুক মেসেঞ্জারে মেসেজ দিলে সাথে সাথে এখানে আসবে</p>
-                  </td>
-                </tr>
-              ) : (
-                recentOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-neutral-850/40 transition-colors group">
-                    <td className="py-4 px-5 font-mono font-bold text-neutral-200">
-                      <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/25 rounded-lg text-emerald-400 text-sm">
-                        #OF-{order.orderNumber}
-                      </span>
-                      <span className="block text-[11px] text-neutral-400 font-normal mt-1">
-                        {order.channel === 'FACEBOOK_MESSENGER' ? 'Messenger AI' : 'WhatsApp'}
-                      </span>
-                    </td>
+          {/* Interactive Step Switcher & Showcase Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Step Navigation Tabs (Left 5 Cols) */}
+            <div className="lg:col-span-5 space-y-3">
+              {steps.map((s, idx) => {
+                const Icon = s.icon;
+                const isCurrent = activeStep === idx;
 
-                    <td className="py-4 px-5">
-                      <p className="font-bold text-neutral-100 text-sm">{order.customerName}</p>
-                      <p className="text-xs text-neutral-400 font-mono flex items-center gap-1.5 mt-0.5">
-                        <PhoneCall className="w-3 h-3 text-emerald-400" />
-                        <span>{order.customerPhone}</span>
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setActiveStep(idx)}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 flex items-start gap-4 ${
+                      isCurrent
+                        ? 'bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-900 border-emerald-500/40 shadow-xl shadow-emerald-500/5 scale-[1.02]'
+                        : 'bg-neutral-900/40 hover:bg-neutral-900/70 border-neutral-800/70 text-neutral-400 hover:text-neutral-200'
+                    }`}
+                  >
+                    <div
+                      className={`p-2.5 rounded-xl border shrink-0 transition-all ${
+                        isCurrent
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                          : 'bg-neutral-800/80 border-neutral-700/60 text-neutral-400'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <h3
+                          className={`font-bold text-sm sm:text-base leading-snug ${
+                            isCurrent ? 'text-neutral-100' : 'text-neutral-300'
+                          }`}
+                        >
+                          {s.title}
+                        </h3>
+                        {isCurrent && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-xs text-neutral-400 mt-1 leading-relaxed line-clamp-2">
+                        {s.subtitle}
                       </p>
-                    </td>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-                    <td className="py-4 px-5 max-w-xs">
-                      {order.items.map((it, idx) => (
-                        <p key={idx} className="text-xs text-neutral-200 font-medium leading-tight">
-                          {it.product?.title || 'প্রোডাক্ট'} {it.variant?.name ? `(${it.variant.name})` : ''} × {it.quantity}
+            {/* Simulated Live Visual Display (Right 7 Cols) */}
+            <div className="lg:col-span-7 bg-[#10131d] border border-neutral-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden min-h-[440px] flex flex-col justify-between">
+              {/* Glow */}
+              <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Demo Card Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-800/80 relative z-10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+                  <span className="text-xs font-mono text-neutral-400 ml-2">
+                    OrderFlow BD Simulator
+                  </span>
+                </div>
+                <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  {steps[activeStep].badge}
+                </span>
+              </div>
+
+              {/* Dynamic Content based on Active Step */}
+              <div className="py-6 relative z-10 my-auto">
+                {activeStep === 0 && (
+                  <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 max-w-md mx-auto">
+                    {/* Customer Message */}
+                    <div className="flex justify-end">
+                      <div className="bg-blue-600 text-white p-3.5 rounded-2xl rounded-tr-none text-xs sm:text-sm max-w-[85%] shadow-md">
+                        {steps[0].demo.userMsg}
+                      </div>
+                    </div>
+
+                    {/* AI Bot Message */}
+                    <div className="flex gap-2.5 items-start">
+                      <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-neutral-950 font-black text-xs shrink-0">
+                        AI
+                      </div>
+                      <div className="bg-neutral-850 border border-neutral-750 p-3.5 rounded-2xl rounded-tl-none text-xs sm:text-sm text-neutral-200 max-w-[85%] space-y-2 shadow-md">
+                        <p>{steps[0].demo.aiMsg}</p>
+                        <div className="rounded-xl overflow-hidden border border-neutral-700/80 aspect-square max-w-[200px] relative">
+                          <img
+                            src={steps[0].demo.image}
+                            alt="Product Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeStep === 1 && (
+                  <div className="animate-in fade-in zoom-in-95 duration-300 max-w-md mx-auto bg-neutral-900/90 border border-neutral-750 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                        Google Gemini Live Sync
+                      </span>
+                      <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">
+                        {steps[1].demo.stockText || 'স্টক এভেইলেবল'}
+                      </span>
+                    </div>
+
+                    <h4 className="text-base font-bold text-neutral-100">
+                      {steps[1].demo.productName || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস'}
+                    </h4>
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-black text-emerald-400 font-mono">
+                        {steps[1].demo.price || '৳১,২৫০'}
+                      </span>
+                      <span className="text-xs text-neutral-500 line-through">
+                        {steps[1].demo.regularPrice || '৳১,৫০০'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-neutral-800">
+                      {['১০০% পিওর কটন ফেব্রিক', 'ম্যাচিং ওড়না ও সেলোয়ার', 'কালার গ্যারান্টি'].map((f, i) => (
+                        <p key={i} className="text-xs text-neutral-300 flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{f}</span>
                         </p>
                       ))}
-                      <p className="text-[11px] text-neutral-400 truncate mt-1">
-                        📍 {order.deliveryAddress}
-                      </p>
-                    </td>
+                    </div>
+                  </div>
+                )}
 
-                    <td className="py-4 px-5 font-mono font-black text-emerald-400 text-base">
-                      {formatBDTEn(order.totalPrice)}
-                    </td>
+                {activeStep === 2 && (
+                  <div className="animate-in fade-in zoom-in-95 duration-300 max-w-md mx-auto bg-neutral-900/90 border border-neutral-750 rounded-2xl p-5 space-y-3.5 shadow-xl">
+                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>ভেরিফায়েড কাস্টমার ইনফরমেশন</span>
+                    </div>
 
-                    <td className="py-4 px-5">
-                      <OrderStatusBadge status={order.status} />
-                    </td>
-
-                    <td className="py-4 px-5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {order.status === 'PENDING_CONFIRMATION' && (
-                          <button
-                            onClick={() => handleConfirmOrder(order.id)}
-                            className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            কনফার্ম
-                          </button>
-                        )}
-
-                        {order.status === 'CONFIRMED' && (
-                          <button
-                            onClick={() => handleDispatchSteadfast(order.id)}
-                            className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
-                          >
-                            <Truck className="w-3.5 h-3.5" />
-                            Steadfast
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => setSelectedMessageOrder(order)}
-                          title="সরাসরি গ্রাহককে মেসেজ পাঠান (Messenger / WhatsApp / SMS)"
-                          className="px-3 py-1.5 bg-indigo-950/60 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 rounded-xl transition-all shadow-sm flex items-center gap-1.5 text-xs font-semibold"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">মেসেজ</span>
-                        </button>
-
-                        <button
-                          onClick={() => setSelectedInvoiceOrder(order)}
-                          title="মেমো প্রিন্ট করুন"
-                          className="p-2 bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-750 rounded-xl transition-all shadow-sm"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
+                    <div className="space-y-2 text-xs text-neutral-200">
+                      <div className="p-2.5 bg-neutral-800/80 rounded-xl flex justify-between">
+                        <span className="text-neutral-400">নাম:</span>
+                        <span className="font-bold">{steps[2].demo.name}</span>
                       </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      <div className="p-2.5 bg-neutral-800/80 rounded-xl flex justify-between items-center">
+                        <span className="text-neutral-400">মোবাইল:</span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          {steps[2].demo.phone}
+                        </span>
+                      </div>
+                      <div className="p-2.5 bg-neutral-800/80 rounded-xl flex justify-between">
+                        <span className="text-neutral-400">ঠিকানা:</span>
+                        <span className="font-medium text-right max-w-[200px]">
+                          {steps[2].demo.address}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeStep === 3 && (
+                  <div className="animate-in fade-in zoom-in-95 duration-300 max-w-md mx-auto bg-neutral-900/90 border border-neutral-750 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-teal-400">
+                        ড্যাশবোর্ডে নতুন অর্ডার যোগ হয়েছে
+                      </span>
+                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 bg-teal-500/20 text-teal-300 rounded-lg">
+                        {steps[3].demo.orderNo}
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-neutral-800/80 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-neutral-400">মোট টাকা:</span>
+                        <span className="text-lg font-mono font-black text-emerald-400">
+                          {steps[3].demo.amount}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-neutral-400">অর্ডার চ্যানেল:</span>
+                        <span className="font-semibold text-neutral-200">
+                          {steps[3].demo.channel}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeStep === 4 && (
+                  <div className="animate-in fade-in zoom-in-95 duration-300 max-w-md mx-auto bg-neutral-900/90 border border-purple-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-5 h-5 text-purple-400" />
+                        <span className="text-sm font-bold text-purple-300">
+                          Steadfast Courier API
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-md">
+                        ১-ক্লিক বুকড
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 bg-purple-950/30 border border-purple-500/20 rounded-xl space-y-1.5 font-mono text-xs">
+                      <p className="text-neutral-400">
+                        Consignment ID:{' '}
+                        <span className="text-purple-300 font-bold">
+                          {steps[4].demo.consignmentId}
+                        </span>
+                      </p>
+                      <p className="text-neutral-400">
+                        Tracking Code:{' '}
+                        <span className="text-emerald-400 font-bold">
+                          {steps[4].demo.trackingCode}
+                        </span>
+                      </p>
+                    </div>
+
+                    <p className="text-xs text-neutral-300 text-center font-medium">
+                      🚀 কুরিয়ারের পোর্টালে আর হাত দিয়ে টাইপ করার দরকার নেই!
+                    </p>
+                  </div>
+                )}
+
+                {activeStep === 5 && (
+                  <div className="animate-in fade-in zoom-in-95 duration-300 max-w-md mx-auto bg-neutral-900/90 border border-emerald-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="w-5 h-5 text-emerald-400" />
+                        <span className="text-sm font-bold text-emerald-300">
+                          ১-ক্লিক WhatsApp ও SMS
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-neutral-800/80 rounded-xl space-y-2 text-xs">
+                      <p className="text-neutral-400">
+                        নম্বর সেভ ছাড়াই চ্যাট:{' '}
+                        <span className="text-emerald-300 font-mono font-bold">
+                          {steps[5].demo.customerPhone}
+                        </span>
+                      </p>
+                      <div className="p-2.5 bg-neutral-900 border border-neutral-700/80 rounded-lg text-neutral-300 text-[11px] leading-relaxed">
+                        📩 {steps[5].demo.smsPreview}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Card Footer Next/Prev */}
+              <div className="flex items-center justify-between pt-4 border-t border-neutral-800/80 relative z-10 text-xs">
+                <span className="text-neutral-400">স্টেপ {activeStep + 1} / ৬</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveStep((prev) => (prev > 0 ? prev - 1 : 5))}
+                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-semibold"
+                  >
+                    আগেরটি
+                  </button>
+                  <button
+                    onClick={() => setActiveStep((prev) => (prev < 5 ? prev + 1 : 0))}
+                    className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg font-semibold"
+                  >
+                    পরবর্তী স্টেপ →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Invoice Modal */}
-      <InvoiceModal
-        order={selectedInvoiceOrder}
-        onClose={() => setSelectedInvoiceOrder(null)}
-      />
+      {/* 4. Core Features Showcase */}
+      <section id="features" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+        <div className="text-center space-y-3 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-full">
+            <Zap className="w-3.5 h-3.5" />
+            <span>আধুনিক প্রযুক্তি ও সুপারপাওয়ার</span>
+          </div>
+          <h2 className="text-2xl sm:text-4xl font-black text-neutral-100 tracking-tight">
+            কেন সাধারণ বট বাদ দিয়ে{' '}
+            <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+              OrderFlow BD ব্যবহার করবেন?
+            </span>
+          </h2>
+          <p className="text-sm sm:text-base text-neutral-400">
+            বাজারের প্রচলিত রোবটিক চ্যাটবটের দিন শেষ। আমাদের এআই কাস্টমারকে বুঝবে ঠিক একজন সিনিয়র সেলস এক্সিকিউটিভের মতো।
+          </p>
+        </div>
 
-      {/* Direct Customer Message Modal */}
-      <DirectMessageModal
-        isOpen={!!selectedMessageOrder}
-        onClose={() => setSelectedMessageOrder(null)}
-        order={selectedMessageOrder}
-        onMessageSent={loadData}
-      />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Feature 1 */}
+          <div className="bg-[#10121b] border border-neutral-800/80 hover:border-emerald-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all group shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Bot className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-extrabold text-neutral-100">
+              Google Gemini 2.5 AI ব্রেন
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              কোনো ফিক্সড বাটন বা টেমপ্লেট নয়। কাস্টমার বাংলিশে লিখুক বা ভাঙা বাংলায়—আমাদের AI নিখুঁতভাবে অর্থ বুঝে চমৎকার বাংলায় রেসপন্স করে।
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="bg-[#10121b] border border-neutral-800/80 hover:border-purple-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all group shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Truck className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-extrabold text-neutral-100">
+              ১-ক্লিক Steadfast API বুকিং
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              ড্যাশবোর্ডের ১ ক্লিকেই কাস্টমারের নাম, ফোন, ঠিকানা ও টাকার পরিমাণ দিয়ে Steadfast কুরিয়ারে বুকিং এবং লাইভ ট্র্যাকিং আইডি জেনারেট।
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="bg-[#10121b] border border-neutral-800/80 hover:border-blue-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all group shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <ShoppingBag className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-extrabold text-neutral-100">
+              লাইভ ডাটাবেজ ক্যাটালগ সিঙ্ক
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              ড্যাশবোর্ডে নতুন প্রোডাক্ট যোগ করার সাথে সাথে AI নিজে থেকেই তা চিনে ফেলে এবং কাস্টমারদের কাছে নতুন কালেকশন প্রদর্শন করে।
+            </p>
+          </div>
+
+          {/* Feature 4 */}
+          <div className="bg-[#10121b] border border-neutral-800/80 hover:border-teal-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all group shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-teal-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <MessageCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-extrabold text-neutral-100">
+              সেন্ট্রালাইজড ওমনি-চ্যানেল ইনবক্স
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              মেসেঞ্জার এবং হোয়াটসঅ্যাপ—দুই প্ল্যাটফর্মের সব অর্ডার ও চ্যাট একটিমাত্র ড্যাশবোর্ডে। কোনো আলাদা সফটওয়্যারে যাওয়ার প্রয়োজন নেই।
+            </p>
+          </div>
+
+          {/* Feature 5 */}
+          <div className="bg-[#10121b] border border-neutral-800/80 hover:border-amber-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all group shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Printer className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-extrabold text-neutral-100">
+              প্রিন্ট-রেডি মেমো ও ইনভয়েস
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              প্রতিটি অর্ডারের প্রফেশনাল মেমো ১-ক্লিকে প্রিন্ট করুন এবং পার্সেলের সাথে সেঁটে দিন। ব্র্যান্ডিং হবে প্রিমিয়াম ও আকর্ষণীয়।
+            </p>
+          </div>
+
+          {/* Feature 6 */}
+          <div className="bg-[#10121b] border border-neutral-800/80 hover:border-pink-500/40 rounded-3xl p-6 sm:p-7 space-y-4 transition-all group shadow-xl">
+            <div className="w-12 h-12 rounded-2xl bg-pink-500/15 border border-pink-500/30 text-pink-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-extrabold text-neutral-100">
+              ভুল নম্বর ও ফেক অর্ডার প্রটেকশন
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              ১০ ডিজিট বা অসম্পূর্ণ ফোন নাম্বার দিলে AI নিজ দায়িত্বে কাস্টমারকে বলে সঠিক ১১ ডিজিট নাম্বার ও পরিষ্কার ঠিকানা নিশ্চিত করে।
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Interactive ROI & Time-Savings Calculator */}
+      <section id="calculator" className="py-20 bg-[#0a0c13] border-y border-neutral-800/80">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-full">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>বিজনেস প্রফিট ও সেভিংস ক্যালকুলেটর</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-neutral-100 tracking-tight">
+              OrderFlow BD ব্যবহার করলে আপনার{' '}
+              <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                প্রতি মাসে কত টাকা ও সময় বাঁচবে?
+              </span>
+            </h2>
+          </div>
+
+          <div className="bg-[#10131d] border border-neutral-800/90 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-8">
+            {/* Interactive Slider */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <label className="text-sm sm:text-base font-bold text-neutral-200">
+                  আপনার পেজে প্রতিদিন গড়ে কতটি অর্ডার আসে?
+                </label>
+                <span className="px-4 py-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono font-black text-lg rounded-xl">
+                  {dailyOrders} টি / দিন
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min="5"
+                max="150"
+                step="5"
+                value={dailyOrders}
+                onChange={(e) => setDailyOrders(Number(e.target.value))}
+                className="w-full h-3 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+              />
+              <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                <span>৫ টি</span>
+                <span>৫০ টি</span>
+                <span>১০০ টি</span>
+                <span>১৫০+ টি</span>
+              </div>
+            </div>
+
+            {/* Calculated Metrics Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-neutral-800">
+              <div className="p-4 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-center space-y-1">
+                <p className="text-xs text-neutral-400 font-medium">প্রতি মাসে সময় বাঁচবে</p>
+                <p className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
+                  {hoursSavedPerMonth} ঘণ্টা
+                </p>
+                <p className="text-[11px] text-neutral-500">ম্যানুয়াল টাইপিং ও কুরিয়ার এন্ট্রি মুক্ত</p>
+              </div>
+
+              <div className="p-4 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-center space-y-1">
+                <p className="text-xs text-neutral-400 font-medium">মাসিক সেলস বৃদ্ধি (সম্ভাব্য)</p>
+                <p className="text-2xl sm:text-3xl font-black text-teal-400 font-mono">
+                  +{potentialExtraSales} টি অর্ডার
+                </p>
+                <p className="text-[11px] text-neutral-500">দ্রুত ও রাতের বেলার অর্ডারের কারণে</p>
+              </div>
+
+              <div className="p-4 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-center space-y-1">
+                <p className="text-xs text-neutral-400 font-medium">মাসিক খরচ সাশ্রয়</p>
+                <p className="text-2xl sm:text-3xl font-black text-indigo-400 font-mono">
+                  ৳{estimatedSavingsBDT.toLocaleString()}
+                </p>
+                <p className="text-[11px] text-neutral-500">অতিরিক্ত শিফট ও কর্মী খরচ বাঁচবে</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Frequently Asked Questions (FAQ) */}
+      <section id="faq" className="py-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold rounded-full">
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>সচরাচর জিজ্ঞাসা</span>
+          </div>
+          <h2 className="text-2xl sm:text-4xl font-black text-neutral-100 tracking-tight">
+            সাধারণ কিছু প্রশ্নের উত্তর
+          </h2>
+        </div>
+
+        <div className="space-y-4">
+          {faqs.map((f, idx) => (
+            <div
+              key={idx}
+              className="bg-[#10131d] border border-neutral-800/80 rounded-2xl overflow-hidden transition-all"
+            >
+              <button
+                onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
+                className="w-full p-5 text-left flex items-center justify-between gap-4 font-bold text-sm sm:text-base text-neutral-200 hover:text-emerald-400 transition-colors"
+              >
+                <span>{f.q}</span>
+                <ChevronRight
+                  className={`w-5 h-5 text-neutral-400 transition-transform duration-300 shrink-0 ${
+                    activeFaq === idx ? 'rotate-90 text-emerald-400' : ''
+                  }`}
+                />
+              </button>
+              {activeFaq === idx && (
+                <div className="px-5 pb-5 text-xs sm:text-sm text-neutral-400 leading-relaxed border-t border-neutral-800/60 pt-3 animate-in fade-in duration-200">
+                  {f.a}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 7. Call To Action Banner */}
+      <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-[#121c19] via-[#0f141f] to-[#0a0d14] p-8 sm:p-12 text-center space-y-6 shadow-2xl">
+          {/* Ambient light */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 max-w-2xl mx-auto space-y-3">
+            <h2 className="text-2xl sm:text-4xl font-black text-neutral-100 tracking-tight">
+              আজই আপনার এফ-কমার্স ব্যবসাকে দিন{' '}
+              <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                আধুনিক অটোমেশনের শক্তি!
+              </span>
+            </h2>
+            <p className="text-sm sm:text-base text-neutral-300 leading-relaxed">
+              OrderFlow BD ড্যাশবোর্ড সরাসরি এক্সপ্লোর করুন এবং আপনার ফেসবুক পেজের সাথে কানেক্ট করুন।
+            </p>
+          </div>
+
+          <div className="relative z-10 pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/dashboard"
+              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <span>🚀 ফ্রি ড্যাশবোর্ডে প্রবেশ করুন</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 8. Footer */}
+      <footer className="mt-auto border-t border-neutral-800/80 bg-[#07080c] py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-emerald-400" />
+            <span className="font-bold text-neutral-300">OrderFlow BD 2.0</span>
+            <span>— Smart F-Commerce AI Platform</span>
+          </div>
+          <p>© {new Date().getFullYear()} OrderFlow BD. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }
-
