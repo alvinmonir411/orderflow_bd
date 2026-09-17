@@ -91,10 +91,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Send via WhatsApp (Waapi)
+    let waSent = false;
+    const cleanPhone = (customerPhone || targetPsid || '').replace(/[^0-9]/g, '');
+    if ((channel === 'WHATSAPP' || !targetPsid) && cleanPhone && cleanPhone.length >= 10) {
+      const instanceId = settings.waapiInstanceId || '104344';
+      const token = settings.waapiApiToken || 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73';
+      const formattedPhone = cleanPhone.startsWith('88') ? cleanPhone : cleanPhone.startsWith('0') ? `88${cleanPhone}` : `880${cleanPhone}`;
+      const chatId = `${formattedPhone}@c.us`;
+
+      if (instanceId && token) {
+        try {
+          const waRes = await fetch(`https://waapi.app/api/v1/instances/${instanceId}/client/action/send-message`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              accept: 'application/json',
+            },
+            body: JSON.stringify({
+              chatId,
+              message: message.trim(),
+            }),
+          });
+          const waData = await waRes.json();
+          if (waRes.ok) {
+            waSent = true;
+          }
+        } catch (waErr) {
+          console.error('[Waapi Manual Send Error]:', waErr);
+        }
+      }
+    }
+
     // Save note to Order in database
     if (orderId) {
       try {
-        const noteEntry = `[${new Date().toLocaleTimeString('bn-BD')}] সেন্ট মেসেজ (${channel || 'Messenger'}): "${message.trim()}"`;
+        const noteEntry = `[${new Date().toLocaleTimeString('bn-BD')}] সেন্ট মেসেজ (${channel || (waSent ? 'WhatsApp' : 'Messenger')}): "${message.trim()}"`;
         await sql`
           UPDATE "Order"
           SET notes = COALESCE(notes || E'\n', '') || ${noteEntry},
@@ -109,11 +142,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       deliveredToMessenger: fbSent,
+      deliveredToWhatsApp: waSent,
       targetPsid: targetPsid || null,
-      message: fbSent 
-        ? 'গ্রাহকের মেসেঞ্জারে সফলভাবে মেসেজ পাঠানো হয়েছে! 🚀'
+      message: (fbSent || waSent)
+        ? 'গ্রাহকের কাছে সফলভাবে মেসেজ পাঠানো হয়েছে! 🚀'
         : 'মেসেজটি সফলভাবে রেকর্ড করা হয়েছে এবং গ্রাহকের অর্ডারে সেভ হয়েছে!',
-      warning: !targetPsid ? 'গ্রাহকের সরাসরি PSID পাওয়া যায়নি, মেসেজটি অর্ডার হিস্ট্রিতে সেভ করা হয়েছে।' : fbError,
+      warning: (!targetPsid && !waSent) ? 'মেসেজটি হিস্ট্রিতে সেভ করা হয়েছে।' : fbError,
     });
   } catch (error: any) {
     console.error('[API /api/send-message Error]:', error);
