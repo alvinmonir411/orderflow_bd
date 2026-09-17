@@ -602,7 +602,10 @@ export async function insertDbOrder(data: {
   channel?: 'FACEBOOK_MESSENGER' | 'WHATSAPP' | 'MANUAL_ENTRY' | 'MANUAL';
   status?: string;
   itemsPrice: number;
-  deliveryCharge: number;
+  deliveryCharge?: number;
+  deliveryFee?: number;
+  totalPrice?: number;
+  notes?: string;
   discount?: number;
   productTitle?: string;
   variantName?: string;
@@ -618,7 +621,8 @@ export async function insertDbOrder(data: {
       data.channel === 'MANUAL' ? 'MANUAL_ENTRY' : data.channel || 'FACEBOOK_MESSENGER';
     const status = data.status || 'PENDING_CONFIRMATION';
     const discount = data.discount || 0;
-    const totalPrice = data.itemsPrice + data.deliveryCharge - discount;
+    const delCharge = data.deliveryCharge ?? data.deliveryFee ?? 120;
+    const totalPrice = data.totalPrice ?? (data.itemsPrice + delCharge - discount);
     const customerId = `cust-${data.customerPhone.replace(/[^0-9]/g, '')}`;
 
     // 1. Upsert Customer

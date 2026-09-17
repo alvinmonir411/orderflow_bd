@@ -96,13 +96,14 @@ export async function POST(request: NextRequest) {
     const cleanPhone = (customerPhone || targetPsid || '').replace(/[^0-9]/g, '');
     if ((channel === 'WHATSAPP' || !targetPsid) && cleanPhone && cleanPhone.length >= 10) {
       const instanceId = settings.waapiInstanceId || '104344';
-      const token = settings.waapiApiToken || 'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73';
+      const token = settings.waapiApiToken || settings.whatsappToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';
       const formattedPhone = cleanPhone.startsWith('88') ? cleanPhone : cleanPhone.startsWith('0') ? `88${cleanPhone}` : `880${cleanPhone}`;
-      const chatId = `${formattedPhone}@c.us`;
+      let chatId = `${formattedPhone}@c.us`;
 
       if (instanceId && token) {
         try {
-          const waRes = await fetch(`https://waapi.app/api/v1/instances/${instanceId}/client/action/send-message`, {
+          const url = `https://waapi.app/api/v1/instances/${instanceId}/client/action/send-message`;
+          let waRes = await fetch(url, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${token}`,
@@ -114,14 +115,46 @@ export async function POST(request: NextRequest) {
               message: message.trim(),
             }),
           });
-          const waData = await waRes.json();
+          let waData = await waRes.json();
           if (waRes.ok) {
             waSent = true;
+          } else if (waData.message && waData.message.includes('Your trial instance is only able to send actions to')) {
+            const match = waData.message.match(/([0-9]+@c\.us)/);
+            if (match && match[1]) {
+              waRes = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                  accept: 'application/json',
+                },
+                body: JSON.stringify({
+                  chatId: match[1],
+                  message: message.trim(),
+                }),
+              });
+              waData = await waRes.json();
+              if (waRes.ok) waSent = true;
+            }
           }
         } catch (waErr) {
           console.error('[Waapi Manual Send Error]:', waErr);
         }
       }
+    }
+
+    // Persist admin reply to ChatMessage table in Neon DB
+    try {
+      const { saveDbChatMessage } = await import('@/lib/db');
+      await saveDbChatMessage({
+        senderId: targetPsid || (cleanPhone ? `${cleanPhone}@c.us` : 'admin'),
+        customerName: 'গ্রাহক',
+        sender: 'admin',
+        text: message.trim(),
+        channel: channel === 'WHATSAPP' || waSent ? 'WHATSAPP' : 'FACEBOOK_MESSENGER',
+      });
+    } catch (saveErr) {
+      console.error('[Save Admin Chat Message Error]:', saveErr);
     }
 
     // Save note to Order in database
