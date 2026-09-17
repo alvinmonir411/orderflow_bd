@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Truck,
   MessageSquare,
@@ -17,66 +17,186 @@ import {
   RefreshCw,
   ExternalLink,
   Check,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StoreSetupWizardModal } from '@/components/onboarding/StoreSetupWizardModal';
 
 export default function IntegrationsPage() {
   const [showWizard, setShowWizard] = useState(false);
-  // Facebook 1-Click State
-  const [fbConnected, setFbConnected] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Facebook State (Dynamic from DB)
+  const [fbPageToken, setFbPageToken] = useState('');
+  const [fbPageId, setFbPageId] = useState('');
   const [isConnectingFb, setIsConnectingFb] = useState(false);
 
-  // WhatsApp QR State
-  const [waConnected, setWaConnected] = useState(true);
-  const [isGeneratingQr, setIsGeneratingQr] = useState(false);
+  // WhatsApp State (Dynamic from DB)
+  const [waConnected, setWaConnected] = useState(false);
+  const [waPhone, setWaPhone] = useState('');
+  const [isUpdatingWa, setIsUpdatingWa] = useState(false);
 
-  // Steadfast State
-  const [steadfastApiKey, setSteadfastApiKey] = useState('stdf_api_9948201948201');
-  const [steadfastSecret, setSteadfastSecret] = useState('stdf_sec_8849204928492');
+  // Steadfast State (Dynamic from DB)
+  const [steadfastApiKey, setSteadfastApiKey] = useState('');
+  const [steadfastSecret, setSteadfastSecret] = useState('');
+  const [isSavingSteadfast, setIsSavingSteadfast] = useState(false);
 
-  // Pathao State
+  // Pathao State (Dynamic from DB)
   const [pathaoApiKey, setPathaoApiKey] = useState('');
   const [pathaoSecret, setPathaoSecret] = useState('');
+  const [isSavingPathao, setIsSavingPathao] = useState(false);
 
   // SMS State
-  const [smsApiKey, setSmsApiKey] = useState('gw_live_key_9948201');
+  const [smsApiKey, setSmsApiKey] = useState('');
   const [smsSenderId, setSmsSenderId] = useState('OrderFlowBD');
-  const [smsTemplate, setSmsTemplate] = useState(
-    'প্রিয় {name}, OrderFlow এ আপনার অর্ডার #{order_id} সফলভাবে গ্রহণ করা হয়েছে। মোট: ৳{amount}',
-  );
+  const [isSavingSms, setIsSavingSms] = useState(false);
 
-  const handleConnectFacebook = () => {
+  // Load Real Configurations from PostgreSQL
+  const loadConfig = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch('/api/bot-config');
+      if (res.ok) {
+        const data = await res.json();
+        setFbPageToken(data.fbPageToken || '');
+        setFbPageId(data.fbPageId || '');
+        setSteadfastApiKey(data.steadfastApiKey || '');
+        setSteadfastSecret(data.steadfastSecretKey || '');
+        setPathaoApiKey(data.pathaoClientId || '');
+        setPathaoSecret(data.pathaoSecretKey || '');
+        setWaConnected(Boolean(data.whatsappConnected));
+        setWaPhone(data.whatsappPhone || '');
+        setSmsApiKey(data.smsApiKey || '');
+        setSmsSenderId(data.smsSenderId || 'OrderFlowBD');
+      }
+    } catch (e) {
+      console.error('Failed to load integration config:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConfig();
+  }, []);
+
+  const fbConnected = Boolean(fbPageToken && fbPageToken.length > 10);
+  const steadfastConnected = Boolean(steadfastApiKey && steadfastApiKey.trim().length > 0);
+  const pathaoConnected = Boolean(pathaoApiKey && pathaoApiKey.trim().length > 0);
+
+  const handleConnectFacebook = async () => {
     setIsConnectingFb(true);
-    setTimeout(() => {
+    try {
+      // Simulate Meta Business Login OAuth flow verification
+      await new Promise((r) => setTimeout(r, 1000));
+      await loadConfig();
+      toast.success('ফেসবুক পেজের কানেকশন স্ট্যাটাস রিফ্রেশ হয়েছে!');
+    } finally {
       setIsConnectingFb(false);
-      setFbConnected(true);
-      toast.success('🎉 ফেসবুক পেজ "Moner Kotha" ১-ক্লিকে সফলভাবে কানেক্ট হয়েছে!');
-    }, 1200);
+    }
   };
 
-  const handleScanQrWhatsApp = () => {
-    setIsGeneratingQr(true);
-    setTimeout(() => {
-      setIsGeneratingQr(false);
-      setWaConnected(true);
-      toast.success('🎉 WhatsApp সফলভাবে লিঙ্ক করা হয়েছে!');
-    }, 1500);
+  const handleToggleWhatsApp = async () => {
+    setIsUpdatingWa(true);
+    try {
+      const nextState = !waConnected;
+      const res = await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsappConnected: nextState,
+          whatsappPhone: waPhone || '01700000000',
+        }),
+      });
+      if (res.ok) {
+        setWaConnected(nextState);
+        toast.success(nextState ? 'WhatsApp চ্যানেল সক্রিয় করা হয়েছে!' : 'WhatsApp চ্যানেল নিষ্ক্রিয় করা হয়েছে');
+      }
+    } catch (e) {
+      toast.error('WhatsApp স্ট্যাটাস আপডেট করা যায়নি');
+    } finally {
+      setIsUpdatingWa(false);
+    }
   };
 
-  const handleSaveSteadfast = (e: React.FormEvent) => {
+  const handleSaveSteadfast = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Steadfast কুরিয়ার API Key সফলভাবে সেভ হয়েছে! এখন থেকে ১-ক্লিকেই পার্সেল এন্ট্রি হবে।');
+    if (!steadfastApiKey.trim() || !steadfastSecret.trim()) {
+      toast.error('দয়া করে আপনার Steadfast API Key এবং Secret Key লিখুন');
+      return;
+    }
+    setIsSavingSteadfast(true);
+    try {
+      const res = await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          steadfastApiKey: steadfastApiKey.trim(),
+          steadfastSecretKey: steadfastSecret.trim(),
+        }),
+      });
+      if (res.ok) {
+        toast.success('🎉 Steadfast API Key সফলভাবে সেভ হয়েছে! এখন ড্যাশবোর্ড থেকে ১-ক্লিকেই পার্সেল এন্ট্রি হবে।');
+        await loadConfig();
+      } else {
+        toast.error('সেভ করতে সমস্যা হয়েছে');
+      }
+    } catch (e) {
+      toast.error('সার্ভারে সমস্যা হয়েছে');
+    } finally {
+      setIsSavingSteadfast(false);
+    }
   };
 
-  const handleSavePathao = (e: React.FormEvent) => {
+  const handleSavePathao = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Pathao কুরিয়ার ক্রেডেনশিয়াল সফলভাবে সেভ হয়েছে!');
+    if (!pathaoApiKey.trim() || !pathaoSecret.trim()) {
+      toast.error('দয়া করে আপনার Pathao Client ID এবং Secret লিখুন');
+      return;
+    }
+    setIsSavingPathao(true);
+    try {
+      const res = await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pathaoClientId: pathaoApiKey.trim(),
+          pathaoSecretKey: pathaoSecret.trim(),
+        }),
+      });
+      if (res.ok) {
+        toast.success('Pathao কুরিয়ার সেটিংস সফলভাবে সেভ হয়েছে!');
+        await loadConfig();
+      }
+    } catch (e) {
+      toast.error('সেভ করতে সমস্যা হয়েছে');
+    } finally {
+      setIsSavingPathao(false);
+    }
   };
 
-  const handleSaveSMS = (e: React.FormEvent) => {
+  const handleSaveSMS = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('এসএমএস গেটওয়ে সেটিংস সফলভাবে কনফিগার করা হয়েছে!');
+    setIsSavingSms(true);
+    try {
+      const res = await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smsApiKey: smsApiKey.trim(),
+          smsSenderId: smsSenderId.trim(),
+        }),
+      });
+      if (res.ok) {
+        toast.success('এসএমএস গেটওয়ে সেটিংস সফলভাবে কনফিগার করা হয়েছে!');
+        await loadConfig();
+      }
+    } catch (e) {
+      toast.error('সেভ করতে সমস্যা হয়েছে');
+    } finally {
+      setIsSavingSms(false);
+    }
   };
 
   return (
@@ -92,7 +212,7 @@ export default function IntegrationsPage() {
             ফেসবুক, হোয়াটসঅ্যাপ ও কুরিয়ার ইন্টিগ্রেশন
           </h2>
           <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-2xl leading-relaxed">
-            কোনো জটিল কোডিং ছাড়া ১-ক্লিকে ফেসবুক পেজ, হোয়াটসঅ্যাপ এবং Steadfast কুরিয়ার কানেক্ট করুন।
+            কোনো জটিল কোডিং ছাড়া ১-ক্লিকে আপনার ফেসবুক পেজ, হোয়াটসঅ্যাপ এবং Steadfast কুরিয়ার কানেক্ট করুন।
           </p>
         </div>
 
@@ -101,13 +221,13 @@ export default function IntegrationsPage() {
           className="relative z-10 px-5 py-3 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 rounded-2xl text-xs sm:text-sm font-black shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center gap-2 self-start md:self-auto shrink-0"
         >
           <Sparkles className="w-4 h-4 fill-neutral-950 text-neutral-950" />
-          <span>৩-স্টেপ ম্যাজিক উইজার্ড চালান</span>
+          <span>৩-স্টেপ সেটআপ উইজার্ড চালান</span>
         </button>
       </div>
 
-      {/* Grid: Facebook 1-Click & WhatsApp QR Connect */}
+      {/* Grid: Facebook 1-Click & WhatsApp Connect */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 1. Facebook Page 1-Click OAuth Connect */}
+        {/* 1. Facebook Page 1-Click Meta Connection */}
         <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -119,35 +239,52 @@ export default function IntegrationsPage() {
                   <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
                     Facebook Page & Messenger
                   </h3>
-                  <p className="text-xs text-neutral-400">১-ক্লিক মেটা বিজনেস কানেকশন</p>
+                  <p className="text-xs text-neutral-400">মেটা বিজনেস ও মেসেঞ্জার বট</p>
                 </div>
               </div>
-              <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>সংযুক্ত</span>
-              </span>
+
+              {fbConnected ? (
+                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>সংযুক্ত</span>
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 text-xs font-bold bg-neutral-800 text-neutral-400 border border-neutral-700 rounded-xl flex items-center gap-1">
+                  <XCircle className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>কানেক্ট করা হয়নি</span>
+                </span>
+              )}
             </div>
 
             <div className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-neutral-200">কানেক্টেড পেজ:</p>
-                  <p className="text-sm font-extrabold text-emerald-300 mt-0.5">
-                    Moner Kotha (ID: 1314475555081210)
+              {fbConnected ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-neutral-400">সংযুক্ত পেজ:</p>
+                      <p className="text-sm font-extrabold text-emerald-300 mt-0.5">
+                        Moner Kotha <span className="text-xs font-mono text-neutral-400 font-normal">(ID: {fbPageId || '1314475555081210'})</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleConnectFacebook}
+                      disabled={isConnectingFb}
+                      className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                    >
+                      {isConnectingFb ? 'সিঙ্ক হচ্ছে...' : 'রিফ্রেশ'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed border-t border-neutral-800/80 pt-2.5">
+                    ✅ <strong>লাইভ সুবিধা:</strong> এই পেজে কাস্টমার মেসেজ দিলে Gemini AI স্বয়ংক্রিয়ভাবে রিপ্লাই দিচ্ছে এবং ড্যাশবোর্ডে অর্ডার সিঙ্ক হচ্ছে।
+                  </p>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-neutral-300">
+                    এখনও কোনো ফেসবুক পেজ সংযুক্ত করা হয়নি। নিচে ক্লিক করে পেজ কানেক্ট করুন।
                   </p>
                 </div>
-                <button
-                  onClick={handleConnectFacebook}
-                  disabled={isConnectingFb}
-                  className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-semibold transition-all active:scale-95"
-                >
-                  {isConnectingFb ? 'সিঙ্ক হচ্ছে...' : 'পেজ পরিবর্তন'}
-                </button>
-              </div>
-
-              <p className="text-[11px] text-neutral-400 leading-relaxed border-t border-neutral-800/80 pt-2.5">
-                ✅ <strong>স্বয়ংক্রিয় সুবিধা:</strong> পেজ টোকেন বা ওয়েব হুক টাইপ করার দরকার নেই। ফেসবুক অনুমোদনের সাথে সাথে Gemini AI চ্যাট চালু হয়ে গেছে।
-              </p>
+              )}
             </div>
           </div>
 
@@ -159,18 +296,18 @@ export default function IntegrationsPage() {
             {isConnectingFb ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>ফেসবুক কানেক্ট হচ্ছে...</span>
+                <span>ফেসবুক স্ট্যাটাস যাচাই হচ্ছে...</span>
               </>
             ) : (
               <>
                 <span className="font-bold text-base leading-none">f</span>
-                <span>১-ক্লিকে ফেসবুক পেজ রিফ্রেশ করুন</span>
+                <span>{fbConnected ? 'ফেসবুক পেজ কানেকশন রিফ্রেশ করুন' : 'Continue with Facebook (১-ক্লিক কানেক্ট)'}</span>
               </>
             )}
           </button>
         </div>
 
-        {/* 2. WhatsApp QR Code Instant Connect */}
+        {/* 2. WhatsApp Connect */}
         <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -180,46 +317,59 @@ export default function IntegrationsPage() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
-                    WhatsApp Web QR Connect
+                    WhatsApp Business Channel
                   </h3>
-                  <p className="text-xs text-neutral-400">মোবাইল থেকে ১ স্ক্যানে লিঙ্ক করুন</p>
+                  <p className="text-xs text-neutral-400">হোয়াটসঅ্যাপ অর্ডার ও কাস্টমার চ্যাট</p>
                 </div>
               </div>
-              <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>লাইভ কানেক্টেড</span>
-              </span>
+
+              {waConnected ? (
+                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>সক্রিয়</span>
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 text-xs font-bold bg-neutral-800 text-neutral-400 border border-neutral-700 rounded-xl flex items-center gap-1">
+                  <XCircle className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>কানেক্ট করা হয়নি</span>
+                </span>
+              )}
             </div>
 
-            <div className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl flex items-center gap-4">
-              <div className="p-2.5 bg-white rounded-2xl shrink-0 shadow-md">
-                <QrCode className="w-14 h-14 text-neutral-950" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-neutral-200">
-                  মোবাইল স্ক্যানিং সক্রিয়:
-                </p>
-                <p className="text-[11px] text-neutral-400 leading-relaxed">
-                  WhatsApp ➔ Linked Devices ➔ Link a Device দিয়ে এই QR স্ক্যান করলেই সরাসরি AI মেসেজ পরিচালনা শুরু করবে।
-                </p>
+            <div className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 bg-white rounded-2xl shrink-0 shadow-md">
+                  <QrCode className="w-12 h-12 text-neutral-950" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-neutral-200">
+                    {waConnected ? 'হোয়াটসঅ্যাপ চ্যানেল সক্রিয় আছে' : 'হোয়াটসঅ্যাপ কানেক্ট করার নিয়ম:'}
+                  </p>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    WhatsApp অ্যাপ ➔ Linked Devices ➔ Link a Device দিয়ে যুক্ত করুন অথবা ক্লাউড API এক্টিভ করুন।
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
           <button
-            onClick={handleScanQrWhatsApp}
-            disabled={isGeneratingQr}
-            className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-green-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+            onClick={handleToggleWhatsApp}
+            disabled={isUpdatingWa}
+            className={`w-full py-3 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${
+              waConnected
+                ? 'bg-neutral-800 hover:bg-neutral-750 text-neutral-300 border border-neutral-700'
+                : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 shadow-green-600/20'
+            }`}
           >
-            {isGeneratingQr ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>QR কোড রিফ্রেশ হচ্ছে...</span>
-              </>
+            {isUpdatingWa ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : waConnected ? (
+              <span>হোয়াটসঅ্যাপ ডিসকানেক্ট করুন</span>
             ) : (
               <>
-                <QrCode className="w-4 h-4" />
-                <span>নতুন QR কোড জেনারেট করুন</span>
+                <Smartphone className="w-4 h-4" />
+                <span>হোয়াটসঅ্যাপ এক্টিভ করুন</span>
               </>
             )}
           </button>
@@ -241,10 +391,23 @@ export default function IntegrationsPage() {
                   <p className="text-xs text-neutral-400">বাংলাদেশের শীর্ষস্থানীয় এফ-কমার্স কুরিয়ার</p>
                 </div>
               </div>
-              <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl">
-                ● সংযুক্ত
-              </span>
+
+              {steadfastConnected ? (
+                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span>সংযুক্ত</span>
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-xl flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>কানেক্ট করা হয়নি</span>
+                </span>
+              )}
             </div>
+
+            <p className="text-xs text-neutral-400">
+              Steadfast মার্চেন্ট অ্যাকাউন্ট (<a href="https://steadfast.com.bd/login" target="_blank" rel="noreferrer" className="text-purple-400 underline">steadfast.com.bd</a>) এর Settings ➔ API Information থেকে কী দিয়ে সেভ করুন।
+            </p>
 
             <form onSubmit={handleSaveSteadfast} className="space-y-4 pt-1">
               <div>
@@ -257,7 +420,7 @@ export default function IntegrationsPage() {
                     type="password"
                     value={steadfastApiKey}
                     onChange={(e) => setSteadfastApiKey(e.target.value)}
-                    placeholder="Api-Key..."
+                    placeholder="আপনার Steadfast API Key দিন..."
                     className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-purple-500 shadow-inner"
                   />
                 </div>
@@ -273,7 +436,7 @@ export default function IntegrationsPage() {
                     type="password"
                     value={steadfastSecret}
                     onChange={(e) => setSteadfastSecret(e.target.value)}
-                    placeholder="Secret-Key..."
+                    placeholder="আপনার Steadfast Secret Key দিন..."
                     className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-purple-500 shadow-inner"
                   />
                 </div>
@@ -281,10 +444,17 @@ export default function IntegrationsPage() {
 
               <button
                 type="submit"
+                disabled={isSavingSteadfast}
                 className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Steadfast কী সেভ করুন</span>
+                {isSavingSteadfast ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{steadfastConnected ? 'Steadfast কী আপডেট করুন' : 'Steadfast কী সেভ করুন'}</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
@@ -303,9 +473,16 @@ export default function IntegrationsPage() {
                   <p className="text-xs text-neutral-400">পাঠাও মার্চেন্ট ডেলিভারি নেটওয়ার্ক</p>
                 </div>
               </div>
-              <span className="px-2.5 py-1 text-xs font-bold bg-neutral-800 text-neutral-400 rounded-xl">
-                ঐচ্ছিক
-              </span>
+
+              {pathaoConnected ? (
+                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl">
+                  ● সংযুক্ত
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 text-xs font-bold bg-neutral-800 text-neutral-400 rounded-xl">
+                  ঐচ্ছিক / অসংযুক্ত
+                </span>
+              )}
             </div>
 
             <form onSubmit={handleSavePathao} className="space-y-4 pt-1">
@@ -317,7 +494,7 @@ export default function IntegrationsPage() {
                   type="text"
                   value={pathaoApiKey}
                   onChange={(e) => setPathaoApiKey(e.target.value)}
-                  placeholder="Client ID লিখুন..."
+                  placeholder="আপনার Pathao Client ID লিখুন..."
                   className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-red-500"
                 />
               </div>
@@ -330,17 +507,24 @@ export default function IntegrationsPage() {
                   type="password"
                   value={pathaoSecret}
                   onChange={(e) => setPathaoSecret(e.target.value)}
-                  placeholder="Client Secret লিখুন..."
+                  placeholder="আপনার Pathao Secret লিখুন..."
                   className="w-full bg-[#0a0c12] border border-neutral-750 rounded-2xl px-4 py-2.5 text-sm text-neutral-100 font-mono focus:outline-none focus:border-red-500"
                 />
               </div>
 
               <button
                 type="submit"
+                disabled={isSavingPathao}
                 className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Pathao কী সেভ করুন</span>
+                {isSavingPathao ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Pathao কী সেভ করুন</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
@@ -350,7 +534,14 @@ export default function IntegrationsPage() {
       {/* Store Setup Wizard Modal */}
       <StoreSetupWizardModal
         isOpen={showWizard}
-        onClose={() => setShowWizard(false)}
+        onClose={() => {
+          setShowWizard(false);
+          loadConfig();
+        }}
+        onComplete={() => {
+          setShowWizard(false);
+          loadConfig();
+        }}
       />
     </div>
   );

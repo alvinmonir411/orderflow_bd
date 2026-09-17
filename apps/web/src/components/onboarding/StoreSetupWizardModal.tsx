@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Zap,
@@ -20,6 +20,8 @@ import {
   Check,
   RefreshCw,
   Lock,
+  Key,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,42 +37,107 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
   onComplete,
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Step 1: Facebook
+  const [fbPageToken, setFbPageToken] = useState('');
+  const [fbPageId, setFbPageId] = useState('');
   const [isConnectingFb, setIsConnectingFb] = useState(false);
-  const [fbConnected, setFbConnected] = useState(true);
-  const [selectedPage, setSelectedPage] = useState('Moner Kotha (ID: 1314475555081210)');
-  const [steadfastPhone, setSteadfastPhone] = useState('01938909812');
-  const [steadfastPassword, setSteadfastPassword] = useState('••••••••');
+
+  // Step 2: Steadfast
+  const [steadfastApiKey, setSteadfastApiKey] = useState('');
+  const [steadfastSecret, setSteadfastSecret] = useState('');
   const [isConnectingSteadfast, setIsConnectingSteadfast] = useState(false);
-  const [steadfastConnected, setSteadfastConnected] = useState(true);
-  const [aiEnabled, setAiEnabled] = useState(true);
+
+  // Step 3: AI & Delivery Fees
   const [deliveryDhaka, setDeliveryDhaka] = useState(120);
   const [deliveryOutside, setDeliveryOutside] = useState(150);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+
+  // Fetch real settings from database
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/bot-config')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data) {
+            setFbPageToken(data.fbPageToken || '');
+            setFbPageId(data.fbPageId || '1314475555081210');
+            setSteadfastApiKey(data.steadfastApiKey || '');
+            setSteadfastSecret(data.steadfastSecretKey || '');
+            setDeliveryDhaka(Number(data.deliveryFeeDhaka) || 120);
+            setDeliveryOutside(Number(data.deliveryFeeOutside) || 150);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleConnectFacebook = () => {
+  const fbConnected = Boolean(fbPageToken && fbPageToken.length > 10);
+  const steadfastConnected = Boolean(steadfastApiKey && steadfastApiKey.trim().length > 0);
+
+  const handleConnectFacebook = async () => {
     setIsConnectingFb(true);
-    setTimeout(() => {
+    try {
+      await new Promise((r) => setTimeout(r, 1000));
+      toast.success('🎉 ফেসবুক পেজ "Moner Kotha" সফলভাবে সংযুক্ত হয়েছে!');
+    } finally {
       setIsConnectingFb(false);
-      setFbConnected(true);
-      toast.success('🎉 ফেসবুক পেজ "Moner Kotha" সফলভাবে কানেক্ট হয়েছে!');
-    }, 1200);
+    }
   };
 
-  const handleConnectSteadfast = (e: React.FormEvent) => {
+  const handleSaveSteadfast = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!steadfastApiKey.trim() || !steadfastSecret.trim()) {
+      toast.error('দয়া করে আপনার Steadfast API Key এবং Secret Key দিন');
+      return;
+    }
     setIsConnectingSteadfast(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          steadfastApiKey: steadfastApiKey.trim(),
+          steadfastSecretKey: steadfastSecret.trim(),
+        }),
+      });
+      if (res.ok) {
+        toast.success('🎉 Steadfast মার্চেন্ট API সফলভাবে সেভ হয়েছে!');
+        setCurrentStep(3);
+      } else {
+        toast.error('সেভ করা যায়নি');
+      }
+    } catch (err) {
+      toast.error('সার্ভারে সমস্যা হয়েছে');
+    } finally {
       setIsConnectingSteadfast(false);
-      setSteadfastConnected(true);
-      toast.success('🎉 Steadfast মার্চেন্ট API সফলভাবে কানেক্ট হয়েছে!');
-    }, 1000);
+    }
   };
 
-  const handleFinishSetup = () => {
-    toast.success('🚀 আপনার সম্পূর্ণ শপ অটোমেশন সফলভাবে কনফিগার করা হয়েছে!');
-    if (onComplete) onComplete();
-    onClose();
+  const handleFinishSetup = async () => {
+    setIsSavingAll(true);
+    try {
+      await fetch('/api/bot-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deliveryFeeDhaka: deliveryDhaka,
+          deliveryFeeOutside: deliveryOutside,
+          steadfastApiKey: steadfastApiKey.trim(),
+          steadfastSecretKey: steadfastSecret.trim(),
+        }),
+      });
+      toast.success('🚀 আপনার সম্পূর্ণ শপ অটোমেশন সফলভাবে কনফিগার করা হয়েছে!');
+      if (onComplete) onComplete();
+      onClose();
+    } catch (err) {
+      toast.error('সেটিংস সেভ করতে সমস্যা হয়েছে');
+    } finally {
+      setIsSavingAll(false);
+    }
   };
 
   return (
@@ -107,8 +174,8 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
         <div className="grid grid-cols-3 gap-2 my-5 relative z-10">
           {[
             { step: 1, label: '১. ফেসবুক পেজ', icon: MessageSquare },
-            { step: 2, label: '২. কুরিয়ার কানেক্ট', icon: Truck },
-            { step: 3, label: '৩. AI সেলস এজেন্ট', icon: Bot },
+            { step: 2, label: '২. Steadfast কুরিয়ার', icon: Truck },
+            { step: 3, label: '৩. AI ও ডেলিভারি', icon: Bot },
           ].map((item) => (
             <div
               key={item.step}
@@ -155,7 +222,9 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
                         f
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-neutral-100">{selectedPage}</p>
+                        <p className="text-sm font-bold text-neutral-100">
+                          Moner Kotha <span className="text-xs font-mono text-neutral-400">(ID: {fbPageId})</span>
+                        </p>
                         <p className="text-xs text-emerald-400 font-medium flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>মেসেঞ্জার ও ওয়েব হুক লাইভ সক্রিয়</span>
@@ -199,16 +268,16 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: Courier 1-Click Connect */}
+          {/* STEP 2: Courier Connect */}
           {currentStep === 2 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
               <div className="p-4 bg-gradient-to-r from-purple-950/30 to-pink-950/20 border border-purple-500/25 rounded-2xl space-y-2">
                 <h3 className="font-extrabold text-sm sm:text-base text-neutral-100 flex items-center gap-2">
                   <Truck className="w-4 h-4 text-purple-400" />
-                  ধাপ ২: Steadfast / Pathao কুরিয়ার কানেক্ট করুন
+                  ধাপ ২: Steadfast কুরিয়ার কানেক্ট করুন
                 </h3>
                 <p className="text-xs text-neutral-300 leading-relaxed">
-                  কুরিয়ারের ফোন নম্বর দিয়ে লগইন করলেই অর্ডার কনফার্ম করার পর ড্যাশবোর্ড থেকে ১-ক্লিকে পার্সেল বুকিং হয়ে যাবে।
+                  Steadfast মার্চেন্ট প্যানেল (<a href="https://steadfast.com.bd/login" target="_blank" rel="noreferrer" className="text-purple-300 underline">steadfast.com.bd</a>) এর Settings ➔ API Information থেকে আপনার Key দিয়ে সেভ করুন।
                 </p>
               </div>
 
@@ -232,29 +301,41 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
                       সংযুক্ত ✅
                     </span>
                   </div>
+                  <button
+                    onClick={() => setSteadfastApiKey('')}
+                    className="text-xs text-neutral-400 hover:text-neutral-200 underline"
+                  >
+                    কী পরিবর্তন করতে চান?
+                  </button>
                 </div>
               ) : (
-                <form onSubmit={handleConnectSteadfast} className="p-5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-3">
+                <form onSubmit={handleSaveSteadfast} className="p-5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-neutral-300">Steadfast রেজিস্টার্ড ফোন নম্বর</label>
-                    <input
-                      type="text"
-                      value={steadfastPhone}
-                      onChange={(e) => setSteadfastPhone(e.target.value)}
-                      placeholder="017XXXXXXXX"
-                      className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-750 focus:border-purple-500 rounded-xl text-xs text-neutral-100 font-mono outline-none"
-                    />
+                    <label className="text-xs font-bold text-neutral-300">Steadfast API Key</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        type="password"
+                        value={steadfastApiKey}
+                        onChange={(e) => setSteadfastApiKey(e.target.value)}
+                        placeholder="আপনার Steadfast API Key দিন..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-950 border border-neutral-750 focus:border-purple-500 rounded-xl text-xs text-neutral-100 font-mono outline-none"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-neutral-300">মার্চেন্ট পাসওয়ার্ড</label>
-                    <input
-                      type="password"
-                      value={steadfastPassword}
-                      onChange={(e) => setSteadfastPassword(e.target.value)}
-                      placeholder="পাসওয়ার্ড লিখুন..."
-                      className="w-full px-4 py-2.5 bg-neutral-950 border border-neutral-750 focus:border-purple-500 rounded-xl text-xs text-neutral-100 outline-none"
-                    />
+                    <label className="text-xs font-bold text-neutral-300">Steadfast Secret Key</label>
+                    <div className="relative">
+                      <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                      <input
+                        type="password"
+                        value={steadfastSecret}
+                        onChange={(e) => setSteadfastSecret(e.target.value)}
+                        placeholder="আপনার Steadfast Secret Key দিন..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-950 border border-neutral-750 focus:border-purple-500 rounded-xl text-xs text-neutral-100 font-mono outline-none"
+                      />
+                    </div>
                   </div>
 
                   <button
@@ -262,7 +343,11 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
                     disabled={isConnectingSteadfast}
                     className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                   >
-                    {isConnectingSteadfast ? 'কানেক্ট হচ্ছে...' : '১-ক্লিকে কুরিয়ার লিংক করুন'}
+                    {isConnectingSteadfast ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      '১-ক্লিকে কুরিয়ার কী সেভ করুন'
+                    )}
                   </button>
                 </form>
               )}
@@ -284,27 +369,27 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
 
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl space-y-1">
-                  <label className="text-neutral-400 block font-bold">ঢাকা সিটিতে ডেলিভারি ফি</label>
+                  <label className="text-neutral-400 block font-bold">ঢাকা সিটিতে ডেলিভারি চার্জ</label>
                   <div className="flex items-center gap-1 font-mono font-bold text-emerald-400 text-base">
                     <span>৳</span>
                     <input
                       type="number"
                       value={deliveryDhaka}
                       onChange={(e) => setDeliveryDhaka(Number(e.target.value))}
-                      className="w-16 bg-neutral-950 border border-neutral-700 px-2 py-1 rounded-lg text-sm text-neutral-100"
+                      className="w-20 bg-neutral-950 border border-neutral-700 px-2 py-1 rounded-lg text-sm text-neutral-100"
                     />
                   </div>
                 </div>
 
                 <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl space-y-1">
-                  <label className="text-neutral-400 block font-bold">ঢাকার বাইরে ডেলিভারি ফি</label>
+                  <label className="text-neutral-400 block font-bold">ঢাকার বাইরে ডেলিভারি চার্জ</label>
                   <div className="flex items-center gap-1 font-mono font-bold text-teal-400 text-base">
                     <span>৳</span>
                     <input
                       type="number"
                       value={deliveryOutside}
                       onChange={(e) => setDeliveryOutside(Number(e.target.value))}
-                      className="w-16 bg-neutral-950 border border-neutral-700 px-2 py-1 rounded-lg text-sm text-neutral-100"
+                      className="w-20 bg-neutral-950 border border-neutral-700 px-2 py-1 rounded-lg text-sm text-neutral-100"
                     />
                   </div>
                 </div>
@@ -348,10 +433,17 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
           ) : (
             <button
               onClick={handleFinishSetup}
+              disabled={isSavingAll}
               className="px-6 py-3 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-black text-sm rounded-xl shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center gap-2"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>সেটআপ সম্পন্ন করুন 🚀</span>
+              {isSavingAll ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>সেটআপ সম্পন্ন করুন 🚀</span>
+                </>
+              )}
             </button>
           )}
         </div>

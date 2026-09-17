@@ -130,9 +130,27 @@ export async function initDatabase() {
         "helplinePhone" TEXT DEFAULT '01700000000',
         "returnPolicy" TEXT DEFAULT 'পণ্য হাতে পেয়ে চেক করে নেওয়ার সুবিধা এবং ৩ দিনের মধ্যে ফ্রি সাইজ পরিবর্তন।',
         "faqs" JSONB,
+        "steadfastApiKey" TEXT DEFAULT '',
+        "steadfastSecretKey" TEXT DEFAULT '',
+        "pathaoClientId" TEXT DEFAULT '',
+        "pathaoSecretKey" TEXT DEFAULT '',
+        "whatsappConnected" BOOLEAN DEFAULT FALSE,
+        "whatsappPhone" TEXT DEFAULT '',
+        "smsApiKey" TEXT DEFAULT '',
+        "smsSenderId" TEXT DEFAULT '',
         "updatedAt" TIMESTAMP DEFAULT NOW()
       );
     `;
+
+    // Ensure newly added columns exist in existing database tables
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "steadfastApiKey" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "steadfastSecretKey" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoClientId" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoSecretKey" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappConnected" BOOLEAN DEFAULT FALSE;`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "whatsappPhone" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsApiKey" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "smsSenderId" TEXT DEFAULT '';`;
 
     // Insert default bot settings if empty
     const settingsExist = await sql`SELECT COUNT(*)::int as count FROM "BotSettings" WHERE "id" = 'settings-1'`;
@@ -141,7 +159,9 @@ export async function initDatabase() {
         INSERT INTO "BotSettings" (
           "id", "storeId", "systemPrompt", "geminiApiKey", "fbPageToken", "fbPageId",
           "deliveryTimeDhaka", "deliveryTimeOutside", "deliveryFeeDhaka", "deliveryFeeOutside",
-          "helplinePhone", "returnPolicy", "faqs", "updatedAt"
+          "helplinePhone", "returnPolicy", "faqs", "steadfastApiKey", "steadfastSecretKey",
+          "pathaoClientId", "pathaoSecretKey", "whatsappConnected", "whatsappPhone",
+          "smsApiKey", "smsSenderId", "updatedAt"
         ) VALUES (
           'settings-1', 'store-1',
           'You are an intelligent, polite, friendly Bangladeshi F-Commerce AI sales representative for OrderFlow BD.',
@@ -152,7 +172,17 @@ export async function initDatabase() {
           '২ থেকে ৩ কার্যদিবস',
           120,
           150,
+          '01700000000',
+          'পণ্য হাতে পেয়ে চেক করে নেওয়ার সুবিধা এবং ৩ দিনের মধ্যে ফ্রি সাইজ পরিবর্তন।',
           ${JSON.stringify(DEFAULT_FAQS)}::jsonb,
+          '',
+          '',
+          '',
+          '',
+          false,
+          '',
+          '',
+          'OrderFlowBD',
           NOW()
         );
       `;
@@ -201,6 +231,14 @@ export async function getBotSettings() {
         helplinePhone: row.helplinePhone || '01700000000',
         returnPolicy: row.returnPolicy || 'পণ্য হাতে পেয়ে চেক করে নেওয়ার সুবিধা এবং ৩ দিনের মধ্যে ফ্রি সাইজ পরিবর্তন।',
         faqs: (row.faqs as BotFaqItem[]) || DEFAULT_FAQS,
+        steadfastApiKey: row.steadfastApiKey || '',
+        steadfastSecretKey: row.steadfastSecretKey || '',
+        pathaoClientId: row.pathaoClientId || '',
+        pathaoSecretKey: row.pathaoSecretKey || '',
+        whatsappConnected: Boolean(row.whatsappConnected),
+        whatsappPhone: row.whatsappPhone || '',
+        smsApiKey: row.smsApiKey || '',
+        smsSenderId: row.smsSenderId || 'OrderFlowBD',
       };
     }
   } catch (err) {
@@ -220,6 +258,14 @@ export async function getBotSettings() {
     helplinePhone: '01700000000',
     returnPolicy: 'পণ্য হাতে পেয়ে চেক করে নেওয়ার সুবিধা এবং ৩ দিনের মধ্যে ফ্রি সাইজ পরিবর্তন।',
     faqs: DEFAULT_FAQS,
+    steadfastApiKey: '',
+    steadfastSecretKey: '',
+    pathaoClientId: '',
+    pathaoSecretKey: '',
+    whatsappConnected: false,
+    whatsappPhone: '',
+    smsApiKey: '',
+    smsSenderId: 'OrderFlowBD',
   };
 }
 
@@ -235,6 +281,14 @@ export async function updateBotSettings(data: {
   helplinePhone?: string;
   returnPolicy?: string;
   faqs?: BotFaqItem[];
+  steadfastApiKey?: string;
+  steadfastSecretKey?: string;
+  pathaoClientId?: string;
+  pathaoSecretKey?: string;
+  whatsappConnected?: boolean;
+  whatsappPhone?: string;
+  smsApiKey?: string;
+  smsSenderId?: string;
 }) {
   const sql = getSql();
   try {
@@ -252,19 +306,30 @@ export async function updateBotSettings(data: {
     const helplinePhone = data.helplinePhone !== undefined ? data.helplinePhone : current.helplinePhone;
     const returnPolicy = data.returnPolicy !== undefined ? data.returnPolicy : current.returnPolicy;
     const faqs = data.faqs !== undefined ? data.faqs : current.faqs;
+    const steadfastApiKey = data.steadfastApiKey !== undefined ? data.steadfastApiKey : current.steadfastApiKey;
+    const steadfastSecretKey = data.steadfastSecretKey !== undefined ? data.steadfastSecretKey : current.steadfastSecretKey;
+    const pathaoClientId = data.pathaoClientId !== undefined ? data.pathaoClientId : current.pathaoClientId;
+    const pathaoSecretKey = data.pathaoSecretKey !== undefined ? data.pathaoSecretKey : current.pathaoSecretKey;
+    const whatsappConnected = data.whatsappConnected !== undefined ? data.whatsappConnected : current.whatsappConnected;
+    const whatsappPhone = data.whatsappPhone !== undefined ? data.whatsappPhone : current.whatsappPhone;
+    const smsApiKey = data.smsApiKey !== undefined ? data.smsApiKey : current.smsApiKey;
+    const smsSenderId = data.smsSenderId !== undefined ? data.smsSenderId : current.smsSenderId;
 
     await sql`
       INSERT INTO "BotSettings" (
         "id", "storeId", "systemPrompt", "geminiApiKey", "fbPageToken", "fbPageId",
         "deliveryTimeDhaka", "deliveryTimeOutside", "deliveryFeeDhaka", "deliveryFeeOutside",
-        "helplinePhone", "returnPolicy", "faqs", "updatedAt"
+        "helplinePhone", "returnPolicy", "faqs",
+        "steadfastApiKey", "steadfastSecretKey", "pathaoClientId", "pathaoSecretKey",
+        "whatsappConnected", "whatsappPhone", "smsApiKey", "smsSenderId", "updatedAt"
       ) VALUES (
         'settings-1', 'store-1', ${systemPrompt}, ${geminiApiKey}, ${fbPageToken}, ${fbPageId},
         ${deliveryTimeDhaka}, ${deliveryTimeOutside}, ${deliveryFeeDhaka}, ${deliveryFeeOutside},
-        ${helplinePhone}, ${returnPolicy}, ${JSON.stringify(faqs)}::jsonb, NOW()
+        ${helplinePhone}, ${returnPolicy}, ${JSON.stringify(faqs)}::jsonb,
+        ${steadfastApiKey}, ${steadfastSecretKey}, ${pathaoClientId}, ${pathaoSecretKey},
+        ${whatsappConnected}, ${whatsappPhone}, ${smsApiKey}, ${smsSenderId}, NOW()
       )
-      ON CONFLICT ("id")
-      DO UPDATE SET
+      ON CONFLICT ("id") DO UPDATE SET
         "systemPrompt" = EXCLUDED."systemPrompt",
         "geminiApiKey" = EXCLUDED."geminiApiKey",
         "fbPageToken" = EXCLUDED."fbPageToken",
@@ -276,9 +341,16 @@ export async function updateBotSettings(data: {
         "helplinePhone" = EXCLUDED."helplinePhone",
         "returnPolicy" = EXCLUDED."returnPolicy",
         "faqs" = EXCLUDED."faqs",
+        "steadfastApiKey" = EXCLUDED."steadfastApiKey",
+        "steadfastSecretKey" = EXCLUDED."steadfastSecretKey",
+        "pathaoClientId" = EXCLUDED."pathaoClientId",
+        "pathaoSecretKey" = EXCLUDED."pathaoSecretKey",
+        "whatsappConnected" = EXCLUDED."whatsappConnected",
+        "whatsappPhone" = EXCLUDED."whatsappPhone",
+        "smsApiKey" = EXCLUDED."smsApiKey",
+        "smsSenderId" = EXCLUDED."smsSenderId",
         "updatedAt" = NOW();
     `;
-
     return { success: true };
   } catch (err) {
     console.error('[DB Update BotSettings Error]:', err);

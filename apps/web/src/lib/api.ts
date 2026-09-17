@@ -195,13 +195,13 @@ class StorageApi {
         const res = await fetch('/api/orders');
         if (res.ok) {
           const live = await res.json();
-          if (Array.isArray(live) && live.length > 0) {
+          if (Array.isArray(live)) {
             return live;
           }
         }
       }
     } catch (e) {}
-    return this.getOrdersFromStorage();
+    return [];
   }
 
   async getProducts(): Promise<Product[]> {
