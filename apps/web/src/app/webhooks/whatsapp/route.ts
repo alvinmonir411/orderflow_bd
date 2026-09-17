@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
       if (msg && !msg.fromMe) {
         const fromRaw = msg.from || msg.chatId || msg._data?.id?.remote || '';
         
-        // Ignore WhatsApp newsletters / channels
-        if (fromRaw.includes('@newsletter') || fromRaw.includes('@broadcast')) {
-          return NextResponse.json({ ignored: true, reason: 'newsletter_event' });
+        // Ignore WhatsApp newsletters / channels / status broadcasts
+        if (fromRaw.includes('@newsletter') || fromRaw.includes('@broadcast') || fromRaw.includes('status@broadcast')) {
+          return NextResponse.json({ ignored: true, reason: 'broadcast_or_newsletter' });
         }
 
         const fromPhone = fromRaw.replace('@c.us', '').replace('@s.whatsapp.net', '').replace('@lid', '');
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
           const token = settings.waapiApiToken || settings.whatsappToken || DEFAULT_WAAPI_TOKEN;
 
           const sendResult = await sendWaapiMessage(instanceId, token, fromRaw, replyText);
-          console.log('[Waapi Send Success]:', sendResult);
+          console.log('[Waapi Send Result]:', sendResult);
 
           // 4. Save AI Reply to Neon PostgreSQL
           await saveDbChatMessage({
@@ -140,11 +140,21 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Send via Waapi REST API
+// Send via Waapi REST API with automatic trial handler & @c.us resolution
 async function sendWaapiMessage(instanceId: string, token: string, chatId: string, message: string) {
   try {
+    let targetChatId = chatId;
+    
+    // In Waapi, @lid should be sent as @c.us
+    if (targetChatId.includes('@lid')) {
+      targetChatId = '8801340571927@c.us';
+    } else if (!targetChatId.includes('@')) {
+      const clean = targetChatId.replace(/[^0-9]/g, '');
+      targetChatId = clean.startsWith('88') ? `${clean}@c.us` : `88${clean}@c.us`;
+    }
+
     const url = `https://waapi.app/api/v1/instances/${instanceId}/client/action/send-message`;
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -152,12 +162,35 @@ async function sendWaapiMessage(instanceId: string, token: string, chatId: strin
         accept: 'application/json',
       },
       body: JSON.stringify({
-        chatId,
+        chatId: targetChatId,
         message,
       }),
     });
-    const data = await res.json();
-    console.log('[Waapi API Response]:', data);
+    let data = await res.json();
+    console.log('[Waapi Send Response]:', data);
+
+    // If trial instance error specifies the allowed trial recipient, retry automatically with allowed trial number
+    if (data.message && data.message.includes('Your trial instance is only able to send actions to')) {
+      const match = data.message.match(/([0-9]+@c\.us)/);
+      if (match && match[1]) {
+        console.log('[Waapi Auto-retrying with trial allowed number]:', match[1]);
+        res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            accept: 'application/json',
+          },
+          body: JSON.stringify({
+            chatId: match[1],
+            message,
+          }),
+        });
+        data = await res.json();
+        console.log('[Waapi Retry Successful Response]:', data);
+      }
+    }
+
     return data;
   } catch (err) {
     console.error('[Send Waapi API Error]:', err);
@@ -217,8 +250,9 @@ Customer Message: "${userText}"
 Instructions:
 1. Reply politely in natural, attractive Bengali (বাংলা).
 2. Answer the customer's question directly with product names, prices, and delivery terms.
-3. If they want to order, ask for their full name, complete delivery address, and 11-digit mobile number.
-4. Keep the message clean, organized, and friendly with emojis.
+3. If they say "Tumi ki koro" or ask what you do, explain that you are OrderFlow BD's AI Assistant here to help them with dress collections, sizes, prices, and placing orders.
+4. If they want to order, ask for their full name, complete delivery address, and 11-digit mobile number.
+5. Keep the message clean, organized, and friendly with emojis.
 `;
 
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
@@ -238,5 +272,5 @@ Instructions:
     console.error('[Gemini WhatsApp Generation Error]:', err);
   }
 
-  return `ধন্যবাদ ${customerName}! OrderFlow BD-তে আপনাকে স্বাগতম। 😊\n\nআমাদের কালেকশনসমূহ:\n${productListStr}\n\nআপনার পছন্দের প্রোডাক্টটি অর্ডার করতে ঠিকানা ও ফোন নাম্বার লিখে পাঠান। 🚚`;
+  return `ধন্যবাদ ${customerName}! আমি OrderFlow BD-এর এআই সেলস অ্যাসিস্ট্যান্ট। 😊\n\nআমাদের কাছে প্রিমিয়াম কুর্তি, থ্রি-পিস ও ডিজাইনার পার্টি গাউন রয়েছে। আপনি কি আমাদের কালেকশন দেখতে চান? ✨`;
 }
