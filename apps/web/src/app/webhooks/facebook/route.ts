@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBotSettings, insertDbOrder, findCustomerLatestOrder, BotFaqItem } from '@/lib/db';
 
+interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
 interface UserSession {
   state: 'IDLE' | 'AWAITING_ADDRESS' | 'AWAITING_PHONE';
   selectedProduct?: string;
   price?: number;
   customerName?: string;
   deliveryAddress?: string;
+  customerPhone?: string;
   partialPhone?: string;
   turnCount?: number;
   nonBusinessCount?: number;
   lastMessageTime?: number;
+  history?: ChatMessage[];
 }
 
 // In-memory conversation state for quick back-to-back inputs
@@ -64,6 +71,8 @@ export async function POST(request: NextRequest) {
 
           const text = event.message?.text || '';
           const payload = event.postback?.payload || event.message?.quick_reply?.payload;
+          const incomingAttachment = event.message?.attachments?.[0];
+          const incomingImageUrl = incomingAttachment?.type === 'image' ? incomingAttachment?.payload?.url : undefined;
 
           // Automatically link active senderId to Customer in Neon DB so dashboard direct messaging works seamlessly!
           try {
@@ -78,7 +87,7 @@ export async function POST(request: NextRequest) {
             console.error('[Auto-link PSID Error]:', linkErr);
           }
 
-          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey, settings);
+          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey, settings, incomingImageUrl);
         }
       }
 
@@ -172,7 +181,19 @@ function extractNameAndAddress(text: string, phone?: string): { name: string; ad
   return { name, address };
 }
 
-// Google AI Studio (Gemini) Call
+// Record chat turn in session memory
+function recordChatTurn(senderId: string, userText: string, botText: string) {
+  const session = userSessions[senderId];
+  if (!session) return;
+  if (!session.history) session.history = [];
+  session.history.push({ role: 'user', text: userText });
+  session.history.push({ role: 'model', text: botText });
+  if (session.history.length > 14) {
+    session.history = session.history.slice(-14);
+  }
+}
+
+// Google AI Studio (Gemini) Call with Multi-Turn History & Context Awareness
 async function callGeminiAI(
   userText: string,
   session: UserSession,
@@ -183,10 +204,10 @@ async function callGeminiAI(
   try {
     const systemPrompt = `You are an ultra-intelligent, friendly Bangladeshi F-Commerce AI sales representative for "OrderFlow BD".
 
-STORE PRODUCTS:
-1. প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০ (সাইজ: M, L, XL, লিলেন সুতি)
-2. জয়পুরি কটন আনস্টিচড থ্রি-পিস - ৳১২৫০ (১০০% পিওর কটন)
-3. ডিজাইনার পার্টি গাউন - ৳১৫০০ (গর্জিয়াস পার্টি গাউন)
+STORE PRODUCTS & SPECIFICATIONS:
+1. প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০ (সাইজ: M, L, XL, উপাদান: আরামদায়ক লিলেন সুতি) [কাস্টমার যদি সাইজ উল্লেখ না করে, তখন সাইজ জানতে চান]
+2. জয়পুরি কটন আনস্টিচড থ্রি-পিস - ৳১২৫০ (১০০% পিওর সুতি, আনস্টিচড ফ্রি সাইজ) [বিশেষ সতর্কতা: এটি সম্পূর্ণ আনস্টিচড বা সেলাইবিহীন থ্রি-পিস, তাই এর জন্য কখনোই কোনো সাইজ (M/L/XL) চাইবেন না!]
+3. ডিজাইনার পার্টি গাউন - ৳১৫০০ (গর্জিয়াস পার্টি কালেকশন, ফ্রি/স্ট্যান্ডার্ড সাইজ)
 
 DELIVERY & STORE POLICIES:
 - ডেলিভারি চার্জ: ঢাকা সিটিতে ৳${settings.deliveryFeeDhaka || 120}, ঢাকার বাইরে ৳${settings.deliveryFeeOutside || 150}।
@@ -197,23 +218,81 @@ DELIVERY & STORE POLICIES:
 ACTIVE CUSTOMER CONTEXT:
 ${
   recentOrder
-    ? `IMPORTANT: This customer has ALREADY confirmed an active Order #${recentOrder.orderNumber} for "${recentOrder.productTitle}", Total ৳${recentOrder.totalPrice}, Status: ${recentOrder.status}, Date: ${recentOrder.createdAt}.
-If the customer asks post-order questions (e.g. delivery time, when will it arrive, tracking, payment, thanks), DO NOT treat them like a new visitor! Answer warmly referring to their existing order #${recentOrder.orderNumber}.`
+    ? `IMPORTANT: This customer has ALREADY confirmed an active previous Order #${recentOrder.orderNumber}:
+- Ordered Product: "${recentOrder.productTitle}"
+- Order Total: ৳${recentOrder.totalPrice}
+- Status: ${recentOrder.status}
+- Customer Name: "${recentOrder.customerName || 'সম্মানিত কাস্টমার'}"
+- Saved Phone Number: "${recentOrder.customerPhone || 'N/A'}"
+- Saved Delivery Address: "${recentOrder.deliveryAddress || 'ঢাকা'}"
+- Date: ${recentOrder.createdAt}
+
+CUSTOMER RE-ORDER / REUSE POLICIES:
+- If customer says "ager name adress number use kro", "ager moto pathan", "use previous info", "ager address e", "ager thikana use koro", or wants to order a new product with their saved information:
+  1. Check the conversation history or session for what new product they selected (e.g. "জয়পুরি কটন আনস্টিচড থ্রি-পিস" ৳১২৫০).
+  2. DO NOT ask for their product name again if they already mentioned it in the chat!
+  3. DO NOT ask for size if it is Joypuri unstitched three-piece or if size is not needed!
+  4. Immediately CONFIRM the new order using their saved details and append:
+     JSON_START{"orderConfirmed":true,"product":"জয়পুরি কটন আনস্টিচড থ্রি-পিস","price":1250,"customerName":"${recentOrder.customerName || 'সম্মানিত কাস্টমার'}","phone":"${recentOrder.customerPhone || '01700000000'}","address":"${recentOrder.deliveryAddress || 'ঢাকা'}"}JSON_END
+  5. In your text reply, congratulate them warmly, state that the new order for the chosen product is confirmed with their saved details (#${recentOrder.orderNumber}), state the total bill breakdown (product price + ৳${settings.deliveryFeeDhaka || 120} delivery = total, Cash on Delivery), and state delivery timeline.
+- If customer asks post-order delivery time/status questions about their existing order #${recentOrder.orderNumber}, answer warmly referring to Order #${recentOrder.orderNumber}.`
     : `No previous order found. Selected Product: ${session.selectedProduct || 'None yet'}, Name: ${session.customerName || 'Unknown'}, Address: ${session.deliveryAddress || 'Unknown'}`
 }
 
 CONVERSATION PROGRESS:
 - Current interaction turn count: ${session.turnCount || 1}
+- Currently Selected Product in Session: ${session.selectedProduct || 'None yet'}
 
 STRICT SALES & BUSINESS RULES:
 1. Speak in warm, natural Bengali (with tasteful emojis). Keep replies concise and sales-focused (2-3 sentences max).
-2. DO NOT engage in unnecessary casual chit-chat, personal talks, or philosophical debates. Always steer the conversation back to our products and shopping.
-3. If the customer asks repetitive product queries without deciding after multiple turns (turn >= 3), answer their question and explicitly invite them to call our helpline (📞 ${settings.helplinePhone || '01700000000'}) or drop their address to place the order.
-4. If they are placing a NEW order:
+2. Maintain continuous conversation context. Always remember what products or questions were discussed in the earlier chat turns.
+3. DO NOT engage in unnecessary casual chit-chat, personal talks, or philosophical debates. Always steer the conversation back to our products and shopping.
+4. If the customer asks repetitive product queries without deciding after multiple turns (turn >= 3), answer their question and explicitly invite them to call our helpline (📞 ${settings.helplinePhone || '01700000000'}) or drop their address to place the order.
+5. If they are placing a NEW order:
    - If phone number is incomplete (wrong number of digits), point out the specific mistake politely.
-   - When all info (Name, 11-digit phone, Address, Product) is ready to confirm:
+   - When all info (Name, 11-digit phone, Address, Product) is ready to confirm (either provided now or requested to reuse from previous order):
      Congratulate them and append:
      JSON_START{"orderConfirmed":true,"product":"...","price":850,"customerName":"...","phone":"...","address":"..."}JSON_END`;
+
+    // Construct multi-turn contents from session.history
+    const pastTurns = (session.history || []).slice(-8);
+    const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+
+    if (pastTurns.length === 0) {
+      contents.push({
+        role: 'user',
+        parts: [{ text: `${systemPrompt}\n\nCustomer message: "${userText}"` }],
+      });
+    } else {
+      let firstTurnHandled = false;
+      for (let i = 0; i < pastTurns.length; i++) {
+        const turn = pastTurns[i];
+        if (!firstTurnHandled && turn.role === 'user') {
+          contents.push({
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\n[Previous Conversation History]\nCustomer: ${turn.text}` }],
+          });
+          firstTurnHandled = true;
+        } else {
+          contents.push({
+            role: turn.role,
+            parts: [{ text: turn.text }],
+          });
+        }
+      }
+
+      if (!firstTurnHandled) {
+        contents.unshift({
+          role: 'user',
+          parts: [{ text: `${systemPrompt}\n\n[Conversation Starts]` }],
+        });
+      }
+
+      contents.push({
+        role: 'user',
+        parts: [{ text: userText }],
+      });
+    }
 
     // Try modern models in priority order
     const modelsToTry = [
@@ -234,14 +313,9 @@ STRICT SALES & BUSINESS RULES:
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: `${systemPrompt}\n\nCustomer message: "${userText}"` }],
-              },
-            ],
+            contents,
             generationConfig: {
-              temperature: 0.7,
+              temperature: 0.6,
               maxOutputTokens: 3000,
             },
           }),
@@ -291,12 +365,14 @@ async function processMessengerEvent(
   pageToken?: string,
   geminiKey?: string,
   settings?: any,
+  incomingImageUrl?: string,
 ) {
   const session = userSessions[senderId] || { 
     state: 'IDLE',
     turnCount: 0,
     nonBusinessCount: 0,
     lastMessageTime: Date.now(),
+    history: [],
   };
   session.turnCount = (session.turnCount || 0) + 1;
   session.lastMessageTime = Date.now();
@@ -305,10 +381,45 @@ async function processMessengerEvent(
   const rawText = text.trim();
   const lowerText = rawText.toLowerCase();
 
-  // 1. Fetch recent order context for this customer from Neon DB
+  // 1. If customer sent an Image Attachment (Photo)
+  if (incomingImageUrl) {
+    const recentOrder = await findCustomerLatestOrder(senderId);
+    let reply = '';
+    if (recentOrder) {
+      reply = `ধন্যবাদ চমৎকার ছবিটি পাঠানোর জন্য ${recentOrder.customerName || ''}! 🌸 এটি আমাদের প্রিমিয়াম কালেকশনের সাথে মিলিয়ে দেখা হচ্ছে।\n\nআপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম ও ঠিকানায় কি এই প্রোডাক্টের নতুন অর্ডারটি কনফার্ম করে দেব? অনুগ্রহ করে 'হ্যাঁ' অথবা পছন্দের সাইজটি লিখে জানান! ❤️`;
+    } else {
+      reply = `ধন্যবাদ সুন্দর ছবিটি পাঠানোর জন্য! 🌸 এটি আমাদের শপের প্রিমিয়াম কালেকশনের সাথে ম্যাচিং করে দেখা হচ্ছে।\n\nঅর্ডার নিশ্চিত করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর এবং সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠান। আমরা দ্রুততম সময়ে ডেলিভারির ব্যবস্থা করব! ❤️`;
+    }
+    recordChatTurn(senderId, `[Customer Sent Image: ${incomingImageUrl}]`, reply);
+    await sendFbMessage(senderId, reply, pageToken);
+    return;
+  }
+
+  // 2. Fetch recent order context for this customer from Neon DB
   const recentOrder = await findCustomerLatestOrder(senderId);
 
-  // 2. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
+  // 3. Pre-detect product mention to store in session context
+  if (lowerText.includes('গাউন') || lowerText.includes('gown') || lowerText.includes('party')) {
+    session.selectedProduct = 'ডিজাইনার পার্টি গাউন';
+    session.price = 1500;
+  } else if (lowerText.includes('কুর্তি') || lowerText.includes('kurti') || lowerText.includes('কাশ্মীরি') || lowerText.includes('kashmiri')) {
+    session.selectedProduct = 'প্রিমিয়াম কাশ্মীরি কুর্তি';
+    session.price = 850;
+  } else if (
+    lowerText.includes('থ্রি-পিস') ||
+    lowerText.includes('থ্রিপিস') ||
+    lowerText.includes('3 piece') ||
+    lowerText.includes('3piece') ||
+    lowerText.includes('জয়পুরি') ||
+    lowerText.includes('joypuri') ||
+    lowerText.includes('jaipuri') ||
+    lowerText.includes('three piece')
+  ) {
+    session.selectedProduct = 'জয়পুরি কটন আনস্টিচড থ্রি-পিস';
+    session.price = 1250;
+  }
+
+  // 3. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
   const isBusinessKeywords = 
     lowerText.includes('order') ||
     lowerText.includes('product') ||
@@ -329,6 +440,8 @@ async function processMessengerEvent(
     lowerText.includes('thikana') ||
     lowerText.includes('address') ||
     lowerText.includes('dhaka') ||
+    lowerText.includes('ager') ||
+    lowerText.includes('আগের') ||
     lowerText.includes('কুর্তি') ||
     lowerText.includes('থ্রি-পিস') ||
     lowerText.includes('গাউন') ||
@@ -351,9 +464,11 @@ async function processMessengerEvent(
   // If customer is making off-topic small talk repeatedly (> 2 turns), send helpline number directly to save API quota
   if (session.nonBusinessCount >= 2 && !payload) {
     const helpline = settings?.helplinePhone || '01700000000';
+    const reply = `আসসালামু আলাইকুম! 🌸 আমি OrderFlow BD-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`;
+    recordChatTurn(senderId, rawText, reply);
     await sendFbQuickReplies(
       senderId,
-      `আসসালামু আলাইকুম! 🌸 আমি OrderFlow BD-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`,
+      reply,
       [
         { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
         { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -364,17 +479,19 @@ async function processMessengerEvent(
     return;
   }
 
-  // 3. If Gemini AI Key is available, prioritize Google AI Studio
+  // 4. If Gemini AI Key is available, prioritize Google AI Studio
   if (geminiKey && rawText && !payload) {
     const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey, recentOrder, settings);
     if (replyText) {
+      recordChatTurn(senderId, rawText, replyText);
+
       if (orderData && orderData.orderConfirmed) {
-        const itemPrice = orderData.price || 850;
-        const deliveryCharge = 120;
-        const finalName = orderData.customerName || session.customerName || 'সম্মানিত কাস্টমার';
-        const finalPhone = orderData.phone || '01700000000';
-        const finalAddress = orderData.address || session.deliveryAddress || 'ঢাকা';
-        const prodTitle = orderData.product || session.selectedProduct || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
+        const itemPrice = orderData.price || session.price || (orderData.product?.includes('জয়পুরি') ? 1250 : orderData.product?.includes('গাউন') ? 1500 : 850);
+        const deliveryCharge = settings?.deliveryFeeDhaka || 120;
+        const finalName = orderData.customerName || recentOrder?.customerName || session.customerName || 'সম্মানিত কাস্টমার';
+        const finalPhone = orderData.phone || recentOrder?.customerPhone || '01700000000';
+        const finalAddress = orderData.address || recentOrder?.deliveryAddress || session.deliveryAddress || 'ঢাকা';
+        const prodTitle = orderData.product || session.selectedProduct || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস';
 
         try {
           await insertDbOrder({
@@ -395,6 +512,8 @@ async function processMessengerEvent(
         }
 
         session.state = 'IDLE';
+        session.selectedProduct = undefined;
+        session.price = undefined;
         userSessions[senderId] = session;
       }
 
@@ -403,7 +522,7 @@ async function processMessengerEvent(
     }
   }
 
-  // 3. Explicit Payload Button Click
+  // 5. Explicit Payload Button Click
   if (payload) {
     if (payload.startsWith('PROD_')) {
       const prodName =
@@ -419,25 +538,91 @@ async function processMessengerEvent(
       session.price = price;
       userSessions[senderId] = session;
 
-      await sendFbMessage(
-        senderId,
-        `আপনি '${prodName} (৳${price})' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার:\n১. পুরো নাম\n২. মোবাইল নম্বর (১১ ডিজিট)\n৩. সম্পূর্ণ ডেলিভারি ঠিকানা\nলিখে মেসেজ পাঠান (যেমন: মনির, 01938909812, মিরপুর ১৬, ঢাকা)।`,
-        pageToken,
-      );
+      const reply = `আপনি '${prodName} (৳${price})' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার:\n১. পুরো নাম\n২. মোবাইল নম্বর (১১ ডিজিট)\n৩. সম্পূর্ণ ডেলিভারি ঠিকানা\nলিখে মেসেজ পাঠান (যেমন: মনির, 01938909812, মিরপুর ১৬, ঢাকা)।`;
+      recordChatTurn(senderId, `[Button Click: ${prodName}]`, reply);
+      await sendFbMessage(senderId, reply, pageToken);
       return;
     }
   }
 
-  // 4. Check for phone & address extraction for NEW orders
+  // 6. Check for "Use Previous Information / Ager Name Address Number" Query (Rule-based Fallback)
+  const isReusePreviousInfoQuery =
+    (lowerText.includes('ager name') ||
+      lowerText.includes('ager address') ||
+      lowerText.includes('ager adress') ||
+      lowerText.includes('ager number') ||
+      lowerText.includes('ager phone') ||
+      lowerText.includes('ager info') ||
+      lowerText.includes('ager thikana') ||
+      lowerText.includes('ager moto') ||
+      lowerText.includes('ager ta tei') ||
+      lowerText.includes('use previous') ||
+      lowerText.includes('ager details') ||
+      lowerText.includes('আগের নাম') ||
+      lowerText.includes('আগের ঠিকানা') ||
+      lowerText.includes('আগের নম্বর') ||
+      lowerText.includes('আগের ইনফো') ||
+      lowerText.includes('আগের মতো')) &&
+    !!recentOrder;
+
+  if (isReusePreviousInfoQuery && recentOrder) {
+    const finalName = recentOrder.customerName || 'সম্মানিত কাস্টমার';
+    const finalPhone = recentOrder.customerPhone || '01700000000';
+    const finalAddress = recentOrder.deliveryAddress || 'ঢাকা';
+    const prodTitle = session.selectedProduct || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস';
+    const itemPrice = session.price || (prodTitle.includes('জয়পুরি') ? 1250 : prodTitle.includes('গাউন') ? 1500 : 850);
+    const deliveryCharge = settings?.deliveryFeeDhaka || 120;
+    const totalPrice = itemPrice + deliveryCharge;
+
+    let orderNum = Math.floor(1000 + Math.random() * 9000);
+    try {
+      const saved = await insertDbOrder({
+        customerName: finalName,
+        customerPhone: finalPhone,
+        deliveryAddress: finalAddress,
+        deliveryCity: 'ঢাকা',
+        channel: 'FACEBOOK_MESSENGER',
+        status: 'PENDING_CONFIRMATION',
+        itemsPrice: itemPrice,
+        deliveryCharge: deliveryCharge,
+        discount: 0,
+        productTitle: prodTitle,
+        psid: senderId,
+      });
+      if (saved?.orderNumber) orderNum = saved.orderNumber;
+    } catch (dbErr) {
+      console.error('[DB Insert Error from Reuse Info]:', dbErr);
+    }
+
+    session.state = 'IDLE';
+    session.selectedProduct = undefined;
+    session.price = undefined;
+    userSessions[senderId] = session;
+
+    const reply =
+      `🎉 ধন্যবাদ ${finalName}! আপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম, ফোন নম্বর ও ঠিকানায় '${prodTitle}' (৳${itemPrice})-এর নতুন অর্ডারটি কনফার্ম করা হয়েছে। 🌸\n\n` +
+      `📦 নতুন অর্ডার নম্বর: #OF-${orderNum}\n` +
+      `👗 প্রোডাক্ট: ${prodTitle}\n` +
+      `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
+      `📞 মোবাইল: ${finalPhone}\n` +
+      `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
+      `🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ আমাদের সাথে থাকার জন্য! ❤️`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbMessage(senderId, reply, pageToken);
+    return;
+  }
+
+  // 7. Check for phone & address extraction for NEW orders
   const { phone, partialPhone } = extractBangladeshiPhone(rawText);
 
   if (phone) {
     const { name, address } = extractNameAndAddress(rawText, phone);
     const finalName = (name && name !== 'সম্মানিত কাস্টমার') ? name : (session.customerName || 'সম্মানিত কাস্টমার');
     const finalAddress = address.length > 3 ? address : (session.deliveryAddress || 'ঢাকা');
-    const prodTitle = session.selectedProduct || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
-    const itemPrice = session.price || 850;
-    const deliveryCharge = 120;
+    const prodTitle = session.selectedProduct || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস';
+    const itemPrice = session.price || (prodTitle.includes('জয়পুরি') ? 1250 : prodTitle.includes('গাউন') ? 1500 : 850);
+    const deliveryCharge = settings?.deliveryFeeDhaka || 120;
     const totalPrice = itemPrice + deliveryCharge;
 
     // Save order to Neon DB
@@ -462,10 +647,11 @@ async function processMessengerEvent(
     }
 
     session.state = 'IDLE';
+    session.selectedProduct = undefined;
+    session.price = undefined;
     userSessions[senderId] = session;
 
-    await sendFbMessage(
-      senderId,
+    const reply =
       `🎉 অভিনন্দন ${finalName}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে।\n\n` +
       `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
       `👗 প্রোডাক্ট: ${prodTitle}\n` +
@@ -473,13 +659,14 @@ async function processMessengerEvent(
       `📞 মোবাইল: ${phone}\n` +
       `💰 মোট পরিমাণ: ৳${totalPrice} (হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
       `🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে।\n\n` +
-      `প্যাকেজটি পাঠানোর পর আপনাকে ট্র্যাকিং কোডসহ এসএমএস ও মেসেজ দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`,
-      pageToken,
-    );
+      `প্যাকেজটি পাঠানোর পর আপনাকে ট্র্যাকিং কোডসহ এসএমএস ও মেসেজ দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbMessage(senderId, reply, pageToken);
     return;
   }
 
-  // 5. If user sent an INCOMPLETE phone number
+  // 8. If user sent an INCOMPLETE phone number
   if (partialPhone) {
     const { name, address } = extractNameAndAddress(rawText, partialPhone);
     session.state = 'AWAITING_PHONE';
@@ -488,17 +675,17 @@ async function processMessengerEvent(
     session.partialPhone = partialPhone;
     userSessions[senderId] = session;
 
-    await sendFbMessage(
-      senderId,
+    const reply =
       `ধন্যবাদ ${session.customerName || ''}! আপনার ঠিকানা (${session.deliveryAddress || address}) নোট করা হয়েছে। 📍\n\n` +
       `⚠️ তবে আপনার দেয়া মোবাইল নম্বরটিতে ${partialPhone.length}টি ডিজিট পাওয়া গেছে (${partialPhone})।\n` +
-      `বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়ে থাকে। অনুগ্রহ করে আপনার সম্পূর্ণ ১১ ডিজিটের মোবাইল নম্বরটি লিখে পাঠান (যেমন: ${partialPhone}xx)।`,
-      pageToken,
-    );
+      `বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়ে থাকে। অনুগ্রহ করে আপনার সম্পূর্ণ ১১ ডিজিটের মোবাইল নম্বরটি লিখে পাঠান (যেমন: ${partialPhone}xx)।`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbMessage(senderId, reply, pageToken);
     return;
   }
 
-  // 6. If user sent text while in AWAITING_PHONE / AWAITING_ADDRESS
+  // 9. If user sent text while in AWAITING_PHONE / AWAITING_ADDRESS
   if (session.state === 'AWAITING_PHONE' || session.state === 'AWAITING_ADDRESS') {
     const digitsOnly = toEnglishDigits(rawText).replace(/[^0-9]/g, '');
     if (digitsOnly.length >= 2 && digitsOnly.length <= 11) {
@@ -512,9 +699,9 @@ async function processMessengerEvent(
       if (combinedPhone.length === 11) {
         const finalName = session.customerName || 'সম্মানিত কাস্টমার';
         const finalAddress = session.deliveryAddress || 'মিরপুর, ঢাকা';
-        const prodTitle = session.selectedProduct || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
-        const itemPrice = session.price || 850;
-        const deliveryCharge = 120;
+        const prodTitle = session.selectedProduct || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস';
+        const itemPrice = session.price || (prodTitle.includes('জয়পুরি') ? 1250 : prodTitle.includes('গাউন') ? 1500 : 850);
+        const deliveryCharge = settings?.deliveryFeeDhaka || 120;
         const totalPrice = itemPrice + deliveryCharge;
         let orderNum = Math.floor(1000 + Math.random() * 9000);
 
@@ -538,24 +725,26 @@ async function processMessengerEvent(
         }
 
         session.state = 'IDLE';
+        session.selectedProduct = undefined;
+        session.price = undefined;
         userSessions[senderId] = session;
 
-        await sendFbMessage(
-          senderId,
+        const reply =
           `🎉 ধন্যবাদ ${finalName}! আপনার ১১ ডিজিটের নম্বর (${combinedPhone}) ভেরিফাই হয়েছে এবং অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে।\n\n` +
           `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
           `👗 প্রোডাক্ট: ${prodTitle}\n` +
           `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
           `💰 মোট পরিমাণ: ৳${totalPrice} (ক্যাশ অন ডেলিভারি)\n` +
-          `🚚 ২-৩ কার্যদিবসের মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ! ❤️`,
-          pageToken,
-        );
+          `🚚 ২-৩ কার্যদিবসের মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ! ❤️`;
+
+        recordChatTurn(senderId, rawText, reply);
+        await sendFbMessage(senderId, reply, pageToken);
         return;
       }
     }
   }
 
-  // 7. Context-Aware FAQ & Intent Matcher
+  // 10. Context-Aware FAQ & Intent Matcher
   const isAlreadyOrderedQuery =
     lowerText.includes('order korchi') ||
     lowerText.includes('order kora') ||
@@ -568,6 +757,16 @@ async function processMessengerEvent(
     lowerText.includes('order to dilam') ||
     lowerText.includes('bujcho') ||
     lowerText.includes('bujso');
+
+  const isMoreOrderIntentQuery =
+    lowerText.includes('aro order') ||
+    lowerText.includes('arekta order') ||
+    lowerText.includes('notun order') ||
+    lowerText.includes('another order') ||
+    lowerText.includes('more order') ||
+    lowerText.includes('আরো অর্ডার') ||
+    lowerText.includes('আরেকটা অর্ডার') ||
+    lowerText.includes('নতুন অর্ডার');
 
   const isCatalogQuery =
     lowerText.includes('ki product') ||
@@ -587,7 +786,7 @@ async function processMessengerEvent(
     lowerText.includes('order dibo') ||
     lowerText.includes('order dite chai') ||
     lowerText.includes('order korte chai') ||
-    lowerText.includes('অর্ডার দিব') ||
+    lowerText.includes('অর্ডার করব') ||
     lowerText.includes('অর্ডার করতে চাই');
 
   const isDeliveryTimeQuery =
@@ -657,13 +856,34 @@ async function processMessengerEvent(
     const prodTitle = recentOrder?.productTitle || 'প্রিমিয়াম কাশ্মীরি কুর্তি';
     const totalAmount = recentOrder?.totalPrice || 970;
 
-    await sendFbMessage(
-      senderId,
+    const reply =
       `📦 জি ${custName} ভাইয়া/আপু, আপনার অর্ডারটি (#OF-${orderNumber}) অলরেডি আমাদের সিস্টেমে সফলভাবে কনফার্ম রয়েছে! ✅\n\n` +
       `👗 প্রোডাক্ট: ${prodTitle}\n` +
       `💰 মোট বিল: ৳${totalAmount} (ক্যাশ অন ডেলিভারি)\n` +
       `🚚 ঢাকা সিটিতে ২৪-৪৮ ঘণ্টা ও ঢাকার বাইরে ২-৩ দিনের মধ্যে কুরিয়ারের মাধ্যমে পৌঁছে যাবে।\n\n` +
-      `কুরিয়ারে হ্যান্ডওভার করার সাথে সাথে আপনাকে ট্র্যাকিং কোডসহ এসএমএস পাঠিয়ে দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`,
+      `কুরিয়ারে হ্যান্ডওভার করার সাথে সাথে আপনাকে ট্র্যাকিং কোডসহ এসএমএস পাঠিয়ে দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbMessage(senderId, reply, pageToken);
+    return;
+  }
+
+  // IF CUSTOMER WANTS TO ORDER MORE ITEMS (ALREADY HAS AN ORDER):
+  if (isMoreOrderIntentQuery && recentOrder) {
+    const custName = recentOrder.customerName || 'সম্মানিত কাস্টমার';
+    const reply =
+      `আপনার ' ${recentOrder.productTitle}'-এর অর্ডারটি (#OF-${recentOrder.orderNumber}) তো প্রসেসিংয়ে রয়েছেই, আপনার আবার অর্ডার করার আগ্রহ দেখে খুব ভালো লাগলো ${custName} ভাইয়া/আপু! 😍\n\n` +
+      `আমাদের অন্যান্য চমৎকার কালেকশন থেকে কোনটি নিতে চাচ্ছেন জানাবেন কি? নিচে চাপ দিয়ে সিলেক্ট করতে পারেন 👇`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbQuickReplies(
+      senderId,
+      reply,
+      [
+        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
+        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
+        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
+      ],
       pageToken,
     );
     return;
@@ -674,8 +894,7 @@ async function processMessengerEvent(
     const custName = recentOrder.customerName || 'সম্মানিত কাস্টমার';
 
     if (isDeliveryTimeQuery || isTrackingQuery) {
-      await sendFbMessage(
-        senderId,
+      const reply =
         `🚚 ${custName} ভাইয়া/আপু, আপনার অর্ডারটি (#OF-${recentOrder.orderNumber}) অলরেডি সফলভাবে কনফার্ম রয়েছে! 📦\n\n` +
         `👗 প্রোডাক্ট: ${recentOrder.productTitle}\n` +
         `📍 ডেলিভারি ঠিকানা: ${recentOrder.deliveryAddress}\n` +
@@ -683,41 +902,83 @@ async function processMessengerEvent(
         `⏱️ ডেলিভারি সময়:\n` +
         `• ঢাকা সিটির ভেতরে: ২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)\n` +
         `• ঢাকার বাইরে: ২ থেকে ৩ কার্যদিবস\n\n` +
-        `কুরিয়ারে পার্সেলটি হস্তান্তর করার সাথে সাথে আপনার মোবাইলে এসএমএস ও ট্র্যাকিং কোড পেয়ে যাবেন। অন্য কোনো তথ্য জানার থাকলে লিখুন! ❤️`,
-        pageToken,
-      );
+        `কুরিয়ারে পার্সেলটি হস্তান্তর করার সাথে সাথে আপনার মোবাইলে এসএমএস ও ট্র্যাকিং কোড পেয়ে যাবেন। অন্য কোনো তথ্য জানার থাকলে লিখুন! ❤️`;
+
+      recordChatTurn(senderId, rawText, reply);
+      await sendFbMessage(senderId, reply, pageToken);
       return;
     }
 
     if (isPaymentQuery) {
-      await sendFbMessage(
-        senderId,
+      const reply =
         `🤝 ${custName} ভাইয়া/আপু, আপনার অর্ডারের (#OF-${recentOrder.orderNumber}) মোট বিল ৳${recentOrder.totalPrice}।\n\n` +
-        `আমাদের কোনো অগ্রিম টাকা দিতে হবে না! পার্সেলটি হাতে পেয়ে ডেলিভারিম্যানকে ক্যাশ টাকা পরিশোধ করবেন। ধন্যবাদ সাথে থাকার জন্য! ❤️`,
-        pageToken,
-      );
+        `আমাদের কোনো অগ্রিম টাকা দিতে হবে না! পার্সেলটি হাতে পেয়ে ডেলিভারিম্যানকে ক্যাশ টাকা পরিশোধ করবেন। ধন্যবাদ সাথে থাকার জন্য! ❤️`;
+
+      recordChatTurn(senderId, rawText, reply);
+      await sendFbMessage(senderId, reply, pageToken);
       return;
     }
 
     if (isThanksQuery) {
-      await sendFbMessage(
-        senderId,
-        `❤️ আপনাকেও অনেক অনেক ধন্যবাদ ${custName} ভাইয়া/আপু! আমরা দ্রুততম সময়ে আপনার ঠিকানায় সুন্দর প্যাকেজিংয়ে পার্সেলটি পৌঁছে দেব। শুভকামনা! 🌸`,
-        pageToken,
-      );
+      const reply = `❤️ আপনাকেও অনেক অনেক ধন্যবাদ ${custName} ভাইয়া/আপু! আমরা দ্রুততম সময়ে আপনার ঠিকানায় সুন্দর প্যাকেজিংয়ে পার্সেলটি পৌঁছে দেব। শুভকামনা! 🌸`;
+      recordChatTurn(senderId, rawText, reply);
+      await sendFbMessage(senderId, reply, pageToken);
       return;
     }
   }
 
+  // IF USER ASKS TO SEE PHOTOS / PICTURES (IMAGE QUERY):
+  const isImageRequest =
+    lowerText.includes('chobi') ||
+    lowerText.includes('picture') ||
+    lowerText.includes('photo') ||
+    lowerText.includes('pic') ||
+    lowerText.includes('ছবি') ||
+    lowerText.includes('পিকচার') ||
+    lowerText.includes('পিক');
+
+  if (isImageRequest) {
+    recordChatTurn(senderId, rawText, '[Sent Product Photo Carousel]');
+    await sendFbGenericTemplate(
+      senderId,
+      [
+        {
+          title: 'জয়পুরি কটন আনস্টিচড থ্রি-পিস',
+          subtitle: '১০০% পিওর কটন | দাম: ৳১২৫০',
+          image_url: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80',
+          buttons: [{ type: 'postback', title: '🛍️ অর্ডার করুন (১২৫০)', payload: 'PROD_3PIECE' }],
+        },
+        {
+          title: 'প্রিমিয়াম কাশ্মীরি কুর্তি',
+          subtitle: 'লিলেন সুতি (M, L, XL) | দাম: ৳৮৫০',
+          image_url: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80',
+          buttons: [{ type: 'postback', title: '🛍️ অর্ডার করুন (৮৫০)', payload: 'PROD_KURTI' }],
+        },
+        {
+          title: 'ডিজাইনার সিল্ক পার্টি গাউন',
+          subtitle: 'গর্জিয়াস পার্টি কালেকশন | দাম: ৳১৫০০',
+          image_url: 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
+          buttons: [{ type: 'postback', title: '🛍️ অর্ডার করুন (১৫০০)', payload: 'PROD_GOWN' }],
+        },
+      ],
+      pageToken,
+    );
+    return;
+  }
+
   // IF USER ASKS WHAT PRODUCTS ARE AVAILABLE (CATALOG QUERY):
   if (isCatalogQuery || isPriceQuery) {
-    await sendFbQuickReplies(
-      senderId,
+    const reply =
       `👗 আমাদের শপের বর্তমান রানিং কালেকশন ও প্রাইস লিস্ট:\n\n` +
       `১. প্রিমিয়াম কাশ্মীরি কুর্তি — ৳৮৫০ (লিলেন সুতি, সাইজ: M, L, XL)\n` +
       `২. জয়পুরি কটন আনস্টিচড থ্রি-পিস — ৳১২৫০ (১০০% পিওর কটন)\n` +
       `৩. ডিজাইনার পার্টি গাউন — ৳১৫০০ (গর্জিয়াস পার্টি গাউন)\n\n` +
-      `যেটি দেখতে বা অর্ডার করতে চান তা নিচে ক্লিক করুন 👇`,
+      `যেটি দেখতে বা অর্ডার করতে চান তা নিচে ক্লিক করুন 👇`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbQuickReplies(
+      senderId,
+      reply,
       [
         { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
         { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -730,10 +991,14 @@ async function processMessengerEvent(
 
   // IF USER SAYS "order dibo" / "order korte chai":
   if (isOrderIntentQuery) {
+    const reply =
+      `🛍️ চমৎকার! অর্ডার করতে অনুগ্রহ করে আপনার পছন্দের প্রোডাক্টটি নির্বাচন করুন 👇\n\n` +
+      `এরপর আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠিয়ে দিলে অর্ডার কনফার্ম হয়ে যাবে।`;
+
+    recordChatTurn(senderId, rawText, reply);
     await sendFbQuickReplies(
       senderId,
-      `🛍️ চমৎকার! অর্ডার করতে অনুগ্রহ করে আপনার পছন্দের প্রোডাক্টটি নির্বাচন করুন 👇\n\n` +
-      `এরপর আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠিয়ে দিলে অর্ডার কনফার্ম হয়ে যাবে।`,
+      reply,
       [
         { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
         { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -746,13 +1011,17 @@ async function processMessengerEvent(
 
   // IF PRE-ORDER / GENERAL INQUIRY:
   if (isDeliveryTimeQuery) {
-    await sendFbQuickReplies(
-      senderId,
+    const reply =
       `🚚 আমাদের ডেলিভারি সময় ও নিয়মাবলী:\n\n` +
       `📍 ঢাকা সিটির মধ্যে: ২৪ থেকে ৪৮ ঘণ্টার মধ্যে (১-২ দিন)।\n` +
       `📍 ঢাকার বাইরে: ২ থেকে ৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে।\n\n` +
       `💵 ক্যাশ অন ডেলিভারি (পণ্য হাতে পেয়ে দেখে টাকা পরিশোধ করার সুবিধা)।\n\n` +
-      `আপনি কোন প্রোডাক্টটি অর্ডার করতে চান? নিচে সিলেক্ট করুন 👇`,
+      `আপনি কোন প্রোডাক্টটি অর্ডার করতে চান? নিচে সিলেক্ট করুন 👇`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbQuickReplies(
+      senderId,
+      reply,
       [
         { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
         { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -764,13 +1033,17 @@ async function processMessengerEvent(
   }
 
   if (isDeliveryChargeQuery) {
-    await sendFbQuickReplies(
-      senderId,
+    const reply =
       `📦 আমাদের ডেলিভারি চার্জ:\n\n` +
       `🏠 ঢাকা সিটির ভেতরে: ৳১২০\n` +
       `🚚 ঢাকার বাইরে যেকোনো জেলায়: ৳১৫০\n\n` +
       `✅ ১০০% ক্যাশ অন ডেলিভারি (কোনো অগ্রিম টাকা দিতে হবে না)।\n\n` +
-      `কোন প্রোডাক্টটি আপনার পছন্দ হয়েছে? নিচে চাপ দিন 👇`,
+      `কোন প্রোডাক্টটি আপনার পছন্দ হয়েছে? নিচে চাপ দিন 👇`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbQuickReplies(
+      senderId,
+      reply,
       [
         { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
         { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -782,13 +1055,17 @@ async function processMessengerEvent(
   }
 
   if (isHowToOrderQuery) {
-    await sendFbQuickReplies(
-      senderId,
+    const reply =
       `🛍️ অর্ডার করার সহজ নিয়ম:\n\n` +
       `১. আপনার পছন্দের প্রোডাক্টটি সিলেক্ট করুন।\n` +
       `২. আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠান।\n` +
       `৩. আপনার অর্ডার কনফার্ম হয়ে যাবে এবং ২-৩ দিনের মধ্যে ডেলিভারি পাবেন।\n\n` +
-      `নিচে আপনার পছন্দের পণ্য নির্বাচন করুন 👇`,
+      `নিচে আপনার পছন্দের পণ্য নির্বাচন করুন 👇`;
+
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbQuickReplies(
+      senderId,
+      reply,
       [
         { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
         { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -800,29 +1077,15 @@ async function processMessengerEvent(
   }
 
   if (isPaymentQuery) {
-    await sendFbQuickReplies(
-      senderId,
+    const reply =
       `💳 পেমেন্ট পদ্ধতি:\n\n` +
       `আমাদের কোনো অগ্রিম (Advance) টাকা দিতে হয় না! সম্পূর্ণ ক্যাশ অন ডেলিভারি (Cash On Delivery) — পার্সেল হাতে পেয়ে ডেলিভারিম্যানকে টাকা দিবেন। 🤝\n\n` +
-      `অর্ডার করতে পছন্দের প্রোডাক্ট চাপুন 👇`,
-      [
-        { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
-        { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
-        { title: 'পার্টি গাউন - ১৫০০', payload: 'PROD_GOWN' },
-      ],
-      pageToken,
-    );
-    return;
-  }
+      `অর্ডার করতে পছন্দের প্রোডাক্ট চাপুন 👇`;
 
-  if (isPriceQuery) {
+    recordChatTurn(senderId, rawText, reply);
     await sendFbQuickReplies(
       senderId,
-      `👗 আমাদের রানিং কালেকশন ও প্রাইস লিস্ট:\n\n` +
-      `১. প্রিমিয়াম কাশ্মীরি কুর্তি — ৳৮৫০ (লিলেন সুতি)\n` +
-      `২. জয়পুরি কটন আনস্টিচড থ্রি-পিস — ৳১২৫০ (১০০% পিওর কটন)\n` +
-      `৩. ডিজাইনার পার্টি গাউন — ৳১৫০০ (গর্জিয়াস পার্টি কালেকশন)\n\n` +
-      `যেটি দেখতে বা অর্ডার করতে চান তা নিচে ক্লিক করুন 👇`,
+      reply,
       [
         { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
         { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -833,7 +1096,7 @@ async function processMessengerEvent(
     return;
   }
 
-  // 8. Natural Language Product Mention
+  // 11. Natural Language Product Mention
   if (session.state === 'IDLE' || !session.selectedProduct) {
     if (lowerText.includes('গাউন') || lowerText.includes('gown') || lowerText.includes('party')) {
       session.state = 'AWAITING_ADDRESS';
@@ -841,11 +1104,9 @@ async function processMessengerEvent(
       session.price = 1500;
       userSessions[senderId] = session;
 
-      await sendFbMessage(
-        senderId,
-        `আপনি 'ডিজাইনার পার্টি গাউন (৳১৫০০)' নির্বাচন করেছেন। 👗✨\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা লিখে পাঠান (যেমন: মনির, 01938909812, মিরপুর ১৬)।`,
-        pageToken,
-      );
+      const reply = `আপনি 'ডিজাইনার পার্টি গাউন (৳১৫০০)' নির্বাচন করেছেন। 👗✨\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা লিখে পাঠান (যেমন: মনির, 01938909812, মিরপুর ১৬)।`;
+      recordChatTurn(senderId, rawText, reply);
+      await sendFbMessage(senderId, reply, pageToken);
       return;
     } else if (lowerText.includes('কুর্তি') || lowerText.includes('kurti') || lowerText.includes('কাশ্মীরি')) {
       session.state = 'AWAITING_ADDRESS';
@@ -853,11 +1114,9 @@ async function processMessengerEvent(
       session.price = 850;
       userSessions[senderId] = session;
 
-      await sendFbMessage(
-        senderId,
-        `আপনি 'প্রিমিয়াম কাশ্মীরি কুর্তি (৳৮৫০)' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা পাঠান।`,
-        pageToken,
-      );
+      const reply = `আপনি 'প্রিমিয়াম কাশ্মীরি কুর্তি (৳৮৫০)' নির্বাচন করেছেন। 🛍️\n\nঅনুগ্রহ করে আপনার সাইজ (M, L, XL) এবং নাম, মোবাইল নম্বর ও ঠিকানা লিখে পাঠান।`;
+      recordChatTurn(senderId, rawText, reply);
+      await sendFbMessage(senderId, reply, pageToken);
       return;
     } else if (lowerText.includes('থ্রি-পিস') || lowerText.includes('3 piece') || lowerText.includes('জয়পুরি') || lowerText.includes('three piece')) {
       session.state = 'AWAITING_ADDRESS';
@@ -865,22 +1124,22 @@ async function processMessengerEvent(
       session.price = 1250;
       userSessions[senderId] = session;
 
-      await sendFbMessage(
-        senderId,
-        `আপনি 'জয়পুরি কটন আনস্টিচড থ্রি-পিস (৳১২৫০)' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা পাঠান।`,
-        pageToken,
-      );
+      const reply = `আমাদের ১০০% পিওর কটন জয়পুরি কটন আনস্টিচড থ্রি-পিসটির মূল্য মাত্র ১২৫০ টাকা! 🌸\n\nঅর্ডার নিশ্চিত করতে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর এবং ঠিকানা লিখে পাঠান।`;
+      recordChatTurn(senderId, rawText, reply);
+      await sendFbMessage(senderId, reply, pageToken);
       return;
     }
   }
 
-  // 9. Default: Main Menu / Greeting
+  // 12. Default: Main Menu / Greeting
   session.state = 'IDLE';
   userSessions[senderId] = session;
 
+  const reply = `আসসালামু আলাইকুম! OrderFlow BD শপে আপনাকে স্বাগতম। 🌸\n\nকোন প্রোডাক্টটি আপনি দেখতে বা অর্ডার করতে চান তা নিচে নির্বাচন করুন 👇`;
+  recordChatTurn(senderId, rawText, reply);
   await sendFbQuickReplies(
     senderId,
-    `আসসালামু আলাইকুম! OrderFlow BD শপে আপনাকে স্বাগতম। 🌸\n\nকোন প্রোডাক্টটি আপনি দেখতে বা অর্ডার করতে চান তা নিচে নির্বাচন করুন 👇`,
+    reply,
     [
       { title: 'প্রিন্ট কুর্তি - ৮৫০', payload: 'PROD_KURTI' },
       { title: 'জয়পুরি থ্রি-পিস - ১২৫০', payload: 'PROD_3PIECE' },
@@ -947,3 +1206,44 @@ async function sendFbQuickReplies(
     console.error('[Facebook Quick Replies Error]:', err);
   }
 }
+
+async function sendFbGenericTemplate(
+  recipientId: string,
+  elements: Array<{
+    title: string;
+    subtitle?: string;
+    image_url?: string;
+    buttons?: Array<{ type: 'postback'; title: string; payload: string }>;
+  }>,
+  token?: string,
+) {
+  const activeToken = token || HARDCODED_TOKEN;
+  if (!activeToken) {
+    console.warn('[Facebook Webhook] Warning: No Page Access Token configured yet to send reply.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v20.0/me/messages?access_token=${activeToken}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: {
+          attachment: {
+            type: 'template',
+            payload: {
+              template_type: 'generic',
+              elements: elements.slice(0, 10),
+            },
+          },
+        },
+      }),
+    });
+    const data = await res.json();
+    console.log('[Facebook Generic Template Result]:', data);
+  } catch (err) {
+    console.error('[Facebook Generic Template Error]:', err);
+  }
+}
+

@@ -205,6 +205,18 @@ class StorageApi {
   }
 
   async getProducts(): Promise<Product[]> {
+    try {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/products');
+        if (res.ok) {
+          const live = await res.json();
+          if (Array.isArray(live) && live.length > 0) {
+            this.saveProductsToStorage(live);
+            return live;
+          }
+        }
+      }
+    } catch (e) {}
     return this.getProductsFromStorage();
   }
 
@@ -342,6 +354,16 @@ class StorageApi {
   }
 
   async updateProductStock(productId: string, delta: number): Promise<Product> {
+    try {
+      if (typeof window !== 'undefined') {
+        await fetch('/api/products', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: productId, stockDelta: delta }),
+        });
+      }
+    } catch (e) {}
+
     const products = this.getProductsFromStorage();
     const index = products.findIndex((p) => p.id === productId);
     if (index === -1) throw new Error('Product not found');
@@ -356,6 +378,23 @@ class StorageApi {
   }
 
   async addProduct(productData: Omit<Product, 'id' | 'createdAt'>): Promise<Product> {
+    try {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productData),
+        });
+        if (res.ok) {
+          const created = await res.json();
+          const products = this.getProductsFromStorage();
+          products.unshift(created);
+          this.saveProductsToStorage(products);
+          return created;
+        }
+      }
+    } catch (e) {}
+
     const products = this.getProductsFromStorage();
     const newProduct: Product = {
       ...productData,
