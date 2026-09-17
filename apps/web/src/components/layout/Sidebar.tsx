@@ -14,6 +14,7 @@ import {
   Layers,
   ChevronRight,
   ExternalLink,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,20 +35,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       gradient: 'from-emerald-500/20 to-teal-500/10',
     },
     {
+      name: 'মেসেজ ও চ্যাট হাব',
+      sub: 'Messenger & WhatsApp',
+      href: '/messages',
+      icon: MessageSquare,
+      badge: 'Live',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      gradient: 'from-emerald-500/20 to-teal-500/10',
+    },
+    {
       name: 'অর্ডার সমূহ',
       sub: 'Live Orders & Sync',
       href: '/orders',
       icon: ShoppingCart,
-      badge: 'Live',
-      badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      gradient: 'from-emerald-500/20 to-green-500/10',
+      badge: 'Orders',
+      badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      gradient: 'from-blue-500/20 to-indigo-500/10',
     },
     {
       name: 'প্রোডাক্ট ও স্টক',
       sub: 'Inventory & Variants',
       href: '/products',
       icon: Boxes,
-      gradient: 'from-blue-500/20 to-cyan-500/10',
+      gradient: 'from-teal-500/20 to-cyan-500/10',
     },
     {
       name: 'মেসেঞ্জার ও AI বট',
