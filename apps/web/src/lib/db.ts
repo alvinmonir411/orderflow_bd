@@ -283,9 +283,13 @@ export async function initDatabase() {
       );
     `;
 
-    // Ensure Customer and Order tables have organizationId column
+    // Ensure organizationId column exists on all existing tables in Neon DB
+    await sql`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "Store" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
 
     // 8. Ensure Normalized Tag and ConversationTag tables exist
     await sql`
