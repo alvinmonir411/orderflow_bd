@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings, insertDbOrder, findCustomerLatestOrder, getDbProducts, saveDbChatMessage, BotFaqItem } from '@/lib/db';
+import { getBotSettings, insertDbOrder, findCustomerLatestOrder, getDbProducts, saveDbChatMessage, getDbChatMessagesBySender, BotFaqItem } from '@/lib/db';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -516,7 +516,10 @@ async function processMessengerEvent(
   incomingImageUrl?: string,
   channel: string = 'FACEBOOK_MESSENGER',
 ) {
-  const session = userSessions[senderId] || {
+  // 1. Fetch DB chat history for persistent context across serverless requests
+  const dbHistory = await getDbChatMessagesBySender(senderId);
+
+  const session: UserSession = userSessions[senderId] || {
     state: 'IDLE',
     turnCount: 0,
     nonBusinessCount: 0,
@@ -525,43 +528,33 @@ async function processMessengerEvent(
   };
   session.turnCount = (session.turnCount || 0) + 1;
   session.lastMessageTime = Date.now();
+
+  // Restore history from DB if available
+  if (dbHistory && dbHistory.length > 0) {
+    session.history = dbHistory.slice(-14).map((m: any) => ({
+      role: (m.sender === 'customer' ? 'user' : 'model') as 'user' | 'model',
+      text: m.text,
+    }));
+
+    // Restore selected product from DB if not present in memory
+    if (!session.selectedProduct) {
+      const lastWithProduct = [...dbHistory].reverse().find((m: any) => m.productTitle);
+      if (lastWithProduct) {
+        session.selectedProduct = lastWithProduct.productTitle;
+        session.price = Number(lastWithProduct.productPrice) || session.price;
+        session.state = 'AWAITING_ADDRESS';
+      }
+    }
+  }
   userSessions[senderId] = session;
 
   const rawText = text.trim();
   const lowerText = rawText.toLowerCase();
 
-  // 1. Fetch live products from Neon PostgreSQL DB
+  // 2. Fetch live products from Neon PostgreSQL DB
   const liveProducts = await getDbProducts();
 
-  // 2. If customer sent an Image Attachment (Photo)
-  if (incomingImageUrl) {
-    const recentOrder = await findCustomerLatestOrder(senderId);
-    let reply = '';
-    if (recentOrder) {
-      reply = `ধন্যবাদ চমৎকার ছবিটি পাঠানোর জন্য ${recentOrder.customerName || ''}! 🌸 এটি আমাদের প্রিমিয়াম কালেকশনের সাথে মিলিয়ে দেখা হচ্ছে।\n\nআপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম ও ঠিকানায় কি এই প্রোডাক্টের নতুন অর্ডারটি কনফার্ম করে দেব? অনুগ্রহ করে 'হ্যাঁ' অথবা পছন্দের সাইজটি লিখে জানান! ❤️`;
-    } else {
-      reply = `ধন্যবাদ সুন্দর ছবিটি পাঠানোর জন্য! 🌸 এটি আমাদের শপের প্রিমিয়াম কালেকশনের সাথে ম্যাচিং করে দেখা হচ্ছে।\n\nঅর্ডার নিশ্চিত করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর এবং সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠান। আমরা দ্রুততম সময়ে ডেলিভারির ব্যবস্থা করব! ❤️`;
-    }
-    await recordChatTurn(senderId, `[Customer Sent Image: ${incomingImageUrl}]`, reply);
-    await sendFbMessage(senderId, reply, pageToken);
-    return;
-  }
-
-  // 3. Fetch recent order context for this customer from Neon DB
-  const recentOrder = await findCustomerLatestOrder(senderId);
-
-  // 4. Pre-detect product mention across all live database products
-  for (const prod of liveProducts) {
-    const pTitle = prod.title.toLowerCase();
-    const pWords = pTitle.split(/\s+/).filter((w: string) => w.length >= 3);
-    if (lowerText.includes(pTitle) || pWords.some((w: string) => lowerText.includes(w))) {
-      session.selectedProduct = prod.title;
-      session.price = Number(prod.basePrice);
-      break;
-    }
-  }
-
-  // Helper to build quick reply items from live dashboard products
+  // 3. Helper to build quick reply items from live dashboard products
   const getDynamicQuickReplies = () => {
     if (liveProducts.length > 0) {
       return liveProducts.slice(0, 6).map((p: any) => ({
@@ -576,7 +569,294 @@ async function processMessengerEvent(
     ];
   };
 
-  // 5. IF USER ASKS TO SEE PHOTOS / PICTURES (IMAGE QUERY):
+  // 4. Handle Explicit Payload Button Click (PROD_...) FIRST
+  if (payload) {
+    if (payload.startsWith('PROD_')) {
+      const prodId = payload.replace('PROD_', '');
+      const matched = liveProducts.find((p: any) => p.id === prodId || p.title === prodId);
+      const prodName = matched ? matched.title : 'প্রিমিয়াম প্রোডাক্ট';
+      const price = matched ? Number(matched.basePrice) : 850;
+      const isUnstitched =
+        prodName.toLowerCase().includes('আনস্টিচড') ||
+        prodName.toLowerCase().includes('unstitched') ||
+        (matched?.category || '').toLowerCase().includes('শাড়ি');
+
+      session.state = 'AWAITING_ADDRESS';
+      session.selectedProduct = prodName;
+      session.price = price;
+      userSessions[senderId] = session;
+
+      const sizeNote = isUnstitched ? '' : ' (প্রয়োজনে সাইজ: M, L, XL)';
+      const reply = `আপনি '${prodName} (৳${price})' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার:\n১. পুরো নাম\n২. মোবাইল নম্বর (১১ ডিজিট)\n৩. সম্পূর্ণ ডেলিভারি ঠিকানা${sizeNote}\nলিখে মেসেজ পাঠান (যেমন: মনির, 01938909812, মিরপুর ১৬, ঢাকা)।`;
+      
+      await recordChatTurn(senderId, `[Button Click: ${prodName}]`, reply, {
+        productTitle: prodName,
+        productPrice: price,
+        channel,
+      });
+      await sendFbMessage(senderId, reply, pageToken);
+      return;
+    }
+  }
+
+  // 5. If customer sent an Image Attachment (Photo)
+  if (incomingImageUrl) {
+    const recentOrder = await findCustomerLatestOrder(senderId);
+    let reply = '';
+    if (recentOrder) {
+      reply = `ধন্যবাদ চমৎকার ছবিটি পাঠানোর জন্য ${recentOrder.customerName || ''}! 🌸 এটি আমাদের প্রিমিয়াম কালেকশনের সাথে মিলিয়ে দেখা হচ্ছে।\n\nআপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম ও ঠিকানায় কি এই প্রোডাক্টের নতুন অর্ডারটি কনফার্ম করে দেব? অনুগ্রহ করে 'হ্যাঁ' অথবা পছন্দের সাইজটি লিখে জানান! ❤️`;
+    } else {
+      reply = `ধন্যবাদ সুন্দর ছবিটি পাঠানোর জন্য! 🌸 এটি আমাদের শপের প্রিমিয়াম কালেকশনের সাথে ম্যাচিং করে দেখা হচ্ছে।\n\nঅর্ডার নিশ্চিত করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর এবং সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠান। আমরা দ্রুততম সময়ে ডেলিভারির ব্যবস্থা করব! ❤️`;
+    }
+    await recordChatTurn(senderId, `[Customer Sent Image: ${incomingImageUrl}]`, reply, { channel });
+    await sendFbMessage(senderId, reply, pageToken);
+    return;
+  }
+
+  // 6. Fetch recent order context for this customer from Neon DB
+  const recentOrder = await findCustomerLatestOrder(senderId);
+
+  // 7. Check for "Use Previous Information / Ager Name Address Number" Query
+  const isReusePreviousInfoQuery =
+    (lowerText.includes('ager name') ||
+      lowerText.includes('ager address') ||
+      lowerText.includes('ager adress') ||
+      lowerText.includes('ager number') ||
+      lowerText.includes('ager phone') ||
+      lowerText.includes('ager info') ||
+      lowerText.includes('ager thikana') ||
+      lowerText.includes('ager moto') ||
+      lowerText.includes('ager ta tei') ||
+      lowerText.includes('use previous') ||
+      lowerText.includes('ager details') ||
+      lowerText.includes('আগের নাম') ||
+      lowerText.includes('আগের ঠিকানা') ||
+      lowerText.includes('আগের নম্বর') ||
+      lowerText.includes('আগের ইনফো') ||
+      lowerText.includes('আগের মতো')) &&
+    !!recentOrder;
+
+  if (isReusePreviousInfoQuery && recentOrder) {
+    const finalName = recentOrder.customerName || 'সম্মানিত কাস্টমার';
+    const finalPhone = recentOrder.customerPhone || '01700000000';
+    const finalAddress = recentOrder.deliveryAddress || 'ঢাকা';
+    const prodTitle = session.selectedProduct || recentOrder.productTitle || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
+    const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase()));
+    const itemPrice = session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
+    const isDhaka = /dhaka|ঢাকা|mirpur|uttara|gulshan|banani|dhanmondi|motijheel|badda|bnasree|banasree|মোহাম্মদপুর|মিরপুর|উত্তরা|বনশ্রী/i.test(finalAddress);
+    const deliveryCharge = isDhaka ? (settings?.deliveryFeeDhaka || 120) : (settings?.deliveryFeeOutside || 150);
+    const deliveryTime = isDhaka ? (settings?.deliveryTimeDhaka || '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)') : (settings?.deliveryTimeOutside || '২ থেকে ৩ কার্যদিবস');
+    const totalPrice = itemPrice + deliveryCharge;
+    const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
+
+    let orderNum = Math.floor(1000 + Math.random() * 9000);
+    try {
+      const saved = await insertDbOrder({
+        customerName: finalName,
+        customerPhone: finalPhone,
+        deliveryAddress: finalAddress,
+        deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
+        channel: 'FACEBOOK_MESSENGER',
+        status: 'PENDING_CONFIRMATION',
+        itemsPrice: itemPrice,
+        deliveryCharge: deliveryCharge,
+        discount: 0,
+        productTitle: prodTitle,
+        productId: finalProdId,
+        psid: senderId,
+      });
+      if (saved?.orderNumber) orderNum = saved.orderNumber;
+    } catch (dbErr) {
+      console.error('[DB Insert Error from Reuse Info]:', dbErr);
+    }
+
+    session.state = 'IDLE';
+    session.selectedProduct = undefined;
+    session.price = undefined;
+    userSessions[senderId] = session;
+
+    const reply =
+      `🎉 ধন্যবাদ ${finalName}! আপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম, ফোন নম্বর ও ঠিকানায় '${prodTitle}' (৳${itemPrice})-এর নতুন অর্ডারটি কনফার্ম করা হয়েছে। 🌸\n\n` +
+      `📦 নতুন অর্ডার নম্বর: #OF-${orderNum}\n` +
+      `👗 প্রোডাক্ট: ${prodTitle}\n` +
+      `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
+      `📞 মোবাইল: ${finalPhone}\n` +
+      `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
+      `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ আমাদের সাথে থাকার জন্য! ❤️`;
+
+    await recordChatTurn(senderId, rawText, reply, { customerName: finalName, channel });
+    await sendFbMessage(senderId, reply, pageToken);
+    return;
+  }
+
+  // 8. CRITICAL: Deterministic Check for 11-digit Bangladeshi Phone & Address Order Submission (Runs BEFORE Gemini!)
+  const { phone, partialPhone } = extractBangladeshiPhone(rawText);
+
+  if (phone) {
+    const { name, address } = extractNameAndAddress(rawText, phone);
+    const finalName = (name && name !== 'সম্মানিত কাস্টমার') ? name : (session.customerName || 'সম্মানিত কাস্টমার');
+    const finalAddress = address.length > 3 ? address : (session.deliveryAddress || 'ঢাকা');
+    
+    // Resolve product
+    let prodTitle = session.selectedProduct;
+    if (!prodTitle) {
+      for (const prod of liveProducts) {
+        const pTitle = prod.title.toLowerCase();
+        const pWords = pTitle.split(/\s+/).filter((w: string) => w.length >= 3);
+        if (lowerText.includes(pTitle) || pWords.some((w: string) => lowerText.includes(w))) {
+          prodTitle = prod.title;
+          session.price = Number(prod.basePrice);
+          break;
+        }
+      }
+    }
+    const finalProdTitle: string = prodTitle || liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস';
+
+    const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(finalProdTitle.toLowerCase()) || finalProdTitle.toLowerCase().includes(p.title.toLowerCase()));
+    const itemPrice = session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
+    const isDhaka = /dhaka|ঢাকা|mirpur|uttara|gulshan|banani|dhanmondi|motijheel|badda|bnasree|banasree|মোহাম্মদপুর|মিরপুর|উত্তরা|বনশ্রী/i.test(finalAddress);
+    const deliveryCharge = isDhaka ? (settings?.deliveryFeeDhaka || 120) : (settings?.deliveryFeeOutside || 150);
+    const deliveryTime = isDhaka ? (settings?.deliveryTimeDhaka || '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)') : (settings?.deliveryTimeOutside || '২ থেকে ৩ কার্যদিবস');
+    const totalPrice = itemPrice + deliveryCharge;
+    const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
+
+    // Save order to Neon DB
+    let orderNum = Math.floor(1000 + Math.random() * 9000);
+    try {
+      const saved = await insertDbOrder({
+        customerName: finalName,
+        customerPhone: phone,
+        deliveryAddress: finalAddress,
+        deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
+        channel: 'FACEBOOK_MESSENGER',
+        status: 'PENDING_CONFIRMATION',
+        itemsPrice: itemPrice,
+        deliveryCharge: deliveryCharge,
+        discount: 0,
+        productTitle: finalProdTitle,
+        productId: finalProdId,
+        psid: senderId,
+      });
+      if (saved?.orderNumber) orderNum = saved.orderNumber;
+    } catch (dbErr) {
+      console.error('[DB Insert Error from Order Placement]:', dbErr);
+    }
+
+    session.state = 'IDLE';
+    session.selectedProduct = undefined;
+    session.price = undefined;
+    session.customerName = finalName;
+    session.deliveryAddress = finalAddress;
+    session.customerPhone = phone;
+    session.partialPhone = undefined;
+    userSessions[senderId] = session;
+
+    const reply =
+      `🎉 অভিনন্দন ${finalName}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। 🌸\n\n` +
+      `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
+      `👗 প্রোডাক্ট: ${finalProdTitle}\n` +
+      `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
+      `📞 মোবাইল: ${phone}\n` +
+      `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
+      `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে।\n\n` +
+      `ডেলিভারিম্যানের কাছ থেকে পণ্য চেক করে দেখে নেওয়ার পূর্ণ সুবিধা রয়েছে। ধন্যবাদ আমাদের সাথে থাকার জন্য! ❤️`;
+
+    await recordChatTurn(senderId, rawText, reply, {
+      customerName: finalName,
+      channel,
+    });
+    await sendFbMessage(senderId, reply, pageToken);
+    return;
+  }
+
+  // 9. If user sent an INCOMPLETE phone number
+  if (partialPhone) {
+    const { name, address } = extractNameAndAddress(rawText, partialPhone);
+    session.state = 'AWAITING_PHONE';
+    if (name && name !== 'সম্মানিত কাস্টমার') session.customerName = name;
+    if (address && address.length > 3) session.deliveryAddress = address;
+    session.partialPhone = partialPhone;
+    userSessions[senderId] = session;
+
+    const reply =
+      `ধন্যবাদ ${session.customerName || ''}! আপনার তথ্য (${session.deliveryAddress || address}) নোট করা হয়েছে। 📍\n\n` +
+      `⚠️ তবে আপনার দেয়া মোবাইল নম্বরটিতে ${partialPhone.length}টি ডিজিট পাওয়া গেছে (${partialPhone})।\n` +
+      `বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়ে থাকে। অনুগ্রহ করে আপনার সম্পূর্ণ ১১ ডিজিটের মোবাইল নম্বরটি লিখে পাঠান (যেমন: 01xxxxxxxxx)।`;
+
+    await recordChatTurn(senderId, rawText, reply, { channel });
+    await sendFbMessage(senderId, reply, pageToken);
+    return;
+  }
+
+  // 10. If user sent text while in AWAITING_PHONE / AWAITING_ADDRESS to complete phone number
+  if (session.state === 'AWAITING_PHONE' || session.state === 'AWAITING_ADDRESS') {
+    const digitsOnly = toEnglishDigits(rawText).replace(/[^0-9]/g, '');
+    if (digitsOnly.length >= 2 && digitsOnly.length <= 11) {
+      let combinedPhone = '';
+      if (digitsOnly.length === 11 && digitsOnly.startsWith('01')) {
+        combinedPhone = digitsOnly;
+      } else if (session.partialPhone && (session.partialPhone + digitsOnly).length === 11) {
+        combinedPhone = session.partialPhone + digitsOnly;
+      }
+
+      if (combinedPhone.length === 11) {
+        const finalName = session.customerName || 'সম্মানিত কাস্টমার';
+        const finalAddress = session.deliveryAddress || 'মিরপুর, ঢাকা';
+        const prodTitle = session.selectedProduct || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
+        const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase()));
+        const itemPrice = session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
+        const isDhaka = /dhaka|ঢাকা|mirpur|uttara|gulshan|banani|dhanmondi|motijheel|badda|bnasree|banasree|মোহাম্মদপুর|মিরপুর|উত্তরা|বনশ্রী/i.test(finalAddress);
+        const deliveryCharge = isDhaka ? (settings?.deliveryFeeDhaka || 120) : (settings?.deliveryFeeOutside || 150);
+        const deliveryTime = isDhaka ? (settings?.deliveryTimeDhaka || '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)') : (settings?.deliveryTimeOutside || '২ থেকে ৩ কার্যদিবস');
+        const totalPrice = itemPrice + deliveryCharge;
+        const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
+        let orderNum = Math.floor(1000 + Math.random() * 9000);
+
+        try {
+          const saved = await insertDbOrder({
+            customerName: finalName,
+            customerPhone: combinedPhone,
+            deliveryAddress: finalAddress,
+            deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
+            channel: 'FACEBOOK_MESSENGER',
+            status: 'PENDING_CONFIRMATION',
+            itemsPrice: itemPrice,
+            deliveryCharge: deliveryCharge,
+            discount: 0,
+            productTitle: prodTitle,
+            productId: finalProdId,
+            psid: senderId,
+          });
+          if (saved?.orderNumber) orderNum = saved.orderNumber;
+        } catch (dbErr) {
+          console.error('[DB Insert Error from Phone Recovery]:', dbErr);
+        }
+
+        session.state = 'IDLE';
+        session.selectedProduct = undefined;
+        session.price = undefined;
+        session.customerName = finalName;
+        session.deliveryAddress = finalAddress;
+        session.customerPhone = combinedPhone;
+        session.partialPhone = undefined;
+        userSessions[senderId] = session;
+
+        const reply =
+          `🎉 ধন্যবাদ ${finalName}! আপনার ১১ ডিজিটের নম্বর (${combinedPhone}) ভেরিফাই হয়েছে এবং অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে। 🌸\n\n` +
+          `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
+          `👗 প্রোডাক্ট: ${prodTitle}\n` +
+          `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
+          `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
+          `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ! ❤️`;
+
+        await recordChatTurn(senderId, rawText, reply, { customerName: finalName, channel });
+        await sendFbMessage(senderId, reply, pageToken);
+        return;
+      }
+    }
+  }
+
+  // 11. IF USER ASKS TO SEE PHOTOS / PICTURES (IMAGE QUERY):
   const isImageRequest =
     lowerText.includes('image') ||
     lowerText.includes('photo') ||
@@ -602,7 +882,6 @@ async function processMessengerEvent(
     (lowerText.includes('dekhi') && (lowerText.includes('age') || lowerText.includes('dan') || lowerText.includes('dress') || lowerText.includes('product') || lowerText.includes('thikana') || lowerText.includes('collection')));
 
   if (isImageRequest) {
-    // Check if user mentioned a specific product (e.g. Joypuri, kurti, saree, gown) or has one selected in session
     let targetProducts = liveProducts.filter((p: any) => p.images && p.images.length > 0 && p.images[0]);
     if (targetProducts.length === 0) targetProducts = liveProducts;
 
@@ -619,7 +898,6 @@ async function processMessengerEvent(
     });
 
     let displayList = matchedSpecificProds.length > 0 ? matchedSpecificProds : targetProducts;
-    // Ensure we send a rich collection (up to 10 products)
     if (displayList.length < 5) {
       const others = targetProducts.filter((p: any) => !displayList.some((d: any) => d.id === p.id));
       displayList = [...displayList, ...others];
@@ -660,9 +938,8 @@ async function processMessengerEvent(
       ? `জি অবশ্যই! 🌸 নিচে '${matchedSpecificProds[0].title}'-সহ আমাদের রানিং কালেকশনের বড় ছবি দেওয়া হলো।\n\n💡 ছবিতে অথবা '🔍 ফুল ছবি দেখুন' বাটনে চাপ দিলে সম্পূর্ণ ফুল-সাইজ HD ছবি দেখতে পাবেন! অর্ডার করতে '🛍️ অর্ডার করুন' বাটনে চাপ দিন। ✨`
       : `জি অবশ্যই! 🌸 নিচে আমাদের স্টোরের রানিং কালেকশনের বড় ছবি ও মূল্য তালিকা দেওয়া হলো।\n\n💡 ছবিতে অথবা '🔍 ফুল ছবি দেখুন' বাটনে চাপ দিলে সম্পূর্ণ ফুল-সাইজ HD ছবি দেখতে পাবেন! ✨`;
 
-    await recordChatTurn(senderId, rawText, `[Sent High-Res Product Images Carousel]`);
+    await recordChatTurn(senderId, rawText, `[Sent High-Res Product Images Carousel]`, { channel });
 
-    // 1. If specific product matched, also send native full-width image attachment for huge view
     if (matchedSpecificProds.length > 0 && matchedSpecificProds[0].images?.[0]) {
       const topImg = matchedSpecificProds[0].images[0];
       if (topImg.startsWith('http')) {
@@ -670,14 +947,12 @@ async function processMessengerEvent(
       }
     }
 
-    // 2. Send text intro
     await sendFbMessage(senderId, leadText, pageToken);
-    // 3. Send Facebook Generic Template Carousel with square 1:1 ratio and default_action full-image view
     await sendFbGenericTemplate(senderId, elements, pageToken, 'square');
     return;
   }
 
-  // 5b. IF USER ASKS FOR PRODUCT LIST / WHAT PRODUCTS WE HAVE:
+  // 12. IF USER ASKS FOR PRODUCT LIST / WHAT PRODUCTS WE HAVE:
   const isProductListQuery =
     lowerText.includes('ki ki product') ||
     lowerText.includes('ki product') ||
@@ -708,12 +983,12 @@ async function processMessengerEvent(
     }).join('\n');
 
     const reply = `আসসালামু আলাইকুম! 🌸 আমাদের স্টোরে বর্তমান রানিং স্পেশাল কালেকশন:\n\n${listText}\n\n💡 যেকোনো প্রোডাক্টের ফুল HD ছবি দেখতে 'ছবি দেখাও' লিখুন, অথবা পছন্দের প্রোডাক্ট নির্বাচন করতে নিচে চাপ দিন 👇`;
-    await recordChatTurn(senderId, rawText, reply);
+    await recordChatTurn(senderId, rawText, reply, { channel });
     await sendFbQuickReplies(senderId, reply, getDynamicQuickReplies(), pageToken);
     return;
   }
 
-  // 6. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
+  // 13. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
   const isBusinessKeywords =
     lowerText.includes('order') ||
     lowerText.includes('product') ||
@@ -764,29 +1039,29 @@ async function processMessengerEvent(
     session.nonBusinessCount = 0;
   }
 
-  // If customer is making off-topic small talk repeatedly (> 2 turns), send helpline number directly to save API quota
   if (session.nonBusinessCount >= 2 && !payload) {
     const helpline = settings?.helplinePhone || '01700000000';
     const reply = `আসসালামু আলাইকুম! 🌸 আমি OrderFlow BD-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`;
-    await recordChatTurn(senderId, rawText, reply);
+    await recordChatTurn(senderId, rawText, reply, { channel });
     await sendFbQuickReplies(senderId, reply, getDynamicQuickReplies(), pageToken);
     return;
   }
 
-  // 7. If Gemini AI Key is available, prioritize Google AI Studio with LIVE DB Products
+  // 14. If Gemini AI Key is available, prioritize Google AI Studio with LIVE DB Products
   if (geminiKey && rawText && !payload) {
     const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey, recentOrder, settings, liveProducts);
     if (replyText) {
-      await recordChatTurn(senderId, rawText, replyText);
+      await recordChatTurn(senderId, rawText, replyText, { channel });
 
       if (orderData && orderData.orderConfirmed) {
         const prodTitle = orderData.product || session.selectedProduct || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
         const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase()));
         const itemPrice = orderData.price || session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
-        const deliveryCharge = settings?.deliveryFeeDhaka || 120;
+        const finalAddress = orderData.address || recentOrder?.deliveryAddress || session.deliveryAddress || 'ঢাকা';
+        const isDhaka = /dhaka|ঢাকা|mirpur|uttara|gulshan|banani|dhanmondi|motijheel|badda|bnasree|banasree|মোহাম্মদপুর|মিরপুর|উত্তরা|বনশ্রী/i.test(finalAddress);
+        const deliveryCharge = isDhaka ? (settings?.deliveryFeeDhaka || 120) : (settings?.deliveryFeeOutside || 150);
         const finalName = orderData.customerName || recentOrder?.customerName || session.customerName || 'সম্মানিত কাস্টমার';
         const finalPhone = orderData.phone || recentOrder?.customerPhone || '01700000000';
-        const finalAddress = orderData.address || recentOrder?.deliveryAddress || session.deliveryAddress || 'ঢাকা';
         const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
 
         try {
@@ -794,7 +1069,7 @@ async function processMessengerEvent(
             customerName: finalName,
             customerPhone: finalPhone,
             deliveryAddress: finalAddress,
-            deliveryCity: 'ঢাকা',
+            deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
             channel: 'FACEBOOK_MESSENGER',
             status: 'PENDING_CONFIRMATION',
             itemsPrice: itemPrice,
@@ -816,239 +1091,6 @@ async function processMessengerEvent(
 
       await sendFbMessage(senderId, replyText, pageToken);
       return;
-    }
-  }
-
-  // 7. Explicit Payload Button Click (PROD_...)
-  if (payload) {
-    if (payload.startsWith('PROD_')) {
-      const prodId = payload.replace('PROD_', '');
-      const matched = liveProducts.find((p: any) => p.id === prodId || p.title === prodId);
-      const prodName = matched ? matched.title : 'প্রিমিয়াম প্রোডাক্ট';
-      const price = matched ? Number(matched.basePrice) : 850;
-      const isUnstitched =
-        prodName.toLowerCase().includes('আনস্টিচড') ||
-        prodName.toLowerCase().includes('unstitched') ||
-        (matched?.category || '').toLowerCase().includes('শাড়ি');
-
-      session.state = 'AWAITING_ADDRESS';
-      session.selectedProduct = prodName;
-      session.price = price;
-      userSessions[senderId] = session;
-
-      const sizeNote = isUnstitched ? '' : ' (প্রয়োজনে সাইজ: M, L, XL)';
-      const reply = `আপনি '${prodName} (৳${price})' নির্বাচন করেছেন। 🛍️\n\nঅর্ডারটি কনফার্ম করতে অনুগ্রহ করে আপনার:\n১. পুরো নাম\n২. মোবাইল নম্বর (১১ ডিজিট)\n৩. সম্পূর্ণ ডেলিভারি ঠিকানা${sizeNote}\nলিখে মেসেজ পাঠান (যেমন: মনির, 01938909812, মিরপুর ১৬, ঢাকা)।`;
-      await recordChatTurn(senderId, `[Button Click: ${prodName}]`, reply);
-      await sendFbMessage(senderId, reply, pageToken);
-      return;
-    }
-  }
-
-  // 8. Check for "Use Previous Information / Ager Name Address Number" Query (Rule-based Fallback)
-  const isReusePreviousInfoQuery =
-    (lowerText.includes('ager name') ||
-      lowerText.includes('ager address') ||
-      lowerText.includes('ager adress') ||
-      lowerText.includes('ager number') ||
-      lowerText.includes('ager phone') ||
-      lowerText.includes('ager info') ||
-      lowerText.includes('ager thikana') ||
-      lowerText.includes('ager moto') ||
-      lowerText.includes('ager ta tei') ||
-      lowerText.includes('use previous') ||
-      lowerText.includes('ager details') ||
-      lowerText.includes('আগের নাম') ||
-      lowerText.includes('আগের ঠিকানা') ||
-      lowerText.includes('আগের নম্বর') ||
-      lowerText.includes('আগের ইনফো') ||
-      lowerText.includes('আগের মতো')) &&
-    !!recentOrder;
-
-  if (isReusePreviousInfoQuery && recentOrder) {
-    const finalName = recentOrder.customerName || 'সম্মানিত কাস্টমার';
-    const finalPhone = recentOrder.customerPhone || '01700000000';
-    const finalAddress = recentOrder.deliveryAddress || 'ঢাকা';
-    const prodTitle = session.selectedProduct || recentOrder.productTitle || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
-    const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase()));
-    const itemPrice = session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
-    const deliveryCharge = settings?.deliveryFeeDhaka || 120;
-    const totalPrice = itemPrice + deliveryCharge;
-    const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
-
-    let orderNum = Math.floor(1000 + Math.random() * 9000);
-    try {
-      const saved = await insertDbOrder({
-        customerName: finalName,
-        customerPhone: finalPhone,
-        deliveryAddress: finalAddress,
-        deliveryCity: 'ঢাকা',
-        channel: 'FACEBOOK_MESSENGER',
-        status: 'PENDING_CONFIRMATION',
-        itemsPrice: itemPrice,
-        deliveryCharge: deliveryCharge,
-        discount: 0,
-        productTitle: prodTitle,
-        productId: finalProdId,
-        psid: senderId,
-      });
-      if (saved?.orderNumber) orderNum = saved.orderNumber;
-    } catch (dbErr) {
-      console.error('[DB Insert Error from Reuse Info]:', dbErr);
-    }
-
-    session.state = 'IDLE';
-    session.selectedProduct = undefined;
-    session.price = undefined;
-    userSessions[senderId] = session;
-
-    const reply =
-      `🎉 ধন্যবাদ ${finalName}! আপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম, ফোন নম্বর ও ঠিকানায় '${prodTitle}' (৳${itemPrice})-এর নতুন অর্ডারটি কনফার্ম করা হয়েছে। 🌸\n\n` +
-      `📦 নতুন অর্ডার নম্বর: #OF-${orderNum}\n` +
-      `👗 প্রোডাক্ট: ${prodTitle}\n` +
-      `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
-      `📞 মোবাইল: ${finalPhone}\n` +
-      `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
-      `🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ আমাদের সাথে থাকার জন্য! ❤️`;
-
-    await recordChatTurn(senderId, rawText, reply);
-    await sendFbMessage(senderId, reply, pageToken);
-    return;
-  }
-
-  // 9. Check for phone & address extraction for NEW orders
-  const { phone, partialPhone } = extractBangladeshiPhone(rawText);
-
-  if (phone) {
-    const { name, address } = extractNameAndAddress(rawText, phone);
-    const finalName = (name && name !== 'সম্মানিত কাস্টমার') ? name : (session.customerName || 'সম্মানিত কাস্টমার');
-    const finalAddress = address.length > 3 ? address : (session.deliveryAddress || 'ঢাকা');
-    const prodTitle = session.selectedProduct || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
-    const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase()));
-    const itemPrice = session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
-    const deliveryCharge = settings?.deliveryFeeDhaka || 120;
-    const totalPrice = itemPrice + deliveryCharge;
-    const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
-
-    // Save order to Neon DB
-    let orderNum = Math.floor(1000 + Math.random() * 9000);
-    try {
-      const saved = await insertDbOrder({
-        customerName: finalName,
-        customerPhone: phone,
-        deliveryAddress: finalAddress,
-        deliveryCity: 'ঢাকা',
-        channel: 'FACEBOOK_MESSENGER',
-        status: 'PENDING_CONFIRMATION',
-        itemsPrice: itemPrice,
-        deliveryCharge: deliveryCharge,
-        discount: 0,
-        productTitle: prodTitle,
-        productId: finalProdId,
-        psid: senderId,
-      });
-      if (saved?.orderNumber) orderNum = saved.orderNumber;
-    } catch (dbErr) {
-      console.error('[DB Insert Error from Rule]:', dbErr);
-    }
-
-    session.state = 'IDLE';
-    session.selectedProduct = undefined;
-    session.price = undefined;
-    userSessions[senderId] = session;
-
-    const reply =
-      `🎉 অভিনন্দন ${finalName}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে।\n\n` +
-      `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
-      `👗 প্রোডাক্ট: ${prodTitle}\n` +
-      `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
-      `📞 মোবাইল: ${phone}\n` +
-      `💰 মোট পরিমাণ: ৳${totalPrice} (হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
-      `🚚 ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে।\n\n` +
-      `প্যাকেজটি পাঠানোর পর আপনাকে ট্র্যাকিং কোডসহ এসএমএস ও মেসেজ দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`;
-
-    await recordChatTurn(senderId, rawText, reply);
-    await sendFbMessage(senderId, reply, pageToken);
-    return;
-  }
-
-  // 10. If user sent an INCOMPLETE phone number
-  if (partialPhone) {
-    const { name, address } = extractNameAndAddress(rawText, partialPhone);
-    session.state = 'AWAITING_PHONE';
-    if (name && name !== 'সম্মানিত কাস্টমার') session.customerName = name;
-    if (address && address.length > 3) session.deliveryAddress = address;
-    session.partialPhone = partialPhone;
-    userSessions[senderId] = session;
-
-    const reply =
-      `ধন্যবাদ ${session.customerName || ''}! আপনার ঠিকানা (${session.deliveryAddress || address}) নোট করা হয়েছে। 📍\n\n` +
-      `⚠️ তবে আপনার দেয়া মোবাইল নম্বরটিতে ${partialPhone.length}টি ডিজিট পাওয়া গেছে (${partialPhone})।\n` +
-      `বাংলাদেশে মোবাইল নম্বর ১১ ডিজিটের হয়ে থাকে। অনুগ্রহ করে আপনার সম্পূর্ণ ১১ ডিজিটের মোবাইল নম্বরটি লিখে পাঠান (যেমন: ${partialPhone}xx)।`;
-
-    await recordChatTurn(senderId, rawText, reply);
-    await sendFbMessage(senderId, reply, pageToken);
-    return;
-  }
-
-  // 11. If user sent text while in AWAITING_PHONE / AWAITING_ADDRESS
-  if (session.state === 'AWAITING_PHONE' || session.state === 'AWAITING_ADDRESS') {
-    const digitsOnly = toEnglishDigits(rawText).replace(/[^0-9]/g, '');
-    if (digitsOnly.length >= 2 && digitsOnly.length <= 11) {
-      let combinedPhone = '';
-      if (digitsOnly.length === 11 && digitsOnly.startsWith('01')) {
-        combinedPhone = digitsOnly;
-      } else if (session.partialPhone && (session.partialPhone + digitsOnly).length === 11) {
-        combinedPhone = session.partialPhone + digitsOnly;
-      }
-
-      if (combinedPhone.length === 11) {
-        const finalName = session.customerName || 'সম্মানিত কাস্টমার';
-        const finalAddress = session.deliveryAddress || 'মিরপুর, ঢাকা';
-        const prodTitle = session.selectedProduct || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
-        const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase()));
-        const itemPrice = session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
-        const deliveryCharge = settings?.deliveryFeeDhaka || 120;
-        const totalPrice = itemPrice + deliveryCharge;
-        const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
-        let orderNum = Math.floor(1000 + Math.random() * 9000);
-
-        try {
-          const saved = await insertDbOrder({
-            customerName: finalName,
-            customerPhone: combinedPhone,
-            deliveryAddress: finalAddress,
-            deliveryCity: 'ঢাকা',
-            channel: 'FACEBOOK_MESSENGER',
-            status: 'PENDING_CONFIRMATION',
-            itemsPrice: itemPrice,
-            deliveryCharge: deliveryCharge,
-            discount: 0,
-            productTitle: prodTitle,
-            productId: finalProdId,
-            psid: senderId,
-          });
-          if (saved?.orderNumber) orderNum = saved.orderNumber;
-        } catch (dbErr) {
-          console.error('[DB Insert Error from Phone Recovery]:', dbErr);
-        }
-
-        session.state = 'IDLE';
-        session.selectedProduct = undefined;
-        session.price = undefined;
-        userSessions[senderId] = session;
-
-        const reply =
-          `🎉 ধন্যবাদ ${finalName}! আপনার ১১ ডিজিটের নম্বর (${combinedPhone}) ভেরিফাই হয়েছে এবং অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে।\n\n` +
-          `📦 অর্ডার নম্বর: #OF-${orderNum}\n` +
-          `👗 প্রোডাক্ট: ${prodTitle}\n` +
-          `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
-          `💰 মোট পরিমাণ: ৳${totalPrice} (ক্যাশ অন ডেলিভারি)\n` +
-          `🚚 ২-৩ কার্যদিবসের মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ! ❤️`;
-
-        await recordChatTurn(senderId, rawText, reply);
-        await sendFbMessage(senderId, reply, pageToken);
-        return;
-      }
     }
   }
 
