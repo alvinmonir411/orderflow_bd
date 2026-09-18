@@ -6,6 +6,7 @@ import {
   getDbChatThreads,
   getDbChatMessagesBySender,
   getDbConversations,
+  getDbChannelConnections,
   upsertDbConversation,
   updateDbConversationAssignment,
   updateDbConversationStatus,
@@ -31,9 +32,23 @@ export async function GET(request: NextRequest) {
     const convId = searchParams.get('convId');
     const isList = searchParams.get('list') === 'true' || (!psid && !orderId && !convId);
 
-    const settings = await getBotSettings();
-    const pageToken = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN;
-    const pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
+    // Multi-tenant page credentials from ChannelConnection
+    let pageToken = '';
+    let pageId = '';
+    try {
+      const conns = await getDbChannelConnections(orgId);
+      const fbConn = conns.find((c: any) => c.platform === 'FACEBOOK_MESSENGER' && c.status === 'CONNECTED');
+      if (fbConn) {
+        pageToken = fbConn.accessToken || '';
+        pageId = fbConn.pageId || '';
+      }
+    } catch (_) {}
+
+    if (!pageToken) {
+      const settings = await getBotSettings();
+      pageToken = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
+      pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
+    }
     const sql = getSql();
 
     // If requesting details (internal notes and timeline) for a specific conversation
@@ -54,7 +69,7 @@ export async function GET(request: NextRequest) {
     if (isList) {
       const [orders, dbThreads, dbConversations] = await Promise.all([
         getDbOrders(orgId),
-        getDbChatThreads(),
+        getDbChatThreads(orgId),
         getDbConversations(orgId),
       ]);
 
@@ -67,7 +82,7 @@ export async function GET(request: NextRequest) {
       let fbConversations: any[] = [];
 
       // 1. Try to fetch live Facebook Page Conversations from Meta Graph API
-      if (pageToken && orgId === 'org-1') {
+      if (pageToken) {
         try {
           const fbUrl = `https://graph.facebook.com/v20.0/me/conversations?fields=id,snippet,updated_time,unread_count,senders,participants,messages.limit(10){id,message,from,created_time}&access_token=${pageToken.trim()}`;
           const fbRes = await fetch(fbUrl, { signal: AbortSignal.timeout(2500) });
@@ -84,52 +99,50 @@ export async function GET(request: NextRequest) {
       const seenPsids = new Set<string>();
 
       // 2. Add threads from recorded ChatMessage table (scoped to orgId)
-      if (orgId === 'org-1') {
-        for (const dbt of dbThreads) {
-          if (!dbt.senderId) continue;
-          seenPsids.add(dbt.senderId);
+      for (const dbt of dbThreads) {
+        if (!dbt.senderId) continue;
+        seenPsids.add(dbt.senderId);
 
-          const msgs = await getDbChatMessagesBySender(dbt.senderId);
-          const matchedOrder = orders.find(
-            (o) => o.psid === dbt.senderId || (o.customerPhone && dbt.senderId.includes(o.customerPhone)),
-          );
+        const msgs = await getDbChatMessagesBySender(dbt.senderId, orgId);
+        const matchedOrder = orders.find(
+          (o) => o.psid === dbt.senderId || (o.customerPhone && dbt.senderId.includes(o.customerPhone)),
+        );
 
-          const dbC = convMap.get(dbt.senderId) || {};
+        const dbC = convMap.get(dbt.senderId) || {};
 
-          threads.push({
-            id: `thread-${dbt.senderId}`,
-            customerName: dbt.c_name || dbt.customerName || (matchedOrder?.customerName) || 'ফেসবুক গ্রাহক',
-            customerPhone: dbt.c_phone || (matchedOrder?.customerPhone) || '01938909812',
-            customerAddress: dbt.c_address || (matchedOrder?.deliveryAddress) || 'মিরপুর, ঢাকা',
-            channel: dbt.channel || 'FACEBOOK_MESSENGER',
-            psid: dbt.senderId,
-            productInterest: dbt.productTitle || (matchedOrder?.items?.[0]?.product?.title) || 'এক্সক্লুসিভ পার্টি গাউন',
-            productImage: dbt.productImage || (matchedOrder?.items?.[0]?.product?.images?.[0]) || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
-            productPrice: dbt.productPrice || (matchedOrder?.totalPrice) || 1750,
-            lastMessage: dbt.lastText || 'মেসেজ এসেছে',
-            lastTime: new Date(dbt.lastTime).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-            unread: true,
-            orderNumber: matchedOrder?.orderNumber || 1049,
-            orderStatus: matchedOrder?.status || 'PENDING_CONFIRMATION',
-            totalSpent: matchedOrder?.totalPrice || 1870,
-            isAiActive: dbC.isAiActive !== undefined ? dbC.isAiActive : true,
-            status: dbC.status || 'OPEN',
-            assignedToId: dbC.assignedToId || null,
-            assignedToName: dbC.assignedToName || null,
-            tags: dbC.tags || ['🔥 Hot Lead'],
-            messages: msgs.map((m: any) => ({
-              id: m.id,
-              sender: m.sender,
-              text: m.text,
-              time: new Date(m.createdAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-              productCard: m.productTitle ? {
-                title: m.productTitle,
-                price: m.productPrice || 1750,
-                image: m.productImage || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
-              } : undefined,
-            })),
-          });
-        }
+        threads.push({
+          id: `thread-${dbt.senderId}`,
+          customerName: dbt.c_name || dbt.customerName || (matchedOrder?.customerName) || 'ফেসবুক গ্রাহক',
+          customerPhone: dbt.c_phone || (matchedOrder?.customerPhone) || '01938909812',
+          customerAddress: dbt.c_address || (matchedOrder?.deliveryAddress) || 'মিরপুর, ঢাকা',
+          channel: dbt.channel || 'FACEBOOK_MESSENGER',
+          psid: dbt.senderId,
+          productInterest: dbt.productTitle || (matchedOrder?.items?.[0]?.product?.title) || 'এক্সক্লুসিভ পার্টি গাউন',
+          productImage: dbt.productImage || (matchedOrder?.items?.[0]?.product?.images?.[0]) || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
+          productPrice: dbt.productPrice || (matchedOrder?.totalPrice) || 1750,
+          lastMessage: dbt.lastText || 'মেসেজ এসেছে',
+          lastTime: new Date(dbt.lastTime).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+          unread: true,
+          orderNumber: matchedOrder?.orderNumber || 1049,
+          orderStatus: matchedOrder?.status || 'PENDING_CONFIRMATION',
+          totalSpent: matchedOrder?.totalPrice || 1870,
+          isAiActive: dbC.isAiActive !== undefined ? dbC.isAiActive : true,
+          status: dbC.status || 'OPEN',
+          assignedToId: dbC.assignedToId || null,
+          assignedToName: dbC.assignedToName || null,
+          tags: dbC.tags || ['🔥 Hot Lead'],
+          messages: msgs.map((m: any) => ({
+            id: m.id,
+            sender: m.sender,
+            text: m.text,
+            time: new Date(m.createdAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+            productCard: m.productTitle ? {
+              title: m.productTitle,
+              price: m.productPrice || 1750,
+              image: m.productImage || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
+            } : undefined,
+          })),
+        });
       }
 
       // 3. Add threads from real database orders for this org
@@ -198,8 +211,8 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // 4. Add threads from Meta Graph API conversations (if org-1 and not already added)
-      if (orgId === 'org-1') {
+      // 4. Add threads from Meta Graph API conversations (if not already added)
+      if (fbConversations.length > 0) {
         for (const fbConv of fbConversations) {
           const sender = fbConv.senders?.data?.[0];
           const senderId = sender?.id;
@@ -265,7 +278,7 @@ export async function GET(request: NextRequest) {
     let profileData = null;
 
     if (targetPsid) {
-      const dbMsgs = await getDbChatMessagesBySender(targetPsid);
+      const dbMsgs = await getDbChatMessagesBySender(targetPsid, orgId);
       if (dbMsgs.length > 0) {
         messages = dbMsgs.map((m: any) => ({
           id: m.id,
@@ -275,7 +288,7 @@ export async function GET(request: NextRequest) {
         }));
       }
 
-      if (pageToken && orgId === 'org-1') {
+      if (pageToken) {
         try {
           const profileUrl = `https://graph.facebook.com/v20.0/${targetPsid}?fields=first_name,last_name,name,profile_pic&access_token=${pageToken}`;
           const pRes = await fetch(profileUrl);

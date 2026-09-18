@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings, updateBotSettings, getSql } from '@/lib/db';
+import { getBotSettings, updateBotSettings, getSql, upsertDbChannelConnection } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, token, pageId, pageToken, pageName } = body;
+    const { action, token, pageId, pageToken, pageName, orgId } = body;
 
     // ACTION 1: INSPECT TOKEN & DISCOVER PAGES
     if (action === 'inspect_token' || (!action && token && !pageId)) {
@@ -125,20 +126,50 @@ export async function POST(request: NextRequest) {
         console.error('[Meta Subscribed Apps Exception]:', subErr);
       }
 
-      // 2. Update BotSettings in Neon DB
-      await updateBotSettings({
-        fbPageId: targetPageId,
-        fbPageToken: targetPageToken,
-        fbPageName: targetPageName,
+      // 2. Get current user's organizationId
+      const currentUser = await getCurrentUser(request);
+      const userOrgId = currentUser?.organizationId || orgId || 'org-1';
+
+      // 3. Save ChannelConnection per org (so webhook can route to correct dashboard)
+      await upsertDbChannelConnection(userOrgId, {
+        platform: 'FACEBOOK_MESSENGER',
+        pageId: targetPageId,
+        pageName: targetPageName,
+        accessToken: targetPageToken,
       });
 
-      // 3. Also update Store record if available
+      // 4. Update BotSettings in Neon DB (global fallback for org-1)
+      if (userOrgId === 'org-1') {
+        await updateBotSettings({
+          fbPageId: targetPageId,
+          fbPageToken: targetPageToken,
+          fbPageName: targetPageName,
+        });
+      } else {
+        // For non-default orgs, store settings in their org-scoped BotSettings
+        try {
+          const sql = getSql();
+          await sql`
+            INSERT INTO "BotSettings" ("id", "storeId", "organizationId", "fbPageId", "fbPageToken", "fbPageName", "updatedAt")
+            VALUES (${`settings-${userOrgId}`}, ${`store-${userOrgId}`}, ${userOrgId}, ${targetPageId}, ${targetPageToken}, ${targetPageName}, NOW())
+            ON CONFLICT ("id") DO UPDATE SET
+              "fbPageId" = EXCLUDED."fbPageId",
+              "fbPageToken" = EXCLUDED."fbPageToken",
+              "fbPageName" = EXCLUDED."fbPageName",
+              "updatedAt" = NOW();
+          `;
+        } catch (botErr) {
+          console.warn('[BotSettings upsert for new org warning]:', botErr);
+        }
+      }
+
+      // 5. Also update Store record if available
       try {
         const sql = getSql();
         await sql`
           UPDATE "Store"
           SET "fbPageId" = ${targetPageId}, "updatedAt" = NOW()
-          WHERE "id" = 'store-1';
+          WHERE "id" = ${`store-${userOrgId}`} OR "id" = 'store-1';
         `;
       } catch (storeErr) {
         console.warn('[Store Update fbPageId Warning]:', storeErr);

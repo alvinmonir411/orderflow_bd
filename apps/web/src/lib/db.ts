@@ -293,7 +293,9 @@ export async function initDatabase() {
     try { await sql`ALTER TABLE "User" ALTER COLUMN "password" DROP NOT NULL;`; } catch (_) {}
     try { await sql`ALTER TABLE "User" ALTER COLUMN "role" TYPE TEXT;`; } catch (_) {}
 
+    try { await sql`ALTER TABLE "Customer" ALTER COLUMN "storeId" DROP NOT NULL;`; } catch (_) {}
     await sql`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "city" TEXT DEFAULT 'ঢাকা';`;
     await sql`ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Store" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
@@ -1037,17 +1039,19 @@ export async function saveDbChatMessage(data: {
   productTitle?: string;
   productPrice?: number;
   productImage?: string;
+  organizationId?: string;
 }) {
   const sql = getSql();
   try {
     await initDatabase();
     const id = `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const orgId = data.organizationId || 'org-1';
     await sql`
       INSERT INTO "ChatMessage" (
-        "id", "senderId", "customerName", "sender", "text", "channel",
+        "id", "organizationId", "senderId", "customerName", "sender", "text", "channel",
         "productTitle", "productPrice", "productImage", "createdAt"
       ) VALUES (
-        ${id}, ${data.senderId}, ${data.customerName || null}, ${data.sender}, ${data.text},
+        ${id}, ${orgId}, ${data.senderId}, ${data.customerName || null}, ${data.sender}, ${data.text},
         ${data.channel || 'FACEBOOK_MESSENGER'}, ${data.productTitle || null},
         ${data.productPrice || null}, ${data.productImage || null}, NOW()
       );
@@ -1059,16 +1063,23 @@ export async function saveDbChatMessage(data: {
   }
 }
 
-export async function getDbChatMessagesBySender(senderId: string) {
+export async function getDbChatMessagesBySender(senderId: string, organizationId?: string) {
   const sql = getSql();
   try {
     await initDatabase();
-    const rows = await sql`
-      SELECT id, "senderId", "customerName", sender, text, channel, "productTitle", "productPrice"::float as "productPrice", "productImage", "createdAt"
-      FROM "ChatMessage"
-      WHERE "senderId" = ${senderId}
-      ORDER BY "createdAt" ASC;
-    `;
+    const rows = organizationId
+      ? await sql`
+          SELECT id, "organizationId", "senderId", "customerName", sender, text, channel, "productTitle", "productPrice"::float as "productPrice", "productImage", "createdAt"
+          FROM "ChatMessage"
+          WHERE "senderId" = ${senderId} AND ("organizationId" = ${organizationId} OR "organizationId" IS NULL)
+          ORDER BY "createdAt" ASC;
+        `
+      : await sql`
+          SELECT id, "organizationId", "senderId", "customerName", sender, text, channel, "productTitle", "productPrice"::float as "productPrice", "productImage", "createdAt"
+          FROM "ChatMessage"
+          WHERE "senderId" = ${senderId}
+          ORDER BY "createdAt" ASC;
+        `;
     return rows;
   } catch (err) {
     console.error('[DB Get Chat Messages Error]:', err);
@@ -1076,7 +1087,7 @@ export async function getDbChatMessagesBySender(senderId: string) {
   }
 }
 
-export async function getDbChatThreads() {
+export async function getDbChatThreads(organizationId = 'org-1') {
   const sql = getSql();
   try {
     await initDatabase();
@@ -1095,12 +1106,14 @@ export async function getDbChatThreads() {
         c.address as "c_address"
       FROM "ChatMessage" m
       LEFT JOIN "Customer" c ON (m."senderId" = c.psid OR m."senderId" = c.phone)
-      WHERE m.id IN (
-        SELECT id FROM (
-          SELECT id, ROW_NUMBER() OVER (PARTITION BY "senderId" ORDER BY "createdAt" DESC) as rn
-          FROM "ChatMessage"
-        ) sub WHERE sub.rn = 1
-      )
+      WHERE (m."organizationId" = ${organizationId} OR (m."organizationId" IS NULL AND ${organizationId} = 'org-1'))
+        AND m.id IN (
+          SELECT id FROM (
+            SELECT id, ROW_NUMBER() OVER (PARTITION BY "senderId" ORDER BY "createdAt" DESC) as rn
+            FROM "ChatMessage"
+            WHERE "organizationId" = ${organizationId} OR (m."organizationId" IS NULL AND ${organizationId} = 'org-1')
+          ) sub WHERE sub.rn = 1
+        )
       ORDER BY m."createdAt" DESC;
     `;
     return rows;

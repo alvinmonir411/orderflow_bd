@@ -1,14 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings } from '@/lib/db';
+import { getBotSettings, getDbChannelConnections } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const settings = await getBotSettings();
-    const token = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
-    const pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
-    let pageName = settings.fbPageName || '';
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+
+    let token = '';
+    let pageId = '';
+    let pageName = '';
+
+    // First check ChannelConnection for this user's organization
+    try {
+      const conns = await getDbChannelConnections(orgId);
+      const fbConn = conns.find((c: any) => c.platform === 'FACEBOOK_MESSENGER' && c.status === 'CONNECTED');
+      if (fbConn) {
+        token = fbConn.accessToken || '';
+        pageId = fbConn.pageId || '';
+        pageName = fbConn.pageName || '';
+      }
+    } catch (_) {}
+
+    // Fallback to BotSettings if not in ChannelConnection
+    if (!token) {
+      const settings = await getBotSettings();
+      token = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
+      pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
+      pageName = settings.fbPageName || '';
+    }
 
     if (!token || token.length < 10) {
       return NextResponse.json({

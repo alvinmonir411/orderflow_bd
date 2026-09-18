@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings, insertDbOrder, findCustomerLatestOrder, getDbProducts, saveDbChatMessage, getDbChatMessagesBySender, BotFaqItem } from '@/lib/db';
+import { getBotSettings, insertDbOrder, findCustomerLatestOrder, getDbProducts, saveDbChatMessage, getDbChatMessagesBySender, getDbChannelConnections, BotFaqItem } from '@/lib/db';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -18,6 +18,7 @@ interface UserSession {
   nonBusinessCount?: number;
   lastMessageTime?: number;
   history?: ChatMessage[];
+  organizationId?: string;
 }
 
 // In-memory conversation state for quick back-to-back inputs
@@ -65,6 +66,15 @@ export async function POST(request: NextRequest) {
 
     if (body.object === 'page' || body.object === 'instagram') {
       const settings = await getBotSettings();
+
+      // Lookup all ChannelConnections to support multi-org page routing
+      let allChannelConnections: any[] = [];
+      try {
+        const { getSql } = await import('@/lib/db');
+        const sql = getSql();
+        allChannelConnections = await sql`SELECT "organizationId", "pageId", "accessToken", "pageName" FROM "ChannelConnection" WHERE "platform" = 'FACEBOOK_MESSENGER' AND "status" = 'CONNECTED' ORDER BY "createdAt" DESC`;
+      } catch (_) {}
+
       const pageToken =
         settings.fbPageToken ||
         process.env.DEFAULT_FACEBOOK_PAGE_TOKEN ||
@@ -82,6 +92,11 @@ export async function POST(request: NextRequest) {
 
       for (const entry of body.entry || []) {
         const pageId = entry.id || configuredPageId;
+
+        // Determine which org this page belongs to for correct order/message routing
+        const matchedConn = allChannelConnections.find((c: any) => c.pageId === pageId);
+        const activeOrgId = matchedConn?.organizationId || 'org-1';
+        const activePageToken = matchedConn?.accessToken || pageToken;
 
         // ============================================================
         // A. FACEBOOK & INSTAGRAM POST COMMENTS (FEED CHANGES)
@@ -173,7 +188,7 @@ export async function POST(request: NextRequest) {
           }
 
           const channel = body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_MESSENGER';
-          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey, settings, incomingImageUrl, channel);
+          await processMessengerEvent(senderId, text, payload, activePageToken, geminiKey, settings, incomingImageUrl, channel, activeOrgId);
         }
       }
 
@@ -272,7 +287,7 @@ async function recordChatTurn(
   senderId: string,
   userText: string,
   botText: string,
-  extra?: { productTitle?: string; productPrice?: number; customerName?: string; channel?: string }
+  extra?: { productTitle?: string; productPrice?: number; customerName?: string; channel?: string; organizationId?: string }
 ) {
   const session = userSessions[senderId];
   if (session) {
@@ -285,6 +300,7 @@ async function recordChatTurn(
   }
 
   const channel = extra?.channel || 'FACEBOOK_MESSENGER';
+  const orgId = extra?.organizationId || session?.organizationId || 'org-1';
 
   // Persist to Neon PostgreSQL ChatMessage table
   try {
@@ -295,6 +311,7 @@ async function recordChatTurn(
         sender: 'customer',
         text: userText,
         channel,
+        organizationId: orgId,
       });
     }
     if (botText) {
@@ -306,6 +323,7 @@ async function recordChatTurn(
         channel,
         productTitle: extra?.productTitle || session?.selectedProduct,
         productPrice: extra?.productPrice || session?.price,
+        organizationId: orgId,
       });
     }
   } catch (dbErr) {
@@ -505,6 +523,7 @@ async function processMessengerEvent(
   settings?: any,
   incomingImageUrl?: string,
   channel: string = 'FACEBOOK_MESSENGER',
+  organizationId: string = 'org-1',
 ) {
   // 1. Fetch DB chat history for persistent context across serverless requests
   const dbHistory = await getDbChatMessagesBySender(senderId);
@@ -518,6 +537,8 @@ async function processMessengerEvent(
   };
   session.turnCount = (session.turnCount || 0) + 1;
   session.lastMessageTime = Date.now();
+  session.organizationId = organizationId;
+  userSessions[senderId] = session;
 
   // Restore history from DB if available
   if (dbHistory && dbHistory.length > 0) {
@@ -646,6 +667,7 @@ async function processMessengerEvent(
         customerPhone: finalPhone,
         deliveryAddress: finalAddress,
         deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
+        organizationId,
         channel: 'FACEBOOK_MESSENGER',
         status: 'PENDING_CONFIRMATION',
         itemsPrice: itemPrice,
@@ -718,6 +740,7 @@ async function processMessengerEvent(
         customerPhone: phone,
         deliveryAddress: finalAddress,
         deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
+        organizationId,
         channel: 'FACEBOOK_MESSENGER',
         status: 'PENDING_CONFIRMATION',
         itemsPrice: itemPrice,
@@ -808,6 +831,7 @@ async function processMessengerEvent(
             customerPhone: combinedPhone,
             deliveryAddress: finalAddress,
             deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
+            organizationId,
             channel: 'FACEBOOK_MESSENGER',
             status: 'PENDING_CONFIRMATION',
             itemsPrice: itemPrice,
@@ -1082,15 +1106,54 @@ async function processMessengerEvent(
     if (replyText) {
       await recordChatTurn(senderId, rawText, replyText, { channel });
 
-      if (orderData && orderData.orderConfirmed) {
-        const prodTitle = orderData.product || session.selectedProduct || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
-        const matchedProd = liveProducts.find((p: any) => p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase()));
-        const itemPrice = orderData.price || session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
-        const finalAddress = orderData.address || recentOrder?.deliveryAddress || session.deliveryAddress || 'ঢাকা';
+      const isConfirmedViaText = /সফলভাবে\s*কনফার্ম|অর্ডারটি\s*সফলভাবে|অর্ডার\s*বিবরণী|অর্ডার\s*কনফার্ম\s*করা\s*হয়েছে|অর্ডারটি\s*কনফার্ম/i.test(replyText);
+      const isConfirmedOrder = (orderData && orderData.orderConfirmed) || isConfirmedViaText;
+
+      if (isConfirmedOrder) {
+        let prodTitle = orderData?.product;
+        if (!prodTitle) {
+          const prodMatch = replyText.match(/প্রোডাক্ট[:\*\s]+([^\n\r]+)/i) ||
+            replyText.match(/পণ্য[:\*\s]+([^\n\r]+)/i) ||
+            replyText.match(/আপনার\s*\*\*([^\*]+)\*\*/i);
+          if (prodMatch) prodTitle = prodMatch[1].replace(/[\*\[\]]/g, '').trim();
+        }
+        prodTitle = prodTitle || session.selectedProduct || (liveProducts[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
+
+        const matchedProd = liveProducts.find((p: any) =>
+          p.title.toLowerCase().includes(prodTitle.toLowerCase()) || prodTitle.toLowerCase().includes(p.title.toLowerCase())
+        );
+
+        let itemPrice = orderData?.price;
+        if (!itemPrice) {
+          const priceMatch = replyText.match(/(?:মূল্য|বিল|টাকা)[:\*\s]+[৳]?\s*([0-9]+)/i) ||
+            replyText.match(/৳\s*([0-9]+)/);
+          if (priceMatch) itemPrice = Number(priceMatch[1]);
+        }
+        itemPrice = itemPrice || session.price || (matchedProd ? Number(matchedProd.basePrice) : 1250);
+
+        let finalAddress = orderData?.address;
+        if (!finalAddress) {
+          const addrMatch = replyText.match(/ঠিকানা[:\*\s]+([^\n\r]+)/i);
+          if (addrMatch) finalAddress = addrMatch[1].replace(/[\*]/g, '').trim();
+        }
+        finalAddress = finalAddress || recentOrder?.deliveryAddress || session.deliveryAddress || 'ঢাকা';
+
+        let finalName = orderData?.customerName;
+        if (!finalName) {
+          const nameMatch = replyText.match(/(?:গ্রাহকের নাম|নাম)[:\*\s]+([^\n\r]+)/i);
+          if (nameMatch) finalName = nameMatch[1].replace(/[\*]/g, '').trim();
+        }
+        finalName = finalName || recentOrder?.customerName || session.customerName || 'সম্মানিত কাস্টমার';
+
+        let finalPhone = orderData?.phone;
+        if (!finalPhone) {
+          const phoneMatch = replyText.match(/01[3-9]\d{8}/) || rawText.match(/01[3-9]\d{8}/);
+          if (phoneMatch) finalPhone = phoneMatch[0];
+        }
+        finalPhone = finalPhone || recentOrder?.customerPhone || session.customerPhone || '01700000000';
+
         const isDhaka = /dhaka|ঢাকা|mirpur|uttara|gulshan|banani|dhanmondi|motijheel|badda|bnasree|banasree|মোহাম্মদপুর|মিরপুর|উত্তরা|বনশ্রী/i.test(finalAddress);
         const deliveryCharge = isDhaka ? (settings?.deliveryFeeDhaka || 120) : (settings?.deliveryFeeOutside || 150);
-        const finalName = orderData.customerName || recentOrder?.customerName || session.customerName || 'সম্মানিত কাস্টমার';
-        const finalPhone = orderData.phone || recentOrder?.customerPhone || '01700000000';
         const finalProdId = matchedProd ? matchedProd.id : (liveProducts[0]?.id || 'prod-1');
 
         try {
@@ -1099,6 +1162,7 @@ async function processMessengerEvent(
             customerPhone: finalPhone,
             deliveryAddress: finalAddress,
             deliveryCity: isDhaka ? 'ঢাকা' : 'ঢাকার বাইরে',
+            organizationId,
             channel: 'FACEBOOK_MESSENGER',
             status: 'PENDING_CONFIRMATION',
             itemsPrice: itemPrice,
@@ -1108,6 +1172,7 @@ async function processMessengerEvent(
             productId: finalProdId,
             psid: senderId,
           });
+          console.log(`[Order Inserted Successfully] Org: ${organizationId}, Customer: ${finalName}, Phone: ${finalPhone}, Item: ${prodTitle}`);
         } catch (dbErr) {
           console.error('[DB Insert Error from AI]:', dbErr);
         }
