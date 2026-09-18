@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getBotSettings, insertDbOrder, getDbProducts, saveDbChatMessage, getSql } from '@/lib/db';
 
 const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'orderflow_bd_secure_verify_2026';
-const DEFAULT_WAAPI_TOKEN = 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';
-const DEFAULT_INSTANCE_ID = '104344';
+const DEFAULT_WAAPI_TOKEN = process.env.WAAPI_API_TOKEN || process.env.WHATSAPP_TOKEN || '';
+const DEFAULT_INSTANCE_ID = process.env.WAAPI_INSTANCE_ID || '';
 
 // Meta Verification Endpoint
 export async function GET(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   console.log(`[WhatsApp Webhook GET] mode=${mode}, token=${token}`);
 
-  if (mode === 'subscribe' && (token === WHATSAPP_VERIFY_TOKEN || token === 'orderflow_bd_secure_verify_2026')) {
+  if (mode === 'subscribe' && token === WHATSAPP_VERIFY_TOKEN && challenge) {
     return new NextResponse(challenge, {
       status: 200,
       headers: { 'Content-Type': 'text/plain' },

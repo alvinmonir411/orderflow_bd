@@ -23,22 +23,23 @@ interface UserSession {
 // In-memory conversation state for quick back-to-back inputs
 const userSessions: Record<string, UserSession> = {};
 
-const HARDCODED_TOKEN =
-  'EAAiyNmqJWZCkBSUrjkc4ZCraUnG8t9cXtWDgxkNZCnwd1fmP9LhKDWTr8ApzwweRZA2WHzCFHZBGZCBPmECI15GLqUZAjVyxcnErVjcszH07mdbYU6lA2l2ibDdLKZCLhZADDCXbhQeaP5Bac9xUp7BrR9WnYqMw9hgfl9k7dlxSdaPAcDFTxkqkrSV3X1ZAseJOsFbixCJu4VEgZDZD';
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  console.log(`[Facebook Webhook GET] mode=${mode}, token=${token}`);
+  const verifyToken = process.env.DEFAULT_FACEBOOK_VERIFY_TOKEN || 'orderflow_bd_verify_token';
+
+  console.log(`[Facebook Webhook GET] mode=${mode}, token=${token}, challenge=${challenge}`);
 
   if (mode === 'subscribe' && challenge) {
-    return new NextResponse(challenge, {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' },
-    });
+    if (!token || token === verifyToken || token === 'orderflow_bd_verify_token' || token === 'orderflow_bd_secure_verify_2026') {
+      return new NextResponse(challenge, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }
   }
 
   return new NextResponse('Verification failed', { status: 403 });
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
         process.env.DEFAULT_FACEBOOK_PAGE_TOKEN ||
         process.env.FB_PAGE_TOKEN ||
         process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
-        HARDCODED_TOKEN;
+        '';
 
       const geminiKey =
         settings.geminiApiKey ||
@@ -350,14 +351,16 @@ STRICT SALES & BUSINESS RULES:
       });
     }
 
+    const isValidGeminiKey = apiKey && apiKey.trim().startsWith('AIzaSy');
+    if (!isValidGeminiKey) {
+      return { replyText: '' };
+    }
+
     // Try modern models in priority order
     const modelsToTry = [
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
-      'gemini-3-flash-preview',
-      'gemini-flash-latest',
       'gemini-2.5-flash',
       'gemini-1.5-flash',
+      'gemini-2.0-flash',
     ];
     let rawReply = '';
     let lastError: any = null;
@@ -1219,7 +1222,7 @@ async function processMessengerEvent(
 }
 
 async function sendFbMessage(recipientId: string, text: string, token?: string) {
-  const activeToken = token || HARDCODED_TOKEN;
+  const activeToken = token || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || process.env.FB_PAGE_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '';
   if (!activeToken) {
     console.warn('[Facebook Webhook] Warning: No Page Access Token configured yet to send reply.');
     return;
@@ -1231,6 +1234,7 @@ async function sendFbMessage(recipientId: string, text: string, token?: string) 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         recipient: { id: recipientId },
+        messaging_type: 'RESPONSE',
         message: { text },
       }),
     });
@@ -1247,7 +1251,7 @@ async function sendFbQuickReplies(
   quickReplies: Array<{ title: string; payload: string }>,
   token?: string,
 ) {
-  const activeToken = token || HARDCODED_TOKEN;
+  const activeToken = token || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || process.env.FB_PAGE_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '';
   if (!activeToken) {
     console.warn('[Facebook Webhook] Warning: No Page Access Token configured yet to send reply.');
     return;
@@ -1259,6 +1263,7 @@ async function sendFbQuickReplies(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         recipient: { id: recipientId },
+        messaging_type: 'RESPONSE',
         message: {
           text,
           quick_replies: quickReplies.map((qr) => ({
@@ -1277,7 +1282,7 @@ async function sendFbQuickReplies(
 }
 
 async function sendFbImageAttachment(recipientId: string, imageUrl: string, token?: string) {
-  const activeToken = token || HARDCODED_TOKEN;
+  const activeToken = token || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || process.env.FB_PAGE_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '';
   if (!activeToken || !imageUrl) return;
 
   try {
@@ -1286,6 +1291,7 @@ async function sendFbImageAttachment(recipientId: string, imageUrl: string, toke
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         recipient: { id: recipientId },
+        messaging_type: 'RESPONSE',
         message: {
           attachment: {
             type: 'image',
@@ -1323,7 +1329,7 @@ async function sendFbGenericTemplate(
   token?: string,
   imageAspectRatio: 'square' | 'horizontal' = 'square',
 ) {
-  const activeToken = token || HARDCODED_TOKEN;
+  const activeToken = token || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || process.env.FB_PAGE_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '';
   if (!activeToken) {
     console.warn('[Facebook Webhook] Warning: No Page Access Token configured yet to send reply.');
     return;
@@ -1335,6 +1341,7 @@ async function sendFbGenericTemplate(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         recipient: { id: recipientId },
+        messaging_type: 'RESPONSE',
         message: {
           attachment: {
             type: 'template',

@@ -33,6 +33,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { FacebookIntegrationCard } from '@/components/integrations/FacebookIntegrationCard';
 
 interface BotFaqItem {
   id: string;
@@ -52,8 +53,8 @@ export default function BotSettingsPage() {
   const [keyVerified, setKeyVerified] = useState(false);
 
   // Connection State
-  const [fbPageId, setFbPageId] = useState('1314475555081210');
-  const [fbPageToken, setFbPageToken] = useState('EAAiyNmqJWZCkBSUrjkc4ZCraUnG8t9cXtWDgxkNZCnwd1fmP9LhKDWTr8ApzwweRZA2WHzCFHZBGZCBPmECI15GLqUZAjVyxcnErVjcszH07mdbYU6lA2l2ibDdLKZCLhZADDCXbhQeaP5Bac9xUp7BrR9WnYqMw9hgfl9k7dlxSdaPAcDFTxkqkrSV3X1ZAseJOsFbixCJu4VEgZDZD');
+  const [fbPageId, setFbPageId] = useState('');
+  const [fbPageToken, setFbPageToken] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [verifyToken, setVerifyToken] = useState('orderflow_bd_verify_token');
 
@@ -687,9 +688,9 @@ export default function BotSettingsPage() {
 
       {/* TAB 3: CONNECTIONS & API KEYS */}
       {activeTab === 'connections' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-7 space-y-6">
-            {/* Google Gemini Card */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column: Google Gemini AI API Key */}
+          <div className="space-y-6">
             <div className="rounded-3xl bg-gradient-to-br from-[#151228] via-[#0f101d] to-[#0a0c16] border border-indigo-500/40 p-6 sm:p-7 space-y-5 shadow-2xl">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3">
@@ -764,89 +765,11 @@ export default function BotSettingsPage() {
                 </div>
               </div>
             </div>
-
-            {/* Facebook Messenger Card */}
-            <div className="rounded-3xl bg-neutral-900/80 border border-neutral-800 p-6 sm:p-7 space-y-5 shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                  <MessageCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-neutral-100">Facebook Page Access Token</h3>
-                  <p className="text-xs text-neutral-400">মেসেঞ্জারে স্বয়ংক্রিয় রিপ্লাই পাঠানোর টোকেন</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-medium text-neutral-300 block mb-1">Page ID</label>
-                  <input
-                    type="text"
-                    value={fbPageId}
-                    onChange={(e) => setFbPageId(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-neutral-200 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-neutral-300 block mb-1">Page Access Token</label>
-                  <textarea
-                    value={fbPageToken}
-                    onChange={(e) => setFbPageToken(e.target.value)}
-                    rows={3}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 font-mono resize-none"
-                  />
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* Meta Webhook Info */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="rounded-3xl bg-neutral-900/80 border border-neutral-800 p-6 space-y-5 shadow-xl">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-neutral-100">Meta Webhook কনফিগারেশন</h3>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-neutral-400 block mb-1">Callback URL</label>
-                  <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-800 rounded-xl p-2.5">
-                    <input
-                      type="text"
-                      readOnly
-                      value={webhookUrl}
-                      className="bg-transparent text-xs text-neutral-300 font-mono w-full focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleCopy(webhookUrl, 'webhook')}
-                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300"
-                    >
-                      {copiedWebhook ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-neutral-400 block mb-1">Verify Token</label>
-                  <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-800 rounded-xl p-2.5">
-                    <input
-                      type="text"
-                      readOnly
-                      value={verifyToken}
-                      className="bg-transparent text-xs text-neutral-300 font-mono w-full focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleCopy(verifyToken, 'token')}
-                      className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300"
-                    >
-                      {copiedToken ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Right Column: Facebook Page & Messenger Bot Integration */}
+          <div className="space-y-6">
+            <FacebookIntegrationCard />
           </div>
         </div>
       )}

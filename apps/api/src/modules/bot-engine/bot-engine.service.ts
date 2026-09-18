@@ -17,9 +17,13 @@ export class BotEngineService {
       const messagingEvents = item.messaging || [];
 
       // Find store linked with this Facebook Page
-      const store = await this.prisma.store.findFirst({
+      let store = await this.prisma.store.findFirst({
         where: { facebookPageId: pageId },
       });
+
+      if (!store) {
+        store = await this.prisma.store.findFirst();
+      }
 
       for (const event of messagingEvents) {
         const senderId = event.sender?.id;

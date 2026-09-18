@@ -1,10 +1,10 @@
 import { neon } from '@neondatabase/serverless';
 
-const DEFAULT_DATABASE_URL =
-  'postgresql://neondb_owner:npg_fVreJN50Kauw@ep-billowing-shadow-a5svvtgn-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require';
-
 export function getSql() {
-  const connStr = process.env.DATABASE_URL || DEFAULT_DATABASE_URL;
+  const connStr = process.env.DATABASE_URL;
+  if (!connStr) {
+    throw new Error('DATABASE_URL environment variable is not defined. Please check your .env file.');
+  }
   return neon(connStr);
 }
 
@@ -139,8 +139,8 @@ export async function initDatabase() {
         "whatsappPhoneId" TEXT DEFAULT '',
         "whatsappToken" TEXT DEFAULT '',
         "whatsappBusinessId" TEXT DEFAULT '',
-        "waapiInstanceId" TEXT DEFAULT '104344',
-        "waapiApiToken" TEXT DEFAULT 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
+        "waapiInstanceId" TEXT DEFAULT '',
+        "waapiApiToken" TEXT DEFAULT '',
         "whatsappProvider" TEXT DEFAULT 'WAAPI',
         "smsApiKey" TEXT DEFAULT '',
         "smsSenderId" TEXT DEFAULT '',
@@ -167,6 +167,11 @@ export async function initDatabase() {
     // Insert default bot settings if empty
     const settingsExist = await sql`SELECT COUNT(*)::int as count FROM "BotSettings" WHERE "id" = 'settings-1'`;
     if ((settingsExist[0]?.count || 0) === 0) {
+      const defaultFbToken = process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
+      const defaultFbPageId = process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
+      const defaultWaInstance = process.env.WAAPI_INSTANCE_ID || '';
+      const defaultWaToken = process.env.WAAPI_API_TOKEN || process.env.WHATSAPP_TOKEN || '';
+
       await sql`
         INSERT INTO "BotSettings" (
           "id", "storeId", "systemPrompt", "geminiApiKey", "fbPageToken", "fbPageId",
@@ -179,9 +184,9 @@ export async function initDatabase() {
         ) VALUES (
           'settings-1', 'store-1',
           'You are an intelligent, polite, friendly Bangladeshi F-Commerce AI sales representative for OrderFlow BD.',
-          '',
-          'EAAiyNmqJWZCkBSUrjkc4ZCraUnG8t9cXtWDgxkNZCnwd1fmP9LhKDWTr8ApzwweRZA2WHzCFHZBGZCBPmECI15GLqUZAjVyxcnErVjcszH07mdbYU6lA2l2ibDdLKZCLhZADDCXbhQeaP5Bac9xUp7BrR9WnYqMw9hgfl9k7dlxSdaPAcDFTxkqkrSV3X1ZAseJOsFbixCJu4VEgZDZD',
-          '1314475555081210',
+          ${process.env.GEMINI_API_KEY || ''},
+          ${defaultFbToken},
+          ${defaultFbPageId},
           '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)',
           '২ থেকে ৩ কার্যদিবস',
           120,
@@ -195,11 +200,11 @@ export async function initDatabase() {
           '',
           true,
           '',
+          ${process.env.WHATSAPP_PHONE_NUMBER_ID || ''},
+          ${defaultWaToken},
           '',
-          '',
-          '',
-          '104344',
-          'MY60stKiB13JQV05HlNywywyhMyLAN0xVAGcd0Gd4852ce73',
+          ${defaultWaInstance},
+          ${defaultWaToken},
           'WAAPI',
           '',
           'OrderFlowBD',
@@ -243,7 +248,8 @@ export async function getBotSettings() {
         systemPrompt: row.systemPrompt || '',
         geminiApiKey: row.geminiApiKey || process.env.GEMINI_API_KEY || '',
         fbPageToken: row.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '',
-        fbPageId: row.fbPageId || '1314475555081210',
+        fbPageId: row.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '',
+        fbPageName: row.fbPageName || (row.fbPageId === '443213442199594' ? 'FastLain' : 'Facebook Page'),
         deliveryTimeDhaka: row.deliveryTimeDhaka || '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)',
         deliveryTimeOutside: row.deliveryTimeOutside || '২ থেকে ৩ কার্যদিবস',
         deliveryFeeDhaka: Number(row.deliveryFeeDhaka) || 120,
@@ -255,14 +261,14 @@ export async function getBotSettings() {
         steadfastSecretKey: row.steadfastSecretKey || '',
         pathaoClientId: row.pathaoClientId || '',
         pathaoSecretKey: row.pathaoSecretKey || '',
-        whatsappConnected: row.whatsappConnected !== undefined ? Boolean(row.whatsappConnected) : Boolean(row.waapiInstanceId),
+        whatsappConnected: Boolean(row.whatsappConnected),
         whatsappPhone: row.whatsappPhone || '',
-        whatsappPhoneId: row.whatsappPhoneId || '',
-        whatsappToken: row.whatsappToken || '',
+        whatsappPhoneId: row.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+        whatsappToken: row.whatsappToken || process.env.WHATSAPP_TOKEN || process.env.WAAPI_API_TOKEN || '',
         whatsappBusinessId: row.whatsappBusinessId || '',
-        waapiInstanceId: row.waapiInstanceId || '104344',
-        waapiApiToken: row.waapiApiToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
-        whatsappProvider: row.whatsappProvider || 'WAAPI',
+        waapiInstanceId: row.waapiInstanceId || process.env.WAAPI_INSTANCE_ID || '',
+        waapiApiToken: row.waapiApiToken || process.env.WAAPI_API_TOKEN || '',
+        whatsappProvider: row.whatsappProvider || 'META',
         smsApiKey: row.smsApiKey || '',
         smsSenderId: row.smsSenderId || 'OrderFlowBD',
       };
@@ -276,7 +282,8 @@ export async function getBotSettings() {
     systemPrompt: '',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     fbPageToken: process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '',
-    fbPageId: '1314475555081210',
+    fbPageId: process.env.DEFAULT_FACEBOOK_PAGE_ID || '',
+    fbPageName: process.env.DEFAULT_FACEBOOK_PAGE_ID === '443213442199594' ? 'FastLain' : 'Facebook Page',
     deliveryTimeDhaka: '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)',
     deliveryTimeOutside: '২ থেকে ৩ কার্যদিবস',
     deliveryFeeDhaka: 120,
@@ -288,14 +295,14 @@ export async function getBotSettings() {
     steadfastSecretKey: '',
     pathaoClientId: '',
     pathaoSecretKey: '',
-    whatsappConnected: true,
+    whatsappConnected: false,
     whatsappPhone: '',
-    whatsappPhoneId: '1340571927',
-    whatsappToken: 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
+    whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+    whatsappToken: process.env.WHATSAPP_TOKEN || process.env.WAAPI_API_TOKEN || '',
     whatsappBusinessId: '',
-    waapiInstanceId: '104344',
-    waapiApiToken: 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca',
-    whatsappProvider: 'WAAPI',
+    waapiInstanceId: process.env.WAAPI_INSTANCE_ID || '',
+    waapiApiToken: process.env.WAAPI_API_TOKEN || '',
+    whatsappProvider: 'META',
     smsApiKey: '',
     smsSenderId: 'OrderFlowBD',
   };
@@ -306,6 +313,7 @@ export async function updateBotSettings(data: {
   geminiApiKey?: string;
   fbPageToken?: string;
   fbPageId?: string;
+  fbPageName?: string;
   deliveryTimeDhaka?: string;
   deliveryTimeOutside?: string;
   deliveryFeeDhaka?: number;
@@ -337,6 +345,7 @@ export async function updateBotSettings(data: {
     const geminiApiKey = data.geminiApiKey !== undefined ? data.geminiApiKey : current.geminiApiKey;
     const fbPageToken = data.fbPageToken !== undefined ? data.fbPageToken : current.fbPageToken;
     const fbPageId = data.fbPageId !== undefined ? data.fbPageId : current.fbPageId;
+    const fbPageName = data.fbPageName !== undefined ? data.fbPageName : current.fbPageName;
     const deliveryTimeDhaka = data.deliveryTimeDhaka !== undefined ? data.deliveryTimeDhaka : current.deliveryTimeDhaka;
     const deliveryTimeOutside = data.deliveryTimeOutside !== undefined ? data.deliveryTimeOutside : current.deliveryTimeOutside;
     const deliveryFeeDhaka = data.deliveryFeeDhaka !== undefined ? data.deliveryFeeDhaka : current.deliveryFeeDhaka;
@@ -361,7 +370,7 @@ export async function updateBotSettings(data: {
 
     await sql`
       INSERT INTO "BotSettings" (
-        "id", "storeId", "systemPrompt", "geminiApiKey", "fbPageToken", "fbPageId",
+        "id", "storeId", "systemPrompt", "geminiApiKey", "fbPageToken", "fbPageId", "fbPageName",
         "deliveryTimeDhaka", "deliveryTimeOutside", "deliveryFeeDhaka", "deliveryFeeOutside",
         "helplinePhone", "returnPolicy", "faqs",
         "steadfastApiKey", "steadfastSecretKey", "pathaoClientId", "pathaoSecretKey",
@@ -369,7 +378,7 @@ export async function updateBotSettings(data: {
         "waapiInstanceId", "waapiApiToken", "whatsappProvider",
         "smsApiKey", "smsSenderId", "updatedAt"
       ) VALUES (
-        'settings-1', 'store-1', ${systemPrompt}, ${geminiApiKey}, ${fbPageToken}, ${fbPageId},
+        'settings-1', 'store-1', ${systemPrompt}, ${geminiApiKey}, ${fbPageToken}, ${fbPageId}, ${fbPageName},
         ${deliveryTimeDhaka}, ${deliveryTimeOutside}, ${deliveryFeeDhaka}, ${deliveryFeeOutside},
         ${helplinePhone}, ${returnPolicy}, ${JSON.stringify(faqs)}::jsonb,
         ${steadfastApiKey}, ${steadfastSecretKey}, ${pathaoClientId}, ${pathaoSecretKey},
@@ -382,6 +391,7 @@ export async function updateBotSettings(data: {
         "geminiApiKey" = EXCLUDED."geminiApiKey",
         "fbPageToken" = EXCLUDED."fbPageToken",
         "fbPageId" = EXCLUDED."fbPageId",
+        "fbPageName" = EXCLUDED."fbPageName",
         "deliveryTimeDhaka" = EXCLUDED."deliveryTimeDhaka",
         "deliveryTimeOutside" = EXCLUDED."deliveryTimeOutside",
         "deliveryFeeDhaka" = EXCLUDED."deliveryFeeDhaka",

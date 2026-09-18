@@ -24,6 +24,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { loginWithFacebookPopup } from '@/lib/facebook-sdk';
 
 interface StoreSetupWizardModalProps {
   isOpen: boolean;
@@ -42,6 +43,8 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
   // Step 1: Facebook
   const [fbPageToken, setFbPageToken] = useState('');
   const [fbPageId, setFbPageId] = useState('');
+  const [fbPageName, setFbPageName] = useState('');
+  const [inputToken, setInputToken] = useState('');
   const [isConnectingFb, setIsConnectingFb] = useState(false);
 
   // Step 2: Steadfast
@@ -62,7 +65,8 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
         .then((data) => {
           if (data) {
             setFbPageToken(data.fbPageToken || '');
-            setFbPageId(data.fbPageId || '1314475555081210');
+            setFbPageId(data.fbPageId || '');
+            setFbPageName(data.fbPageName || (data.fbPageId === '443213442199594' ? 'FastLain' : 'Facebook Page'));
             setSteadfastApiKey(data.steadfastApiKey || '');
             setSteadfastSecret(data.steadfastSecretKey || '');
             setDeliveryDhaka(Number(data.deliveryFeeDhaka) || 120);
@@ -78,11 +82,101 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
   const fbConnected = Boolean(fbPageToken && fbPageToken.length > 10);
   const steadfastConnected = Boolean(steadfastApiKey && steadfastApiKey.trim().length > 0);
 
-  const handleConnectFacebook = async () => {
+  const handleFacebookLoginPopup = async () => {
     setIsConnectingFb(true);
     try {
-      await new Promise((r) => setTimeout(r, 1000));
-      toast.success('🎉 ফেসবুক পেজ "Moner Kotha" সফলভাবে সংযুক্ত হয়েছে!');
+      toast.info('ফেসবুক লগইন উইন্ডো ওপেন হচ্ছে...');
+      const loginRes = await loginWithFacebookPopup();
+
+      if (!loginRes.success || !loginRes.accessToken) {
+        toast.error(loginRes.error || 'ফেসবুক লগইন সম্পন্ন হয়নি');
+        return;
+      }
+
+      // Inspect & Connect
+      const res = await fetch('/api/facebook/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'inspect_token',
+          token: loginRes.accessToken,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.pages?.[0]) {
+        const page = data.pages[0];
+        const cRes = await fetch('/api/facebook/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'connect_page',
+            pageId: page.id,
+            pageToken: page.pageToken || loginRes.accessToken,
+            pageName: page.name,
+          }),
+        });
+
+        if (cRes.ok) {
+          setFbPageId(page.id);
+          setFbPageName(page.name);
+          setFbPageToken(page.pageToken || loginRes.accessToken);
+          toast.success(`🎉 ফেসবুক পেজ "${page.name}" সফলভাবে সংযুক্ত হয়েছে!`);
+          setCurrentStep(2);
+        }
+      } else {
+        toast.error(data.error || 'পেজ লোড করা যায়নি');
+      }
+    } catch (e) {
+      toast.error('লগইনে সমস্যা হয়েছে');
+    } finally {
+      setIsConnectingFb(false);
+    }
+  };
+
+  const handleConnectFacebook = async () => {
+    if (!inputToken.trim()) {
+      toast.error('দয়া করে আপনার ফেসবুক টোকেন পেস্ট করুন');
+      return;
+    }
+
+    setIsConnectingFb(true);
+    try {
+      const res = await fetch('/api/facebook/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'inspect_token',
+          token: inputToken.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.pages?.[0]) {
+        const page = data.pages[0];
+        const cRes = await fetch('/api/facebook/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'connect_page',
+            pageId: page.id,
+            pageToken: page.pageToken || inputToken.trim(),
+            pageName: page.name,
+          }),
+        });
+
+        if (cRes.ok) {
+          setFbPageId(page.id);
+          setFbPageName(page.name);
+          setFbPageToken(page.pageToken || inputToken.trim());
+          toast.success(`🎉 ফেসবুক পেজ "${page.name}" সফলভাবে সংযুক্ত হয়েছে!`);
+          setCurrentStep(2);
+        }
+      } else {
+        toast.error(data.error || 'টোকেন ভেরিফাই করা যায়নি');
+      }
+    } catch (e) {
+      toast.error('সার্ভারে সমস্যা হয়েছে');
     } finally {
       setIsConnectingFb(false);
     }
@@ -223,7 +317,7 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
                       </div>
                       <div>
                         <p className="text-sm font-bold text-neutral-100">
-                          Moner Kotha <span className="text-xs font-mono text-neutral-400">(ID: {fbPageId})</span>
+                          {fbPageName || 'FastLain'} <span className="text-xs font-mono text-neutral-400">(ID: {fbPageId})</span>
                         </p>
                         <p className="text-xs text-emerald-400 font-medium flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -242,26 +336,58 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="p-6 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-center space-y-4">
+                <div className="p-5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-4">
                   <button
-                    onClick={handleConnectFacebook}
+                    type="button"
+                    onClick={handleFacebookLoginPopup}
                     disabled={isConnectingFb}
-                    className="w-full py-3.5 bg-[#1877F2] hover:bg-[#166fe5] text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-gradient-to-r from-[#1877F2] via-[#1b6fd8] to-[#145fc2] hover:from-[#166fe5] hover:to-[#1255af] text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2.5"
                   >
                     {isConnectingFb ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>ফেসবুকের সাথে কানেক্ট হচ্ছে...</span>
+                        <span>ফেসবুক লগইন হচ্ছে...</span>
                       </>
                     ) : (
                       <>
-                        <span className="font-bold text-lg leading-none">f</span>
+                        <span className="font-black text-lg leading-none">f</span>
                         <span>Continue with Facebook (১-ক্লিক কানেক্ট)</span>
                       </>
                     )}
                   </button>
-                  <p className="text-[11px] text-neutral-500">
-                    🔒 মেটা অফিশিয়াল বিজনেস লগইন দ্বারা সুরক্ষিত
+
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-neutral-800"></div>
+                    <span className="flex-shrink mx-3 text-neutral-500 text-[11px] uppercase tracking-wider">অথবা টোকেন দিয়ে</span>
+                    <div className="flex-grow border-t border-neutral-800"></div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-neutral-300 block mb-1">
+                      ফেসবুক টোকেন পেস্ট করুন (ঐচ্ছিক)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={inputToken}
+                      onChange={(e) => setInputToken(e.target.value)}
+                      placeholder="EAAZAdxz..."
+                      className="w-full bg-neutral-950 border border-neutral-750 focus:border-blue-500 rounded-xl p-2.5 text-xs text-neutral-100 font-mono outline-none resize-none"
+                    />
+                  </div>
+
+                  {inputToken.trim() && (
+                    <button
+                      onClick={handleConnectFacebook}
+                      disabled={isConnectingFb}
+                      className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-100 font-bold text-xs rounded-xl border border-neutral-700 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-blue-400" />
+                      <span>টোকেন দিয়ে পেজ কানেক্ট করুন</span>
+                    </button>
+                  )}
+                  
+                  <p className="text-[11px] text-neutral-500 text-center">
+                    🔒 মেটা অফিশিয়াল বিজনেস লগইন ও ওয়েব হুক দ্বারা সুরক্ষিত
                   </p>
                 </div>
               )}

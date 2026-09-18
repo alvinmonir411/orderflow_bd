@@ -22,6 +22,7 @@ dist/
 apps/*/.env
 apps/*/.env.local
 !apps/*/.env.example
+!.env.example
 
 # Vercel
 .vercel

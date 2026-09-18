@@ -141,7 +141,7 @@ export default function ProductsPage() {
     if (!file) return;
 
     setIsUploading(true);
-    const toastId = toast.loading('Cloudinary (dgaiqqh7k) এ ইমেজ আপলোড হচ্ছে...');
+    const toastId = toast.loading('Cloudinary এ ইমেজ আপলোড হচ্ছে...');
 
     try {
       const formData = new FormData();
@@ -309,7 +309,7 @@ export default function ProductsPage() {
               প্রোডাক্ট ও ইনভেন্টরি কন্ট্রোল
             </h2>
             <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-xl leading-relaxed">
-              Cloudinary (dgaiqqh7k) ইমেজ সিডিএন এবং ফেসবুক এআই বটের সাথে লাইভ যুক্ত সম্পূর্ণ ক্যাটালগ।
+              Cloudinary ইমেজ সিডিএন এবং ফেসবুক এআই বটের সাথে লাইভ যুক্ত সম্পূর্ণ ক্যাটালগ।
             </p>
           </div>
 
@@ -761,7 +761,7 @@ export default function ProductsPage() {
                     </>
                   )}
                 </h3>
-                <span className="text-[11px] text-neutral-400">Cloudinary (dgaiqqh7k) সিঙ্ক সক্রিয়</span>
+                <span className="text-[11px] text-neutral-400">Cloudinary সিঙ্ক সক্রিয়</span>
               </div>
               <button
                 onClick={() => {

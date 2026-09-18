@@ -131,8 +131,8 @@ export async function POST(request: NextRequest) {
 
       // 2. Fallback to Waapi if Meta Cloud API wasn't used or succeeded
       if (!waSent) {
-        const instanceId = settings.waapiInstanceId || '104344';
-        const token = settings.waapiApiToken || settings.whatsappToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca';
+        const instanceId = settings.waapiInstanceId || process.env.WAAPI_INSTANCE_ID || '';
+        const token = settings.waapiApiToken || settings.whatsappToken || process.env.WAAPI_API_TOKEN || process.env.WHATSAPP_TOKEN || '';
         const chatId = `${formattedPhone}@c.us`;
 
         if (instanceId && token) {

@@ -24,15 +24,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StoreSetupWizardModal } from '@/components/onboarding/StoreSetupWizardModal';
+import { FacebookIntegrationCard } from '@/components/integrations/FacebookIntegrationCard';
 
 export default function IntegrationsPage() {
   const [showWizard, setShowWizard] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Facebook State (Dynamic from DB)
-  const [fbPageToken, setFbPageToken] = useState('');
-  const [fbPageId, setFbPageId] = useState('');
-  const [isConnectingFb, setIsConnectingFb] = useState(false);
 
   // WhatsApp State (Supports Official Meta Cloud API & Waapi)
   const [waProviderTab, setWaProviderTab] = useState<'META' | 'WAAPI'>('META');
@@ -42,9 +38,9 @@ export default function IntegrationsPage() {
   const [isSavingMeta, setIsSavingMeta] = useState(false);
 
   // Waapi State (Dynamic from DB)
-  const [waapiInstanceId, setWaapiInstanceId] = useState('104344');
-  const [waapiApiToken, setWaapiApiToken] = useState('KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca');
-  const [waConnected, setWaConnected] = useState(true);
+  const [waapiInstanceId, setWaapiInstanceId] = useState('');
+  const [waapiApiToken, setWaapiApiToken] = useState('');
+  const [waConnected, setWaConnected] = useState(false);
   const [isSavingWaapi, setIsSavingWaapi] = useState(false);
 
   // Steadfast State (Dynamic from DB)
@@ -64,8 +60,6 @@ export default function IntegrationsPage() {
       const res = await fetch('/api/bot-config');
       if (res.ok) {
         const data = await res.json();
-        setFbPageToken(data.fbPageToken || '');
-        setFbPageId(data.fbPageId || '1314475555081210');
         setSteadfastApiKey(data.steadfastApiKey || '');
         setSteadfastSecret(data.steadfastSecretKey || '');
         setPathaoApiKey(data.pathaoClientId || '');
@@ -75,14 +69,14 @@ export default function IntegrationsPage() {
         setMetaBusinessId(data.whatsappBusinessId || '');
         setMetaToken(data.whatsappToken || '');
 
-        setWaapiInstanceId(data.waapiInstanceId || '104344');
-        setWaapiApiToken(data.waapiApiToken || 'KhHNKuRBXDQ871SPnIPHle3cRZnb9cB5tuzhEMGEc945dcca');
+        setWaapiInstanceId(data.waapiInstanceId || '');
+        setWaapiApiToken(data.waapiApiToken || '');
         
         if (data.whatsappProvider === 'META' || (data.whatsappPhoneId && data.whatsappToken?.startsWith('EAA'))) {
           setWaProviderTab('META');
           setWaConnected(Boolean(data.whatsappPhoneId && data.whatsappToken));
         } else {
-          setWaProviderTab('META'); // Default to Meta Cloud API tab
+          setWaProviderTab('META');
           setWaConnected(Boolean(data.whatsappConnected || (data.waapiInstanceId && data.waapiApiToken)));
         }
       }
@@ -97,7 +91,6 @@ export default function IntegrationsPage() {
     loadConfig();
   }, []);
 
-  const fbConnected = Boolean(fbPageToken && fbPageToken.length > 10);
   const metaWaConnected = Boolean(metaPhoneId && metaToken && metaToken.length > 10);
   const steadfastConnected = Boolean(steadfastApiKey && steadfastApiKey.trim().length > 0);
   const pathaoConnected = Boolean(pathaoApiKey && pathaoApiKey.trim().length > 0);
@@ -105,17 +98,6 @@ export default function IntegrationsPage() {
   const handleCopyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} ক্লিপবোর্ডে কপি হয়েছে!`);
-  };
-
-  const handleConnectFacebook = async () => {
-    setIsConnectingFb(true);
-    try {
-      await new Promise((r) => setTimeout(r, 800));
-      await loadConfig();
-      toast.success('ফেসবুক পেজ কানেকশন স্ট্যাটাস রিফ্রেশ হয়েছে!');
-    } finally {
-      setIsConnectingFb(false);
-    }
   };
 
   const handleSaveMetaWhatsApp = async (e: React.FormEvent) => {
@@ -299,84 +281,7 @@ export default function IntegrationsPage() {
       {/* Grid: Facebook 1-Click & WhatsApp Waapi Connect */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 1. Facebook Page Meta Connection */}
-        <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-600/30">
-                  f
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg">
-                    Facebook Page & Messenger
-                  </h3>
-                  <p className="text-xs text-neutral-400">মেটা বিজনেস ও মেসেঞ্জার বট</p>
-                </div>
-              </div>
-
-              {fbConnected ? (
-                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>সংযুক্ত</span>
-                </span>
-              ) : (
-                <span className="px-2.5 py-1 text-xs font-bold bg-neutral-800 text-neutral-400 border border-neutral-700 rounded-xl flex items-center gap-1">
-                  <XCircle className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>কানেক্ট করা হয়নি</span>
-                </span>
-              )}
-            </div>
-
-            <div className="p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-3">
-              {fbConnected ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-neutral-400">সংযুক্ত পেজ:</p>
-                      <p className="text-sm font-extrabold text-emerald-300 mt-0.5">
-                        Moner Kotha <span className="text-xs font-mono text-neutral-400 font-normal">(ID: {fbPageId || '1314475555081210'})</span>
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleConnectFacebook}
-                      disabled={isConnectingFb}
-                      className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-semibold transition-all active:scale-95"
-                    >
-                      {isConnectingFb ? 'সিঙ্ক হচ্ছে...' : 'রিফ্রেশ'}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-neutral-400 leading-relaxed border-t border-neutral-800/80 pt-2.5">
-                    ✅ <strong>লাইভ সুবিধা:</strong> এই পেজে কাস্টমার মেসেজ দিলে Gemini AI স্বয়ংক্রিয়ভাবে রিপ্লাই দিচ্ছে এবং ড্যাশবোর্ডে অর্ডার সিঙ্ক হচ্ছে।
-                  </p>
-                </>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xs text-neutral-300">
-                    এখনও কোনো ফেসবুক পেজ সংযুক্ত করা হয়নি। নিচে ক্লিক করে পেজ কানেক্ট করুন।
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <button
-            onClick={handleConnectFacebook}
-            disabled={isConnectingFb}
-            className="w-full py-3 bg-[#1877F2] hover:bg-[#166fe5] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            {isConnectingFb ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>ফেসবুক স্ট্যাটাস যাচাই হচ্ছে...</span>
-              </>
-            ) : (
-              <>
-                <span className="font-bold text-base leading-none">f</span>
-                <span>{fbConnected ? 'ফেসবুক পেজ কানেকশন রিফ্রেশ করুন' : 'Continue with Facebook (১-ক্লিক কানেক্ট)'}</span>
-              </>
-            )}
-          </button>
-        </div>
+        <FacebookIntegrationCard onStatusChange={loadConfig} />
 
         {/* 2. WhatsApp Integration (Official Meta Cloud API & Waapi) */}
         <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between">
@@ -607,7 +512,7 @@ export default function IntegrationsPage() {
                         type="password"
                         value={waapiApiToken}
                         onChange={(e) => setWaapiApiToken(e.target.value)}
-                        placeholder="MY60stKi..."
+                        placeholder="Waapi API Token"
                         className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl pl-10 pr-4 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-green-500 shadow-inner"
                       />
                     </div>

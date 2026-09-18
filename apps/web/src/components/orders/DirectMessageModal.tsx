@@ -164,11 +164,14 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
     }
   };
 
+  const pageId = process.env.NEXT_PUBLIC_DEFAULT_FACEBOOK_PAGE_ID || '';
   const directMetaLink =
     inboxUrl ||
-    `https://business.facebook.com/latest/inbox/messenger?mailbox_id=1314475555081210&selected_item_id=${
-      order.psid || fbProfile?.id || '28626322373646425'
-    }`;
+    (pageId
+      ? `https://business.facebook.com/latest/inbox/messenger?mailbox_id=${pageId}&selected_item_id=${
+          order.psid || fbProfile?.id || '28626322373646425'
+        }`
+      : undefined);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">

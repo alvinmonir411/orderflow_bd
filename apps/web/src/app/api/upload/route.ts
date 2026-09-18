@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'dgaiqqh7k';
-const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '584391462478369';
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || '';
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '';
 
 export async function POST(request: NextRequest) {
   try {

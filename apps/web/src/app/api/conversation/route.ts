@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
 
     const settings = await getBotSettings();
     const pageToken = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN;
+    const pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
     const sql = getSql();
 
     // If requesting the FULL list of real conversations
@@ -152,7 +153,7 @@ export async function GET(request: NextRequest) {
         const rawMsgs = fbConv.messages?.data || [];
         const threadMsgs = rawMsgs.reverse().map((m: any) => ({
           id: m.id,
-          sender: m.from?.id === '1314475555081210' || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
+          sender: (pageId && m.from?.id === pageId) || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
           text: m.message || 'মেসেজ',
           time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
         }));
@@ -233,7 +234,7 @@ export async function GET(request: NextRequest) {
                 id: m.id,
                 text: m.message,
                 senderName: m.from?.name,
-                sender: m.from?.id === '1314475555081210' || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
+                sender: (pageId && m.from?.id === pageId) || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
                 time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
               }));
             }
@@ -249,7 +250,7 @@ export async function GET(request: NextRequest) {
       psid: targetPsid || null,
       profile: profileData,
       messages,
-      inboxUrl: targetPsid ? `https://business.facebook.com/latest/inbox/messenger?mailbox_id=1314475555081210&selected_item_id=${targetPsid}` : null,
+      inboxUrl: targetPsid && pageId ? `https://business.facebook.com/latest/inbox/messenger?mailbox_id=${pageId}&selected_item_id=${targetPsid}` : null,
     });
   } catch (error: any) {
     console.error('[API GET /api/conversation Error]:', error);

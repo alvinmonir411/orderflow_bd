@@ -78,7 +78,7 @@ Create a file named `.env` in `apps/web/`:
 **File Path: `apps/web/.env`**
 ```env
 # Neon PostgreSQL Database Connection
-DATABASE_URL="postgresql://neondb_owner:npg_fVreJN50Kauw@ep-billowing-shadow-a5svvtgn-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL="postgresql://neondb_owner:YOUR_PASSWORD@ep-placeholder.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
 # Meta Webhook Verification Token
 DEFAULT_FACEBOOK_VERIFY_TOKEN="orderflow_bd_verify_token"

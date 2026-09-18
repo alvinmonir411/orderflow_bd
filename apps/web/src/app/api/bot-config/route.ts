@@ -18,6 +18,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     await updateBotSettings(body);
     const updated = await getBotSettings();
+
+    // If new Facebook Page Token provided, automatically subscribe Page to Webhooks in Meta Graph API
+    if (body.fbPageToken && body.fbPageToken.trim().length > 10) {
+      try {
+        const subRes = await fetch(`https://graph.facebook.com/v20.0/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks,message_reads,message_deliveries&access_token=${body.fbPageToken.trim()}`, {
+          method: 'POST',
+        });
+        const subData = await subRes.json();
+        console.log('[Meta Subscribed Apps Result]:', subData);
+      } catch (subErr) {
+        console.error('[Meta Subscribed Apps Error]:', subErr);
+      }
+    }
+
     return NextResponse.json({ success: true, message: 'Settings saved successfully', config: updated });
   } catch (error: any) {
     console.error('[API POST /bot-config Error]:', error);
