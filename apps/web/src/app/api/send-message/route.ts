@@ -64,26 +64,60 @@ export async function POST(request: NextRequest) {
     let fbSent = false;
     let fbError = null;
 
-    // Send via Facebook Messenger Graph API
+    // 1. Send via Facebook / Instagram (Messenger PSID, Comment ID, or Instagram IGSID)
     if (targetPsid && pageToken) {
       try {
-        const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken.trim()}`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipient: { id: targetPsid },
-            message: { text: message.trim() },
-            messaging_type: 'RESPONSE',
-          }),
-        });
+        const isComment = channel === 'FACEBOOK_COMMENT' || String(targetPsid).includes('_') || targetPsid.startsWith('comm-');
+        const cleanCommentId = String(targetPsid).replace('comm-', '');
 
-        const data = await res.json();
-        if (res.ok && data.message_id) {
-          fbSent = true;
+        if (isComment) {
+          // Public Comment reply
+          try {
+            const commentReplyUrl = `https://graph.facebook.com/v20.0/${cleanCommentId}/comments?access_token=${pageToken.trim()}`;
+            await fetch(commentReplyUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: message.trim() }),
+            });
+          } catch (cErr) {
+            console.error('[Admin Public Comment Reply Error]:', cErr);
+          }
+
+          // Private reply to comment
+          const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken.trim()}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipient: { comment_id: cleanCommentId },
+              messaging_type: 'RESPONSE',
+              message: { text: message.trim() },
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.message_id) {
+            fbSent = true;
+          }
         } else {
-          fbError = data.error?.message || 'Meta API returned error';
-          console.error('[FB Send Message Error]:', data);
+          // Standard Messenger / Instagram DM to PSID / IGSID
+          const url = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken.trim()}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipient: { id: targetPsid },
+              messaging_type: 'RESPONSE',
+              message: { text: message.trim() },
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && (data.message_id || data.recipient_id)) {
+            fbSent = true;
+          } else {
+            fbError = data.error?.message || 'Meta API returned error';
+            console.error('[FB Send Message Error]:', data);
+          }
         }
       } catch (err: any) {
         fbError = err.message;

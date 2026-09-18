@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    if (body.object === 'page') {
+    if (body.object === 'page' || body.object === 'instagram') {
       const settings = await getBotSettings();
       const pageToken =
         settings.fbPageToken ||
@@ -83,6 +83,44 @@ export async function POST(request: NextRequest) {
       for (const entry of body.entry || []) {
         const pageId = entry.id || configuredPageId;
 
+        // ============================================================
+        // A. FACEBOOK & INSTAGRAM POST COMMENTS (FEED CHANGES)
+        // ============================================================
+        if (entry.changes && Array.isArray(entry.changes)) {
+          for (const change of entry.changes) {
+            if (change.field === 'feed' || change.field === 'comments') {
+              const value = change.value;
+              if (value && value.item === 'comment' && (value.verb === 'add' || value.verb === undefined)) {
+                const commentId = value.comment_id || value.id;
+                const senderId = value.from?.id;
+                const senderName = value.from?.name || 'গ্রাহক';
+                const commentText = (value.message || value.text || '').trim();
+
+                // Skip if comment is from page itself
+                if (senderId === pageId || senderId === configuredPageId) continue;
+                if (!commentText || !commentId) continue;
+
+                console.log(`[Facebook/Instagram Comment Received from ${senderName} (${senderId})]: "${commentText}"`);
+
+                await handleFacebookComment(
+                  commentId,
+                  value.post_id,
+                  senderId,
+                  senderName,
+                  commentText,
+                  pageToken,
+                  settings,
+                  geminiKey,
+                  body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_COMMENT'
+                );
+              }
+            }
+          }
+        }
+
+        // ============================================================
+        // B. MESSENGER & INSTAGRAM DIRECT MESSAGES
+        // ============================================================
         for (const event of entry.messaging || []) {
           // 1. STRICT ECHO & EVENT FILTER: Ignore delivery receipts, read receipts, reactions, etc.
           if (event.delivery || event.read || event.reaction || event.account_linking || event.pass_thread_control) {
@@ -119,7 +157,7 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          console.log(`[Facebook Webhook Processing Message from ${senderId}]: "${text}" (payload: ${payload})`);
+          console.log(`[Facebook/Instagram Webhook Processing Message from ${senderId}]: "${text}" (payload: ${payload})`);
 
           // Automatically link active senderId to Customer in Neon DB
           try {
@@ -134,7 +172,8 @@ export async function POST(request: NextRequest) {
             console.error('[Auto-link PSID Error]:', linkErr);
           }
 
-          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey, settings, incomingImageUrl);
+          const channel = body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_MESSENGER';
+          await processMessengerEvent(senderId, text, payload, pageToken, geminiKey, settings, incomingImageUrl, channel);
         }
       }
 
@@ -233,7 +272,7 @@ async function recordChatTurn(
   senderId: string,
   userText: string,
   botText: string,
-  extra?: { productTitle?: string; productPrice?: number; customerName?: string }
+  extra?: { productTitle?: string; productPrice?: number; customerName?: string; channel?: string }
 ) {
   const session = userSessions[senderId];
   if (session) {
@@ -245,6 +284,8 @@ async function recordChatTurn(
     }
   }
 
+  const channel = extra?.channel || 'FACEBOOK_MESSENGER';
+
   // Persist to Neon PostgreSQL ChatMessage table
   try {
     if (userText) {
@@ -253,7 +294,7 @@ async function recordChatTurn(
         customerName: extra?.customerName || session?.customerName,
         sender: 'customer',
         text: userText,
-        channel: 'FACEBOOK_MESSENGER',
+        channel,
       });
     }
     if (botText) {
@@ -262,7 +303,7 @@ async function recordChatTurn(
         customerName: extra?.customerName || session?.customerName,
         sender: 'ai',
         text: botText,
-        channel: 'FACEBOOK_MESSENGER',
+        channel,
         productTitle: extra?.productTitle || session?.selectedProduct,
         productPrice: extra?.productPrice || session?.price,
       });
@@ -474,6 +515,7 @@ async function processMessengerEvent(
   geminiKey?: string,
   settings?: any,
   incomingImageUrl?: string,
+  channel: string = 'FACEBOOK_MESSENGER',
 ) {
   const session = userSessions[senderId] || { 
     state: 'IDLE',
@@ -1450,6 +1492,84 @@ async function sendFbGenericTemplate(
   } catch (err) {
     console.error('[Facebook Generic Template Error]:', err);
   }
+}
+
+async function handleFacebookComment(
+  commentId: string,
+  postId: string,
+  senderId: string,
+  senderName: string,
+  message: string,
+  pageToken: string,
+  settings: any,
+  geminiKey: string,
+  channel: string = 'FACEBOOK_COMMENT'
+) {
+  if (!commentId || !pageToken) return;
+
+  // 1. Save customer comment in Neon PostgreSQL DB
+  await saveDbChatMessage({
+    senderId: senderId || commentId,
+    customerName: senderName || 'ফেসবুক কমেন্টকারী',
+    sender: 'customer',
+    text: `[পোস্ট কমেন্ট]: "${message}"`,
+    channel,
+  });
+
+  const products = await getDbProducts();
+  const lower = message.toLowerCase();
+
+  // Matched product from comment text
+  let matched = products.find((p: any) =>
+    lower.includes(p.title.toLowerCase()) ||
+    p.title.toLowerCase().split(/\s+/).some((w: string) => w.length >= 3 && lower.includes(w))
+  );
+  const prodTitle = matched ? matched.title : (products[0]?.title || 'জয়পুরি কটন আনস্টিচড থ্রি-পিস');
+  const prodPrice = matched ? Number(matched.basePrice) : 1250;
+  const deliveryCharge = settings?.deliveryFeeDhaka || 120;
+
+  // 2. Reply publicly to the comment on Facebook
+  const publicReplyText = `ধন্যবাদ ${senderName || 'সম্মানিত কাস্টমার'}! 🌸 আমরা আপনার ইনবক্সে বিস্তারিত বিবরণ, আকর্ষণীয় মূল্য তালিকা ও বড় ছবি পাঠিয়ে দিয়েছি। দয়া করে ইনবক্স মেসেজটি চেক করুন! ✨`;
+
+  try {
+    const commentReplyUrl = `https://graph.facebook.com/v20.0/${commentId}/comments?access_token=${pageToken}`;
+    await fetch(commentReplyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: publicReplyText }),
+    });
+  } catch (cErr) {
+    console.error('[Public Comment Reply Error]:', cErr);
+  }
+
+  // 3. Send Private Message to the user using recipient.comment_id
+  const privateDmText = `আসসালামু আলাইকুম ${senderName || ''}! 🌸 পোস্টে কমেন্ট করার জন্য ধন্যবাদ।\n\nআমাদের '${prodTitle}'-এর অফার মূল্য মাত্র ৳${prodPrice}!\n\n🚚 ডেলিভারি চার্জ: ঢাকা সিটিতে ৳${deliveryCharge}, ঢাকার বাইরে ৳${settings?.deliveryFeeOutside || 150} (১০০% ক্যাশ অন ডেলিভারি)।\n\nঅর্ডার কনফার্ম করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা লিখে পাঠান! 🛍️✨`;
+
+  try {
+    const dmUrl = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken}`;
+    await fetch(dmUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { comment_id: commentId },
+        messaging_type: 'RESPONSE',
+        message: { text: privateDmText },
+      }),
+    });
+  } catch (dmErr) {
+    console.error('[Private Comment DM Error]:', dmErr);
+  }
+
+  // 4. Save AI Reply in DB
+  await saveDbChatMessage({
+    senderId: senderId || commentId,
+    customerName: senderName || 'ফেসবুক কমেন্টকারী',
+    sender: 'ai',
+    text: `[স্বয়ংক্রিয় কমেন্ট রিপ্লাই ও ইনবক্স পাঠানো হয়েছে]: ${privateDmText}`,
+    channel,
+    productTitle: prodTitle,
+    productPrice: prodPrice,
+  });
 }
 
 

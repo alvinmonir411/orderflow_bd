@@ -383,10 +383,16 @@ async function generateAiReply(
   // -------------------------------------------------------------
   // 2. Try Google Gemini API if a valid Google AI API Key is configured
   // -------------------------------------------------------------
-  const isValidGeminiKey = geminiKey && geminiKey.trim().startsWith('AIzaSy');
+  const isValidGeminiKey = Boolean(geminiKey && geminiKey.trim().length > 10);
   if (isValidGeminiKey) {
     try {
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+      const modelsToTry = [
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-3.7-flash',
+        'gemini-flash-latest',
+        'gemini-2.5-flash',
+      ];
       const systemPrompt = `You are a polite, helpful Bangladeshi F-Commerce AI sales representative for OrderFlow BD on WhatsApp.
 Customer Name: ${customerName}
 

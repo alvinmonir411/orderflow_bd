@@ -66,7 +66,7 @@ interface ConversationThread {
 }
 
 export default function MessagesPage() {
-  const [activeChannelFilter, setActiveChannelFilter] = useState<'ALL' | 'MESSENGER' | 'WHATSAPP' | 'ORDERS'>('ALL');
+  const [activeChannelFilter, setActiveChannelFilter] = useState<'ALL' | 'MESSENGER' | 'COMMENTS' | 'INSTAGRAM' | 'WHATSAPP' | 'ORDERS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -111,6 +111,8 @@ export default function MessagesPage() {
       if (!matchSearch) return false;
 
       if (activeChannelFilter === 'MESSENGER') return t.channel === 'FACEBOOK_MESSENGER';
+      if (activeChannelFilter === 'COMMENTS') return t.channel === 'FACEBOOK_COMMENT';
+      if (activeChannelFilter === 'INSTAGRAM') return t.channel === 'INSTAGRAM';
       if (activeChannelFilter === 'WHATSAPP') return t.channel === 'WHATSAPP';
       if (activeChannelFilter === 'ORDERS') return !!t.orderNumber;
       return true;
@@ -244,7 +246,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
               <button
                 onClick={() => setActiveChannelFilter('ALL')}
                 className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
@@ -264,6 +266,26 @@ export default function MessagesPage() {
                 }`}
               >
                 🔵 Messenger
+              </button>
+              <button
+                onClick={() => setActiveChannelFilter('COMMENTS')}
+                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
+                  activeChannelFilter === 'COMMENTS'
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                    : 'bg-neutral-850 text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                💬 Comments
+              </button>
+              <button
+                onClick={() => setActiveChannelFilter('INSTAGRAM')}
+                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
+                  activeChannelFilter === 'INSTAGRAM'
+                    ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
+                    : 'bg-neutral-850 text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                📸 Instagram
               </button>
               <button
                 onClick={() => setActiveChannelFilter('WHATSAPP')}
@@ -295,12 +317,21 @@ export default function MessagesPage() {
                 <Inbox className="w-10 h-10 text-neutral-600 mx-auto" />
                 <p className="text-sm font-bold text-neutral-300">কোনো চ্যাট মেসেজ নেই</p>
                 <p className="text-xs text-neutral-500">
-                  ফেসবুক পেজের মেসেঞ্জারে বা হোয়াটসঅ্যাপে নক দিলে সাথে সাথে এখানে লাইভ চ্যাট দেখা যাবে।
+                  ফেসবুক পেজের মেসেঞ্জারে, কমেন্টে বা হোয়াটসঅ্যাপে নক দিলে সাথে সাথে এখানে লাইভ চ্যাট দেখা যাবে।
                 </p>
               </div>
             ) : (
               filteredThreads.map((t) => {
                 const isSelected = t.id === currentThread?.id;
+
+                const getChannelBadge = (ch: string) => {
+                  if (ch === 'FACEBOOK_COMMENT') return { bg: 'bg-indigo-600', label: 'C', title: 'Facebook Comment' };
+                  if (ch === 'INSTAGRAM') return { bg: 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600', label: 'IG', title: 'Instagram' };
+                  if (ch === 'WHATSAPP') return { bg: 'bg-emerald-600', label: 'WA', title: 'WhatsApp' };
+                  return { bg: 'bg-blue-600', label: 'M', title: 'Messenger' };
+                };
+
+                const badge = getChannelBadge(t.channel);
 
                 return (
                   <button
@@ -318,12 +349,10 @@ export default function MessagesPage() {
                         {t.customerName.slice(0, 2)}
                       </div>
                       <span
-                        className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ${
-                          t.channel === 'FACEBOOK_MESSENGER' ? 'bg-blue-500' : 'bg-green-500'
-                        }`}
-                        title={t.channel === 'FACEBOOK_MESSENGER' ? 'Messenger' : 'WhatsApp'}
+                        className={`absolute -bottom-1 -right-1 px-1 min-w-[18px] h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white shadow-sm ${badge.bg}`}
+                        title={badge.title}
                       >
-                        {t.channel === 'FACEBOOK_MESSENGER' ? 'M' : 'W'}
+                        {badge.label}
                       </span>
                     </div>
 
@@ -389,18 +418,26 @@ export default function MessagesPage() {
                       </h3>
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                          currentThread.channel === 'FACEBOOK_MESSENGER'
-                            ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                            : 'bg-green-500/15 text-green-300 border-green-500/30'
+                          currentThread.channel === 'FACEBOOK_COMMENT'
+                            ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                            : currentThread.channel === 'INSTAGRAM'
+                            ? 'bg-pink-500/15 text-pink-300 border-pink-500/30'
+                            : currentThread.channel === 'WHATSAPP'
+                            ? 'bg-green-500/15 text-green-300 border-green-500/30'
+                            : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
                         }`}
                       >
-                        {currentThread.channel === 'FACEBOOK_MESSENGER'
-                          ? '🔵 Messenger'
-                          : '🟢 WhatsApp'}
+                        {currentThread.channel === 'FACEBOOK_COMMENT'
+                          ? '💬 FB Comment'
+                          : currentThread.channel === 'INSTAGRAM'
+                          ? '📸 Instagram'
+                          : currentThread.channel === 'WHATSAPP'
+                          ? '🟢 WhatsApp'
+                          : '🔵 Messenger'}
                       </span>
                     </div>
                     <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
-                      {currentThread.customerPhone}
+                      {currentThread.customerPhone || currentThread.psid}
                     </p>
                   </div>
                 </div>
