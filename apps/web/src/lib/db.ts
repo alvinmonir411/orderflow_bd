@@ -217,6 +217,7 @@ export async function initDatabase() {
     await sql`
       CREATE TABLE IF NOT EXISTS "ChatMessage" (
         "id" TEXT PRIMARY KEY,
+        "organizationId" TEXT NOT NULL DEFAULT 'org-1',
         "senderId" TEXT NOT NULL,
         "customerName" TEXT,
         "sender" TEXT NOT NULL,
@@ -228,6 +229,7 @@ export async function initDatabase() {
         "createdAt" TIMESTAMP DEFAULT NOW()
       );
     `;
+    await sql`ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`CREATE INDEX IF NOT EXISTS "idx_chat_senderId" ON "ChatMessage" ("senderId");`;
     await sql`CREATE INDEX IF NOT EXISTS "idx_chat_createdAt" ON "ChatMessage" ("createdAt" DESC);`;
 
@@ -238,9 +240,6 @@ export async function initDatabase() {
         "name" TEXT NOT NULL,
         "slug" TEXT UNIQUE NOT NULL,
         "plan" TEXT DEFAULT 'PRO',
-        "fbPageId" TEXT DEFAULT '',
-        "fbPageName" TEXT DEFAULT '',
-        "fbPageToken" TEXT DEFAULT '',
         "maxTeamMembers" INT DEFAULT 10,
         "maxConversationsPerMonth" INT DEFAULT 10000,
         "createdAt" TIMESTAMP DEFAULT NOW(),
@@ -248,7 +247,25 @@ export async function initDatabase() {
       );
     `;
 
-    // 6. Ensure User table exists with roles (SUPER_ADMIN, ADMIN, USER)
+    // 6. Ensure ChannelConnection table exists (Multi-Page / Meta Token separation)
+    await sql`
+      CREATE TABLE IF NOT EXISTS "ChannelConnection" (
+        "id" TEXT PRIMARY KEY,
+        "organizationId" TEXT NOT NULL DEFAULT 'org-1',
+        "platform" TEXT NOT NULL DEFAULT 'FACEBOOK_MESSENGER',
+        "pageId" TEXT,
+        "pageName" TEXT,
+        "accessToken" TEXT,
+        "tokenExpiresAt" TIMESTAMP,
+        "status" TEXT DEFAULT 'CONNECTED',
+        "metadata" JSONB DEFAULT '{}'::jsonb,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS "idx_channel_org" ON "ChannelConnection" ("organizationId");`;
+
+    // 7. Ensure User table exists with roles (SUPER_ADMIN, ADMIN, USER)
     await sql`
       CREATE TABLE IF NOT EXISTS "User" (
         "id" TEXT PRIMARY KEY,
@@ -266,11 +283,28 @@ export async function initDatabase() {
       );
     `;
 
-    // 7. Ensure Conversation CRM table exists (Status, Assignment, Tags)
+    // Ensure Customer and Order tables have organizationId column
+    await sql`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+
+    // 8. Ensure Normalized Tag and ConversationTag tables exist
+    await sql`
+      CREATE TABLE IF NOT EXISTS "Tag" (
+        "id" TEXT PRIMARY KEY,
+        "organizationId" TEXT NOT NULL DEFAULT 'org-1',
+        "name" TEXT NOT NULL,
+        "color" TEXT DEFAULT 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+    `;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS "idx_tag_org_name" ON "Tag" ("organizationId", "name");`;
+
+    // 9. Ensure Conversation CRM table exists (Normalized with assignedToId FK and customerId FK)
     await sql`
       CREATE TABLE IF NOT EXISTS "Conversation" (
         "id" TEXT PRIMARY KEY,
         "organizationId" TEXT NOT NULL DEFAULT 'org-1',
+        "customerId" TEXT,
         "senderId" TEXT NOT NULL,
         "customerName" TEXT,
         "customerPhone" TEXT,
@@ -278,7 +312,6 @@ export async function initDatabase() {
         "channel" TEXT DEFAULT 'FACEBOOK_MESSENGER',
         "status" TEXT DEFAULT 'OPEN',
         "assignedToId" TEXT,
-        "assignedToName" TEXT,
         "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
         "isAiActive" BOOLEAN DEFAULT TRUE,
         "productInterest" TEXT,
@@ -293,26 +326,37 @@ export async function initDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS "idx_conv_org" ON "Conversation" ("organizationId");`;
     await sql`CREATE INDEX IF NOT EXISTS "idx_conv_sender" ON "Conversation" ("senderId");`;
 
-    // 8. Ensure InternalNote table exists (Private agent notes)
+    await sql`
+      CREATE TABLE IF NOT EXISTS "ConversationTag" (
+        "id" TEXT PRIMARY KEY,
+        "organizationId" TEXT NOT NULL DEFAULT 'org-1',
+        "conversationId" TEXT NOT NULL,
+        "tagId" TEXT NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+    `;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS "idx_conv_tag_unique" ON "ConversationTag" ("conversationId", "tagId");`;
+
+    // 10. Ensure InternalNote table exists (Normalized with authorId FK)
     await sql`
       CREATE TABLE IF NOT EXISTS "InternalNote" (
         "id" TEXT PRIMARY KEY,
         "conversationId" TEXT NOT NULL,
         "organizationId" TEXT NOT NULL DEFAULT 'org-1',
         "authorId" TEXT NOT NULL,
-        "authorName" TEXT NOT NULL,
         "content" TEXT NOT NULL,
         "createdAt" TIMESTAMP DEFAULT NOW()
       );
     `;
     await sql`CREATE INDEX IF NOT EXISTS "idx_note_conv" ON "InternalNote" ("conversationId");`;
 
-    // 9. Ensure ConversationTimeline table exists (Activity history)
+    // 11. Ensure ConversationTimeline table exists (Normalized with actorId FK)
     await sql`
       CREATE TABLE IF NOT EXISTS "ConversationTimeline" (
         "id" TEXT PRIMARY KEY,
         "conversationId" TEXT NOT NULL,
         "organizationId" TEXT NOT NULL DEFAULT 'org-1',
+        "actorId" TEXT,
         "actorName" TEXT NOT NULL,
         "actionType" TEXT NOT NULL,
         "description" TEXT NOT NULL,
@@ -328,6 +372,19 @@ export async function initDatabase() {
       ON CONFLICT ("id") DO NOTHING;
     `;
 
+    // Seed default tags for org-1
+    await sql`
+      INSERT INTO "Tag" ("id", "organizationId", "name", "color", "createdAt")
+      VALUES
+        ('tag-1', 'org-1', '🔥 Hot Lead', 'bg-rose-500/15 text-rose-300 border-rose-500/30', NOW()),
+        ('tag-2', 'org-1', '💎 VIP', 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30', NOW()),
+        ('tag-3', 'org-1', '⏰ Follow Up', 'bg-amber-500/15 text-amber-300 border-amber-500/30', NOW()),
+        ('tag-4', 'org-1', '🛍️ Interested', 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', NOW()),
+        ('tag-5', 'org-1', '⚠️ Complaint', 'bg-red-500/15 text-red-300 border-red-500/30', NOW()),
+        ('tag-6', 'org-1', '🚚 High Value', 'bg-purple-500/15 text-purple-300 border-purple-500/30', NOW())
+      ON CONFLICT ("organizationId", "name") DO NOTHING;
+    `;
+
     // Ensure Default Users exist (SUPER_ADMIN, ADMIN, USER)
     await sql`
       INSERT INTO "User" ("id", "organizationId", "name", "email", "passwordHash", "role", "avatar", "title", "isActive", "createdAt")
@@ -338,6 +395,17 @@ export async function initDatabase() {
         ('usr-agent-2', 'org-1', 'Fatima Rahman', 'support@orderflow.com', 'agent123', 'USER', 'FR', 'Customer Support Executive', true, NOW())
       ON CONFLICT ("id") DO NOTHING;
     `;
+
+    // Seed default ChannelConnection for Meta Page if configured in env
+    const defaultFbToken = process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
+    const defaultFbPageId = process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
+    if (defaultFbToken && defaultFbPageId) {
+      await sql`
+        INSERT INTO "ChannelConnection" ("id", "organizationId", "platform", "pageId", "pageName", "accessToken", "status", "createdAt", "updatedAt")
+        VALUES ('conn-fb-default', 'org-1', 'FACEBOOK_MESSENGER', ${defaultFbPageId}, 'Moner Kotha', ${defaultFbToken}, 'CONNECTED', NOW(), NOW())
+        ON CONFLICT ("id") DO NOTHING;
+      `;
+    }
   } catch (err) {
     console.error('[DB Init Error]:', err);
   }
@@ -582,42 +650,77 @@ export async function findCustomerLatestOrder(senderId?: string, phone?: string)
   return null;
 }
 
-export async function getDbOrders() {
+export async function getDbOrders(organizationId?: string) {
   const sql = getSql();
   try {
     await initDatabase();
 
-    const orders = await sql`
-      SELECT 
-        o.id,
-        o."orderNumber",
-        o."storeId",
-        o."customerId",
-        o.channel,
-        o.status,
-        o."itemsPrice"::float as "itemsPrice",
-        o."deliveryCharge"::float as "deliveryCharge",
-        o.discount::float as discount,
-        o."totalPrice"::float as "totalPrice",
-        o."deliveryAddress",
-        o."deliveryCity",
-        o."customerPhone",
-        o."customerName",
-        o.notes,
-        o."courierProvider",
-        o."courierTrackingId",
-        o."consignmentId",
-        o."courierStatus",
-        o."createdAt",
-        c.name as "c_name",
-        c.phone as "c_phone",
-        c.psid as "c_psid",
-        c."totalOrders" as "c_totalOrders",
-        c."deliveryRate" as "c_deliveryRate"
-      FROM "Order" o
-      LEFT JOIN "Customer" c ON o."customerId" = c.id
-      ORDER BY o."createdAt" DESC
-    `;
+    const orders = organizationId
+      ? await sql`
+          SELECT 
+            o.id,
+            o."orderNumber",
+            o."storeId",
+            o."organizationId",
+            o."customerId",
+            o.channel,
+            o.status,
+            o."itemsPrice"::float as "itemsPrice",
+            o."deliveryCharge"::float as "deliveryCharge",
+            o.discount::float as discount,
+            o."totalPrice"::float as "totalPrice",
+            o."deliveryAddress",
+            o."deliveryCity",
+            o."customerPhone",
+            o."customerName",
+            o.notes,
+            o."courierProvider",
+            o."courierTrackingId",
+            o."consignmentId",
+            o."courierStatus",
+            o."createdAt",
+            c.name as "c_name",
+            c.phone as "c_phone",
+            c.psid as "c_psid",
+            c."totalOrders" as "c_totalOrders",
+            c."deliveryRate" as "c_deliveryRate"
+          FROM "Order" o
+          LEFT JOIN "Customer" c ON o."customerId" = c.id
+          WHERE o."organizationId" = ${organizationId}
+          ORDER BY o."createdAt" DESC;
+        `
+      : await sql`
+          SELECT 
+            o.id,
+            o."orderNumber",
+            o."storeId",
+            o."organizationId",
+            o."customerId",
+            o.channel,
+            o.status,
+            o."itemsPrice"::float as "itemsPrice",
+            o."deliveryCharge"::float as "deliveryCharge",
+            o.discount::float as discount,
+            o."totalPrice"::float as "totalPrice",
+            o."deliveryAddress",
+            o."deliveryCity",
+            o."customerPhone",
+            o."customerName",
+            o.notes,
+            o."courierProvider",
+            o."courierTrackingId",
+            o."consignmentId",
+            o."courierStatus",
+            o."createdAt",
+            c.name as "c_name",
+            c.phone as "c_phone",
+            c.psid as "c_psid",
+            c."totalOrders" as "c_totalOrders",
+            c."deliveryRate" as "c_deliveryRate"
+          FROM "Order" o
+          LEFT JOIN "Customer" c ON o."customerId" = c.id
+          ORDER BY o."createdAt" DESC;
+        `;
 
     if (orders.length === 0) return [];
 
@@ -658,6 +761,7 @@ export async function getDbOrders() {
       id: o.id,
       orderNumber: o.orderNumber,
       storeId: o.storeId,
+      organizationId: o.organizationId,
       customerId: o.customerId,
       channel: o.channel,
       status: o.status,
@@ -701,6 +805,7 @@ export async function getDbOrders() {
 }
 
 export async function insertDbOrder(data: {
+  organizationId?: string;
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
@@ -722,21 +827,22 @@ export async function insertDbOrder(data: {
   try {
     await initDatabase();
 
-    const storeId = 'store-1';
+    const orgId = data.organizationId || 'org-1';
+    const storeId = `store-${orgId}`;
     const channel =
       data.channel === 'MANUAL' ? 'MANUAL_ENTRY' : data.channel || 'FACEBOOK_MESSENGER';
     const status = data.status || 'PENDING_CONFIRMATION';
     const discount = data.discount || 0;
     const delCharge = data.deliveryCharge ?? data.deliveryFee ?? 120;
-    const totalPrice = data.totalPrice ?? (data.itemsPrice + delCharge - discount);
-    const customerId = `cust-${data.customerPhone.replace(/[^0-9]/g, '')}`;
+    const itemsPrice = data.itemsPrice || 850;
+    const totalPrice = data.totalPrice ?? (itemsPrice + delCharge - discount);
 
-    // 1. Upsert Customer
+    // 1. Create or Find Customer scoped by organizationId
+    const customerId = `cust-${data.customerPhone.replace(/[^0-9]/g, '') || Date.now()}`;
     await sql`
-      INSERT INTO "Customer" ("id", "storeId", "name", "phone", "psid", "address", "totalOrders", "deliveryRate", "createdAt", "updatedAt")
-      VALUES (${customerId}, ${storeId}, ${data.customerName}, ${data.customerPhone}, ${data.psid || null}, ${data.deliveryAddress}, 1, 100.0, NOW(), NOW())
-      ON CONFLICT ("storeId", "phone") 
-      DO UPDATE SET 
+      INSERT INTO "Customer" ("id", "organizationId", "name", "phone", "address", "city", "psid", "totalOrders", "deliveryRate", "createdAt", "updatedAt")
+      VALUES (${customerId}, ${orgId}, ${data.customerName}, ${data.customerPhone}, ${data.deliveryAddress}, ${data.deliveryCity || 'ঢাকা'}, ${data.psid || null}, 1, 100, NOW(), NOW())
+      ON CONFLICT ("id") DO UPDATE SET
         "name" = EXCLUDED."name",
         "psid" = COALESCE(EXCLUDED."psid", "Customer"."psid"),
         "address" = EXCLUDED."address",
@@ -795,40 +901,83 @@ export async function insertDbOrder(data: {
 export async function updateDbOrderStatus(
   orderId: string,
   status: string,
-  extra?: { courierProvider?: string; courierTrackingId?: string; notes?: string },
+  extra?: { courierProvider?: string; courierTrackingId?: string; notes?: string; organizationId?: string },
 ) {
   const sql = getSql();
   try {
+    const orgId = extra?.organizationId;
+    let res: any[] = [];
+
     if (extra?.courierProvider) {
-      await sql`
-        UPDATE "Order"
-        SET 
-          "status" = ${status}::"OrderStatus",
-          "courierProvider" = ${extra.courierProvider}::"CourierProvider",
-          "courierTrackingId" = ${extra.courierTrackingId || null},
-          "notes" = COALESCE(${extra.notes || null}, "notes"),
-          "updatedAt" = NOW()
-        WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
-      `;
+      if (orgId) {
+        res = await sql`
+          UPDATE "Order"
+          SET 
+            "status" = ${status}::"OrderStatus",
+            "courierProvider" = ${extra.courierProvider}::"CourierProvider",
+            "courierTrackingId" = ${extra.courierTrackingId || null},
+            "notes" = COALESCE(${extra.notes || null}, "notes"),
+            "updatedAt" = NOW()
+          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND "organizationId" = ${orgId}
+          RETURNING id;
+        `;
+      } else {
+        res = await sql`
+          UPDATE "Order"
+          SET 
+            "status" = ${status}::"OrderStatus",
+            "courierProvider" = ${extra.courierProvider}::"CourierProvider",
+            "courierTrackingId" = ${extra.courierTrackingId || null},
+            "notes" = COALESCE(${extra.notes || null}, "notes"),
+            "updatedAt" = NOW()
+          WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
+          RETURNING id;
+        `;
+      }
     } else if (extra?.notes !== undefined) {
-      await sql`
-        UPDATE "Order"
-        SET 
-          "status" = ${status}::"OrderStatus",
-          "notes" = ${extra.notes},
-          "updatedAt" = NOW()
-        WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
-      `;
+      if (orgId) {
+        res = await sql`
+          UPDATE "Order"
+          SET 
+            "status" = ${status}::"OrderStatus",
+            "notes" = ${extra.notes},
+            "updatedAt" = NOW()
+          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND "organizationId" = ${orgId}
+          RETURNING id;
+        `;
+      } else {
+        res = await sql`
+          UPDATE "Order"
+          SET 
+            "status" = ${status}::"OrderStatus",
+            "notes" = ${extra.notes},
+            "updatedAt" = NOW()
+          WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
+          RETURNING id;
+        `;
+      }
     } else {
-      await sql`
-        UPDATE "Order"
-        SET 
-          "status" = ${status}::"OrderStatus",
-          "updatedAt" = NOW()
-        WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
-      `;
+      if (orgId) {
+        res = await sql`
+          UPDATE "Order"
+          SET 
+            "status" = ${status}::"OrderStatus",
+            "updatedAt" = NOW()
+          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND "organizationId" = ${orgId}
+          RETURNING id;
+        `;
+      } else {
+        res = await sql`
+          UPDATE "Order"
+          SET 
+            "status" = ${status}::"OrderStatus",
+            "updatedAt" = NOW()
+          WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
+          RETURNING id;
+        `;
+      }
     }
-    return true;
+    return res.length > 0;
   } catch (err) {
     console.error('[DB Update Order Status Error]:', err);
     return false;
@@ -1023,7 +1172,7 @@ export async function deleteDbTeamMember(userId: string) {
 }
 
 // ==========================================
-// ADVANCED CRM CONVERSATION MANAGEMENT
+// ADVANCED CRM CONVERSATION MANAGEMENT (Normalized)
 // ==========================================
 export async function getDbConversations(organizationId = 'org-1') {
   const sql = getSql();
@@ -1031,11 +1180,37 @@ export async function getDbConversations(organizationId = 'org-1') {
     await initDatabase();
     const rows = await sql`
       SELECT 
-        c.id, c."organizationId", c."senderId", c."customerName", c."customerPhone", c."customerAddress",
-        c.channel, c.status, c."assignedToId", c."assignedToName", c.tags, c."isAiActive",
-        c."productInterest", c."productPrice"::float as "productPrice", c."productImage",
-        c."lastMessage", c."lastMessageAt", c."createdAt"
+        c.id,
+        c."organizationId",
+        c."customerId",
+        c."senderId",
+        c."customerName",
+        c."customerPhone",
+        c."customerAddress",
+        c.channel,
+        c.status,
+        c."assignedToId",
+        u.name as "assignedToName",
+        u.avatar as "assignedToAvatar",
+        c."isAiActive",
+        c."productInterest",
+        c."productPrice"::float as "productPrice",
+        c."productImage",
+        c."lastMessage",
+        c."lastMessageAt",
+        c."createdAt",
+        COALESCE(
+          (
+            SELECT array_agg(t.name)
+            FROM "ConversationTag" ct
+            JOIN "Tag" t ON ct."tagId" = t.id
+            WHERE ct."conversationId" = c.id
+          ),
+          c.tags,
+          ARRAY[]::text[]
+        ) as tags
       FROM "Conversation" c
+      LEFT JOIN "User" u ON c."assignedToId" = u.id
       WHERE c."organizationId" = ${organizationId}
       ORDER BY c."lastMessageAt" DESC;
     `;
@@ -1049,6 +1224,7 @@ export async function getDbConversations(organizationId = 'org-1') {
 export async function upsertDbConversation(data: {
   id?: string;
   organizationId?: string;
+  customerId?: string;
   senderId: string;
   customerName?: string;
   customerPhone?: string;
@@ -1056,7 +1232,6 @@ export async function upsertDbConversation(data: {
   channel?: string;
   status?: string;
   assignedToId?: string;
-  assignedToName?: string;
   tags?: string[];
   productInterest?: string;
   productPrice?: number;
@@ -1071,12 +1246,12 @@ export async function upsertDbConversation(data: {
 
     await sql`
       INSERT INTO "Conversation" (
-        "id", "organizationId", "senderId", "customerName", "customerPhone", "customerAddress",
-        "channel", "status", "assignedToId", "assignedToName", "tags", "productInterest", "productPrice", "productImage", "lastMessage", "lastMessageAt", "createdAt", "updatedAt"
+        "id", "organizationId", "customerId", "senderId", "customerName", "customerPhone", "customerAddress",
+        "channel", "status", "assignedToId", "tags", "productInterest", "productPrice", "productImage", "lastMessage", "lastMessageAt", "createdAt", "updatedAt"
       ) VALUES (
-        ${convId}, ${orgId}, ${data.senderId}, ${data.customerName || 'Messenger Customer'},
+        ${convId}, ${orgId}, ${data.customerId || null}, ${data.senderId}, ${data.customerName || 'Messenger Customer'},
         ${data.customerPhone || ''}, ${data.customerAddress || ''}, ${data.channel || 'FACEBOOK_MESSENGER'},
-        ${data.status || 'OPEN'}, ${data.assignedToId || null}, ${data.assignedToName || null},
+        ${data.status || 'OPEN'}, ${data.assignedToId || null},
         ${data.tags || []}::text[], ${data.productInterest || null}, ${data.productPrice || null},
         ${data.productImage || null}, ${data.lastMessage || ''}, NOW(), NOW(), NOW()
       )
@@ -1095,22 +1270,35 @@ export async function upsertDbConversation(data: {
   }
 }
 
-export async function updateDbConversationAssignment(convId: string, assignedToId: string | null, assignedToName: string | null, actorName = 'Admin') {
+export async function updateDbConversationAssignment(
+  organizationId: string,
+  convId: string,
+  assignedToId: string | null,
+  actorId = 'usr-admin-1',
+  actorName = 'Admin'
+) {
   const sql = getSql();
   try {
     await sql`
       UPDATE "Conversation"
-      SET "assignedToId" = ${assignedToId}, "assignedToName" = ${assignedToName}, "updatedAt" = NOW()
-      WHERE "id" = ${convId} OR "senderId" = ${convId};
+      SET "assignedToId" = ${assignedToId}, "updatedAt" = NOW()
+      WHERE ("id" = ${convId} OR "senderId" = ${convId}) AND "organizationId" = ${organizationId};
     `;
 
-    // Log to timeline
+    // Fetch assigned user name if assignedToId exists
+    let assignedName = null;
+    if (assignedToId) {
+      const uRows = await sql`SELECT name FROM "User" WHERE id = ${assignedToId} LIMIT 1`;
+      assignedName = uRows[0]?.name || 'Staff';
+    }
+
     await addDbConversationTimeline(
       convId,
-      'org-1',
+      organizationId,
       actorName,
       'ASSIGNED',
-      assignedToName ? `চ্যাটটি ${assignedToName}-কে অ্যাসাইন করা হয়েছে` : 'চ্যাটটি আনঅ্যাসাইন করা হয়েছে'
+      assignedName ? `চ্যাটটি ${assignedName}-কে অ্যাসাইন করা হয়েছে` : 'চ্যাটটি আনঅ্যাসাইন করা হয়েছে',
+      actorId
     );
     return true;
   } catch (err) {
@@ -1119,13 +1307,19 @@ export async function updateDbConversationAssignment(convId: string, assignedToI
   }
 }
 
-export async function updateDbConversationStatus(convId: string, status: string, actorName = 'Admin') {
+export async function updateDbConversationStatus(
+  organizationId: string,
+  convId: string,
+  status: string,
+  actorId = 'usr-admin-1',
+  actorName = 'Admin'
+) {
   const sql = getSql();
   try {
     await sql`
       UPDATE "Conversation"
       SET "status" = ${status}, "updatedAt" = NOW()
-      WHERE "id" = ${convId} OR "senderId" = ${convId};
+      WHERE ("id" = ${convId} OR "senderId" = ${convId}) AND "organizationId" = ${organizationId};
     `;
 
     const statusLabels: Record<string, string> = {
@@ -1137,10 +1331,11 @@ export async function updateDbConversationStatus(convId: string, status: string,
 
     await addDbConversationTimeline(
       convId,
-      'org-1',
+      organizationId,
       actorName,
       'STATUS_CHANGED',
-      `স্ট্যাটাস পরিবর্তন করে '${statusLabels[status] || status}' করা হয়েছে`
+      `স্ট্যাটাস পরিবর্তন করে '${statusLabels[status] || status}' করা হয়েছে`,
+      actorId
     );
     return true;
   } catch (err) {
@@ -1149,47 +1344,89 @@ export async function updateDbConversationStatus(convId: string, status: string,
   }
 }
 
-export async function updateDbConversationTags(convId: string, tags: string[], actorName = 'Admin') {
+export async function setDbConversationTags(
+  organizationId: string,
+  convId: string,
+  tagNames: string[],
+  actorId = 'usr-admin-1',
+  actorName = 'Admin'
+) {
   const sql = getSql();
   try {
+    // 1. Update text array column for fast fallback
     await sql`
       UPDATE "Conversation"
-      SET "tags" = ${tags}::text[], "updatedAt" = NOW()
-      WHERE "id" = ${convId} OR "senderId" = ${convId};
+      SET "tags" = ${tagNames}::text[], "updatedAt" = NOW()
+      WHERE ("id" = ${convId} OR "senderId" = ${convId}) AND "organizationId" = ${organizationId};
     `;
+
+    // 2. Ensure each tag exists in Tag table and link in ConversationTag
+    await sql`
+      DELETE FROM "ConversationTag"
+      WHERE "conversationId" = ${convId} AND "organizationId" = ${organizationId};
+    `;
+
+    for (const tagName of tagNames) {
+      const tagId = `tag-${tagName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      await sql`
+        INSERT INTO "Tag" ("id", "organizationId", "name", "createdAt")
+        VALUES (${tagId}, ${organizationId}, ${tagName}, NOW())
+        ON CONFLICT ("organizationId", "name") DO NOTHING;
+      `;
+
+      const foundTag = await sql`
+        SELECT id FROM "Tag" WHERE "organizationId" = ${organizationId} AND name = ${tagName} LIMIT 1;
+      `;
+      if (foundTag.length > 0) {
+        const ctId = `ct-${convId}-${foundTag[0].id}`;
+        await sql`
+          INSERT INTO "ConversationTag" ("id", "organizationId", "conversationId", "tagId", "createdAt")
+          VALUES (${ctId}, ${organizationId}, ${convId}, ${foundTag[0].id}, NOW())
+          ON CONFLICT ("conversationId", "tagId") DO NOTHING;
+        `;
+      }
+    }
 
     await addDbConversationTimeline(
       convId,
-      'org-1',
+      organizationId,
       actorName,
       'TAG_ADDED',
-      `ট্যাগ আপডেট করা হয়েছে: ${tags.join(', ') || 'কোনো ট্যাগ নেই'}`
+      `ট্যাগ আপডেট করা হয়েছে: ${tagNames.join(', ') || 'কোনো ট্যাগ নেই'}`,
+      actorId
     );
     return true;
   } catch (err) {
-    console.error('[DB Update Tags Error]:', err);
+    console.error('[DB Set Conversation Tags Error]:', err);
     return false;
   }
 }
 
 // ==========================================
-// INTERNAL NOTES & TIMELINE
+// INTERNAL NOTES & TIMELINE (Normalized)
 // ==========================================
-export async function addDbInternalNote(convId: string, orgId = 'org-1', authorId: string, authorName: string, content: string) {
+export async function addDbInternalNote(
+  organizationId: string,
+  convId: string,
+  authorId: string,
+  authorName: string,
+  content: string
+) {
   const sql = getSql();
   try {
     const id = `note-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     await sql`
-      INSERT INTO "InternalNote" ("id", "conversationId", "organizationId", "authorId", "authorName", "content", "createdAt")
-      VALUES (${id}, ${convId}, ${orgId}, ${authorId}, ${authorName}, ${content}, NOW());
+      INSERT INTO "InternalNote" ("id", "conversationId", "organizationId", "authorId", "content", "createdAt")
+      VALUES (${id}, ${convId}, ${organizationId}, ${authorId}, ${content}, NOW());
     `;
 
     await addDbConversationTimeline(
       convId,
-      orgId,
+      organizationId,
       authorName,
       'NOTE_ADDED',
-      `একটি ইন্টারনাল নোট যুক্ত করেছেন: "${content.slice(0, 40)}${content.length > 40 ? '...' : ''}"`
+      `একটি ইন্টারনাল নোট যুক্ত করেছেন: "${content.slice(0, 40)}${content.length > 40 ? '...' : ''}"`,
+      authorId
     );
     return { id, conversationId: convId, authorId, authorName, content, createdAt: new Date().toISOString() };
   } catch (err) {
@@ -1198,14 +1435,24 @@ export async function addDbInternalNote(convId: string, orgId = 'org-1', authorI
   }
 }
 
-export async function getDbInternalNotes(convId: string) {
+export async function getDbInternalNotes(organizationId: string, convId: string) {
   const sql = getSql();
   try {
     const rows = await sql`
-      SELECT id, "conversationId", "authorId", "authorName", content, "createdAt"
-      FROM "InternalNote"
-      WHERE "conversationId" = ${convId} OR "conversationId" = ${`conv-${convId}`}
-      ORDER BY "createdAt" ASC;
+      SELECT 
+        n.id,
+        n."conversationId",
+        n."organizationId",
+        n."authorId",
+        COALESCE(u.name, 'Staff') as "authorName",
+        u.avatar as "authorAvatar",
+        n.content,
+        n."createdAt"
+      FROM "InternalNote" n
+      LEFT JOIN "User" u ON n."authorId" = u.id
+      WHERE (n."conversationId" = ${convId} OR n."conversationId" = ${`conv-${convId}`})
+        AND n."organizationId" = ${organizationId}
+      ORDER BY n."createdAt" ASC;
     `;
     return rows;
   } catch (err) {
@@ -1214,13 +1461,20 @@ export async function getDbInternalNotes(convId: string) {
   }
 }
 
-export async function addDbConversationTimeline(convId: string, orgId = 'org-1', actorName: string, actionType: string, description: string) {
+export async function addDbConversationTimeline(
+  convId: string,
+  organizationId = 'org-1',
+  actorName: string,
+  actionType: string,
+  description: string,
+  actorId?: string
+) {
   const sql = getSql();
   try {
     const id = `tl-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     await sql`
-      INSERT INTO "ConversationTimeline" ("id", "conversationId", "organizationId", "actorName", "actionType", "description", "createdAt")
-      VALUES (${id}, ${convId}, ${orgId}, ${actorName}, ${actionType}, ${description}, NOW());
+      INSERT INTO "ConversationTimeline" ("id", "conversationId", "organizationId", "actorId", "actorName", "actionType", "description", "createdAt")
+      VALUES (${id}, ${convId}, ${organizationId}, ${actorId || null}, ${actorName}, ${actionType}, ${description}, NOW());
     `;
     return true;
   } catch (err) {
@@ -1229,13 +1483,14 @@ export async function addDbConversationTimeline(convId: string, orgId = 'org-1',
   }
 }
 
-export async function getDbConversationTimeline(convId: string) {
+export async function getDbConversationTimeline(organizationId: string, convId: string) {
   const sql = getSql();
   try {
     const rows = await sql`
-      SELECT id, "conversationId", "actorName", "actionType", description, "createdAt"
+      SELECT id, "conversationId", "actorId", "actorName", "actionType", description, "createdAt"
       FROM "ConversationTimeline"
-      WHERE "conversationId" = ${convId} OR "conversationId" = ${`conv-${convId}`}
+      WHERE ("conversationId" = ${convId} OR "conversationId" = ${`conv-${convId}`})
+        AND "organizationId" = ${organizationId}
       ORDER BY "createdAt" DESC;
     `;
     return rows;
@@ -1244,5 +1499,65 @@ export async function getDbConversationTimeline(convId: string) {
     return [];
   }
 }
+
+// ==========================================
+// CHANNEL CONNECTION (Multi-Page Meta Token)
+// ==========================================
+export async function getDbChannelConnections(organizationId = 'org-1', platform?: string) {
+  const sql = getSql();
+  try {
+    await initDatabase();
+    if (platform) {
+      return await sql`
+        SELECT * FROM "ChannelConnection"
+        WHERE "organizationId" = ${organizationId} AND "platform" = ${platform}
+        ORDER BY "createdAt" DESC;
+      `;
+    }
+    return await sql`
+      SELECT * FROM "ChannelConnection"
+      WHERE "organizationId" = ${organizationId}
+      ORDER BY "createdAt" DESC;
+    `;
+  } catch (err) {
+    console.error('[DB Get Channel Connections Error]:', err);
+    return [];
+  }
+}
+
+export async function upsertDbChannelConnection(
+  organizationId: string,
+  data: {
+    platform: string;
+    pageId: string;
+    pageName?: string;
+    accessToken: string;
+    tokenExpiresAt?: Date;
+  }
+) {
+  const sql = getSql();
+  try {
+    await initDatabase();
+    const id = `conn-${data.platform.toLowerCase()}-${data.pageId}`;
+    await sql`
+      INSERT INTO "ChannelConnection" (
+        "id", "organizationId", "platform", "pageId", "pageName", "accessToken", "tokenExpiresAt", "status", "createdAt", "updatedAt"
+      ) VALUES (
+        ${id}, ${organizationId}, ${data.platform}, ${data.pageId}, ${data.pageName || 'Page'}, ${data.accessToken}, ${data.tokenExpiresAt || null}, 'CONNECTED', NOW(), NOW()
+      )
+      ON CONFLICT ("id") DO UPDATE SET
+        "pageName" = EXCLUDED."pageName",
+        "accessToken" = EXCLUDED."accessToken",
+        "tokenExpiresAt" = EXCLUDED."tokenExpiresAt",
+        "status" = 'CONNECTED',
+        "updatedAt" = NOW();
+    `;
+    return { success: true, id };
+  } catch (err) {
+    console.error('[DB Upsert Channel Connection Error]:', err);
+    return { success: false, error: err };
+  }
+}
+
 
 

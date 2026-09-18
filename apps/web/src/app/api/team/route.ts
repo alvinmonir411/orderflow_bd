@@ -5,18 +5,21 @@ import {
   updateDbTeamMemberRole,
   deleteDbTeamMember,
 } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAuth, requireAdmin } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser(req);
-    const orgId = user?.organizationId || 'org-1';
+    const auth = await requireAuth(req);
+    if (auth.response) return auth.response;
+
+    const user = auth.user;
+    const orgId = user.organizationId || 'org-1';
     const members = await getDbTeamMembers(orgId);
 
     return NextResponse.json({
       success: true,
       members,
-      currentUserRole: user?.role || 'ADMIN',
+      currentUserRole: user.role || 'ADMIN',
     });
   } catch (err: any) {
     console.error('[Team GET Error]:', err);
@@ -26,14 +29,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(req);
-    if (currentUser && currentUser.role === 'USER') {
-      return NextResponse.json(
-        { success: false, error: 'শুধুমাত্র অ্যাডমিন নতুন টিম মেম্বার যুক্ত করতে পারেন।' },
-        { status: 403 },
-      );
-    }
+    const auth = await requireAdmin(req);
+    if (auth.response) return auth.response;
 
+    const currentUser = auth.user;
     const body = await req.json();
     const { name, email, role = 'USER', title, phone, password = 'agent123' } = body;
 
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const orgId = currentUser?.organizationId || 'org-1';
+    const orgId = currentUser.organizationId || 'org-1';
     const newMember = await createDbTeamMember({
       organizationId: orgId,
       name,
@@ -68,13 +67,8 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(req);
-    if (currentUser && currentUser.role === 'USER') {
-      return NextResponse.json(
-        { success: false, error: 'শুধুমাত্র অ্যাডমিন রোল পরিবর্তন করতে পারেন।' },
-        { status: 403 },
-      );
-    }
+    const auth = await requireAdmin(req);
+    if (auth.response) return auth.response;
 
     const body = await req.json();
     const { userId, role } = body;
@@ -96,13 +90,8 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(req);
-    if (currentUser && currentUser.role === 'USER') {
-      return NextResponse.json(
-        { success: false, error: 'শুধুমাত্র অ্যাডমিন মেম্বার রিমুভ করতে পারেন।' },
-        { status: 403 },
-      );
-    }
+    const auth = await requireAdmin(req);
+    if (auth.response) return auth.response;
 
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
@@ -121,3 +110,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+

@@ -9,7 +9,7 @@ import {
   upsertDbConversation,
   updateDbConversationAssignment,
   updateDbConversationStatus,
-  updateDbConversationTags,
+  setDbConversationTags,
   addDbInternalNote,
   getDbInternalNotes,
   addDbConversationTimeline,
@@ -21,7 +21,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request);
     const searchParams = request.nextUrl.searchParams;
+    const queryOrgId = searchParams.get('orgId');
+    const orgId = user?.role === 'SUPER_ADMIN' && queryOrgId ? queryOrgId : (user?.organizationId || 'org-1');
+
     const psid = searchParams.get('psid');
     const orderId = searchParams.get('orderId');
     const convId = searchParams.get('convId');
@@ -35,8 +39,8 @@ export async function GET(request: NextRequest) {
     // If requesting details (internal notes and timeline) for a specific conversation
     if (convId) {
       const [notes, timeline] = await Promise.all([
-        getDbInternalNotes(convId),
-        getDbConversationTimeline(convId),
+        getDbInternalNotes(orgId, convId),
+        getDbConversationTimeline(orgId, convId),
       ]);
       return NextResponse.json({
         success: true,
@@ -49,9 +53,9 @@ export async function GET(request: NextRequest) {
     // If requesting the FULL list of real conversations
     if (isList) {
       const [orders, dbThreads, dbConversations] = await Promise.all([
-        getDbOrders(),
+        getDbOrders(orgId),
         getDbChatThreads(),
-        getDbConversations('org-1'),
+        getDbConversations(orgId),
       ]);
 
       const convMap = new Map<string, any>();
@@ -63,70 +67,72 @@ export async function GET(request: NextRequest) {
       let fbConversations: any[] = [];
 
       // 1. Try to fetch live Facebook Page Conversations from Meta Graph API
-      if (pageToken) {
+      if (pageToken && orgId === 'org-1') {
         try {
           const fbUrl = `https://graph.facebook.com/v20.0/me/conversations?fields=id,snippet,updated_time,unread_count,senders,participants,messages.limit(10){id,message,from,created_time}&access_token=${pageToken.trim()}`;
-          const fbRes = await fetch(fbUrl);
+          const fbRes = await fetch(fbUrl, { signal: AbortSignal.timeout(2500) });
           if (fbRes.ok) {
             const fbData = await fbRes.json();
             fbConversations = fbData?.data || [];
           }
         } catch (fbErr) {
-          console.error('[Fetch Meta Conversations Error]:', fbErr);
+          // Soft fail for Meta graph network errors without breaking internal CRM
         }
       }
 
       const threads: any[] = [];
       const seenPsids = new Set<string>();
 
-      // 2. Add threads from recorded ChatMessage table
-      for (const dbt of dbThreads) {
-        if (!dbt.senderId) continue;
-        seenPsids.add(dbt.senderId);
+      // 2. Add threads from recorded ChatMessage table (scoped to orgId)
+      if (orgId === 'org-1') {
+        for (const dbt of dbThreads) {
+          if (!dbt.senderId) continue;
+          seenPsids.add(dbt.senderId);
 
-        const msgs = await getDbChatMessagesBySender(dbt.senderId);
-        const matchedOrder = orders.find(
-          (o) => o.psid === dbt.senderId || (o.customerPhone && dbt.senderId.includes(o.customerPhone)),
-        );
+          const msgs = await getDbChatMessagesBySender(dbt.senderId);
+          const matchedOrder = orders.find(
+            (o) => o.psid === dbt.senderId || (o.customerPhone && dbt.senderId.includes(o.customerPhone)),
+          );
 
-        const dbC = convMap.get(dbt.senderId) || {};
+          const dbC = convMap.get(dbt.senderId) || {};
 
-        threads.push({
-          id: `thread-${dbt.senderId}`,
-          customerName: dbt.c_name || dbt.customerName || (matchedOrder?.customerName) || 'ফেসবুক গ্রাহক',
-          customerPhone: dbt.c_phone || (matchedOrder?.customerPhone) || '01938909812',
-          customerAddress: dbt.c_address || (matchedOrder?.deliveryAddress) || 'মিরপুর, ঢাকা',
-          channel: dbt.channel || 'FACEBOOK_MESSENGER',
-          psid: dbt.senderId,
-          productInterest: dbt.productTitle || (matchedOrder?.items?.[0]?.product?.title) || 'এক্সক্লুসিভ পার্টি গাউন',
-          productImage: dbt.productImage || (matchedOrder?.items?.[0]?.product?.images?.[0]) || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
-          productPrice: dbt.productPrice || (matchedOrder?.totalPrice) || 1750,
-          lastMessage: dbt.lastText || 'মেসেজ এসেছে',
-          lastTime: new Date(dbt.lastTime).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-          unread: true,
-          orderNumber: matchedOrder?.orderNumber || 1049,
-          orderStatus: matchedOrder?.status || 'PENDING_CONFIRMATION',
-          totalSpent: matchedOrder?.totalPrice || 1870,
-          isAiActive: dbC.isAiActive !== undefined ? dbC.isAiActive : true,
-          status: dbC.status || 'OPEN',
-          assignedToId: dbC.assignedToId || null,
-          assignedToName: dbC.assignedToName || null,
-          tags: dbC.tags || ['🔥 Hot Lead'],
-          messages: msgs.map((m: any) => ({
-            id: m.id,
-            sender: m.sender,
-            text: m.text,
-            time: new Date(m.createdAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-            productCard: m.productTitle ? {
-              title: m.productTitle,
-              price: m.productPrice || 1750,
-              image: m.productImage || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
-            } : undefined,
-          })),
-        });
+          threads.push({
+            id: `thread-${dbt.senderId}`,
+            customerName: dbt.c_name || dbt.customerName || (matchedOrder?.customerName) || 'ফেসবুক গ্রাহক',
+            customerPhone: dbt.c_phone || (matchedOrder?.customerPhone) || '01938909812',
+            customerAddress: dbt.c_address || (matchedOrder?.deliveryAddress) || 'মিরপুর, ঢাকা',
+            channel: dbt.channel || 'FACEBOOK_MESSENGER',
+            psid: dbt.senderId,
+            productInterest: dbt.productTitle || (matchedOrder?.items?.[0]?.product?.title) || 'এক্সক্লুসিভ পার্টি গাউন',
+            productImage: dbt.productImage || (matchedOrder?.items?.[0]?.product?.images?.[0]) || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
+            productPrice: dbt.productPrice || (matchedOrder?.totalPrice) || 1750,
+            lastMessage: dbt.lastText || 'মেসেজ এসেছে',
+            lastTime: new Date(dbt.lastTime).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+            unread: true,
+            orderNumber: matchedOrder?.orderNumber || 1049,
+            orderStatus: matchedOrder?.status || 'PENDING_CONFIRMATION',
+            totalSpent: matchedOrder?.totalPrice || 1870,
+            isAiActive: dbC.isAiActive !== undefined ? dbC.isAiActive : true,
+            status: dbC.status || 'OPEN',
+            assignedToId: dbC.assignedToId || null,
+            assignedToName: dbC.assignedToName || null,
+            tags: dbC.tags || ['🔥 Hot Lead'],
+            messages: msgs.map((m: any) => ({
+              id: m.id,
+              sender: m.sender,
+              text: m.text,
+              time: new Date(m.createdAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+              productCard: m.productTitle ? {
+                title: m.productTitle,
+                price: m.productPrice || 1750,
+                image: m.productImage || 'https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=600&auto=format&fit=crop&q=80',
+              } : undefined,
+            })),
+          });
+        }
       }
 
-      // 3. Add threads from real database orders if not already added
+      // 3. Add threads from real database orders for this org
       for (const ord of orders) {
         const custPsid = ord.psid || (ord.customer as any)?.psid;
         const threadKey = custPsid || ord.customerPhone || ord.id;
@@ -192,42 +198,44 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // 4. Add threads from Meta Graph API conversations (if not already added)
-      for (const fbConv of fbConversations) {
-        const sender = fbConv.senders?.data?.[0];
-        const senderId = sender?.id;
-        if (!senderId || seenPsids.has(senderId)) continue;
-        seenPsids.add(senderId);
+      // 4. Add threads from Meta Graph API conversations (if org-1 and not already added)
+      if (orgId === 'org-1') {
+        for (const fbConv of fbConversations) {
+          const sender = fbConv.senders?.data?.[0];
+          const senderId = sender?.id;
+          if (!senderId || seenPsids.has(senderId)) continue;
+          seenPsids.add(senderId);
 
-        const rawMsgs = fbConv.messages?.data || [];
-        const threadMsgs = rawMsgs.reverse().map((m: any) => ({
-          id: m.id,
-          sender: (pageId && m.from?.id === pageId) || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
-          text: m.message || 'মেসেজ',
-          time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-        }));
+          const rawMsgs = fbConv.messages?.data || [];
+          const threadMsgs = rawMsgs.reverse().map((m: any) => ({
+            id: m.id,
+            sender: (pageId && m.from?.id === pageId) || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
+            text: m.message || 'মেসেজ',
+            time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+          }));
 
-        const dbC = convMap.get(senderId) || {};
+          const dbC = convMap.get(senderId) || {};
 
-        threads.push({
-          id: `thread-fb-${senderId}`,
-          customerName: sender?.name || 'ফেসবুক গ্রাহক',
-          customerPhone: 'ইনবক্স কাস্টমার',
-          customerAddress: 'মেসেঞ্জার ইনকোয়ারি',
-          channel: 'FACEBOOK_MESSENGER',
-          psid: senderId,
-          productInterest: 'ইনবক্স মেসেজ',
-          productPrice: 0,
-          lastMessage: fbConv.snippet || 'নতুন মেসেজ এসেছে',
-          lastTime: new Date(fbConv.updated_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-          unread: fbConv.unread_count > 0,
-          isAiActive: true,
-          status: dbC.status || 'OPEN',
-          assignedToId: dbC.assignedToId || null,
-          assignedToName: dbC.assignedToName || null,
-          tags: dbC.tags || ['⏰ Follow Up'],
-          messages: threadMsgs,
-        });
+          threads.push({
+            id: `thread-fb-${senderId}`,
+            customerName: sender?.name || 'ফেসবুক গ্রাহক',
+            customerPhone: 'ইনবক্স কাস্টমার',
+            customerAddress: 'মেসেঞ্জার ইনকোয়ারি',
+            channel: 'FACEBOOK_MESSENGER',
+            psid: senderId,
+            productInterest: 'ইনবক্স মেসেজ',
+            productPrice: 0,
+            lastMessage: fbConv.snippet || 'নতুন মেসেজ এসেছে',
+            lastTime: new Date(fbConv.updated_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+            unread: fbConv.unread_count > 0,
+            isAiActive: true,
+            status: dbC.status || 'OPEN',
+            assignedToId: dbC.assignedToId || null,
+            assignedToName: dbC.assignedToName || null,
+            tags: dbC.tags || ['⏰ Follow Up'],
+            messages: threadMsgs,
+          });
+        }
       }
 
       return NextResponse.json({
@@ -244,7 +252,8 @@ export async function GET(request: NextRequest) {
         SELECT c.psid 
         FROM "Order" o
         LEFT JOIN "Customer" c ON o."customerId" = c.id
-        WHERE o.id = ${orderId} OR o."orderNumber"::text = ${String(orderId)}
+        WHERE (o.id = ${orderId} OR o."orderNumber"::text = ${String(orderId)})
+          AND o."organizationId" = ${orgId}
         LIMIT 1;
       `;
       if (rows.length > 0 && rows[0].psid) {
@@ -266,7 +275,7 @@ export async function GET(request: NextRequest) {
         }));
       }
 
-      if (pageToken) {
+      if (pageToken && orgId === 'org-1') {
         try {
           const profileUrl = `https://graph.facebook.com/v20.0/${targetPsid}?fields=first_name,last_name,name,profile_pic&access_token=${pageToken}`;
           const pRes = await fetch(profileUrl);
@@ -295,6 +304,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+    const actorId = user?.id || 'usr-admin-1';
     const actorName = user?.name || 'Admin';
     const body = await request.json();
     const { action, convId, senderId, assignedToId, assignedToName, status, tags, noteContent } = body;
@@ -303,7 +314,7 @@ export async function POST(request: NextRequest) {
 
     // 1. UPDATE ASSIGNMENT
     if (action === 'assign') {
-      await updateDbConversationAssignment(targetConvId, assignedToId || null, assignedToName || null, actorName);
+      await updateDbConversationAssignment(orgId, targetConvId, assignedToId || null, actorId, actorName);
       return NextResponse.json({
         success: true,
         message: assignedToName ? `চ্যাটটি ${assignedToName}-কে অ্যাসাইন করা হয়েছে` : 'চ্যাটটি আনঅ্যাসাইন করা হয়েছে',
@@ -312,7 +323,7 @@ export async function POST(request: NextRequest) {
 
     // 2. UPDATE STATUS
     if (action === 'status') {
-      await updateDbConversationStatus(targetConvId, status, actorName);
+      await updateDbConversationStatus(orgId, targetConvId, status, actorId, actorName);
       return NextResponse.json({
         success: true,
         message: `স্ট্যাটাস '${status}' এ আপডেট করা হয়েছে`,
@@ -321,7 +332,7 @@ export async function POST(request: NextRequest) {
 
     // 3. UPDATE TAGS
     if (action === 'tags') {
-      await updateDbConversationTags(targetConvId, tags || [], actorName);
+      await setDbConversationTags(orgId, targetConvId, tags || [], actorId, actorName);
       return NextResponse.json({
         success: true,
         message: 'কাস্টম ট্যাগ সফলভাবে সেভ হয়েছে',
@@ -335,9 +346,9 @@ export async function POST(request: NextRequest) {
       }
 
       const note = await addDbInternalNote(
+        orgId,
         targetConvId,
-        user?.organizationId || 'org-1',
-        user?.id || 'usr-admin-1',
+        actorId,
         actorName,
         noteContent.trim(),
       );
@@ -355,3 +366,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+

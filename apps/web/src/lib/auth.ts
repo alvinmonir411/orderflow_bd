@@ -154,6 +154,118 @@ export async function getCurrentUser(req?: NextRequest): Promise<User | null> {
   };
 }
 
+// Rate limiter for login brute-force protection
+interface RateLimitEntry {
+  attempts: number;
+  resetAt: number;
+}
+const loginRateLimitMap = new Map<string, RateLimitEntry>();
+
+export function checkLoginRateLimit(key: string, maxAttempts = 5, windowMs = 5 * 60 * 1000): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const entry = loginRateLimitMap.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    loginRateLimitMap.set(key, { attempts: 1, resetAt: now + windowMs });
+    return { allowed: true };
+  }
+
+  if (entry.attempts >= maxAttempts) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  entry.attempts += 1;
+  return { allowed: true };
+}
+
+export function resetLoginRateLimit(key: string) {
+  loginRateLimitMap.delete(key);
+}
+
+// Extract and verify session token strictly from NextRequest
+export async function getVerifiedUserFromRequest(req: NextRequest): Promise<User | null> {
+  const token = req.cookies.get(COOKIE_NAME)?.value || req.headers.get('authorization')?.replace('Bearer ', '');
+  if (!token) return null;
+
+  const payload = verifySessionToken(token);
+  if (!payload) return null;
+
+  try {
+    const sql = getSql();
+    const rows = await sql`
+      SELECT id, "organizationId", name, email, role, avatar, phone, title, "isActive", "createdAt"
+      FROM "User"
+      WHERE id = ${payload.userId} AND "isActive" = true
+      LIMIT 1
+    `;
+    if (rows.length > 0) {
+      const r = rows[0];
+      return {
+        id: r.id,
+        organizationId: r.organizationId,
+        name: r.name,
+        email: r.email,
+        role: r.role as UserRole,
+        avatar: r.avatar,
+        phone: r.phone,
+        title: r.title,
+        isActive: r.isActive,
+        createdAt: r.createdAt,
+      };
+    }
+  } catch (err) {
+    console.error('[getVerifiedUserFromRequest DB error]:', err);
+  }
+
+  return {
+    id: payload.userId,
+    organizationId: payload.organizationId,
+    name: payload.name,
+    email: payload.email,
+    role: payload.role,
+    title: payload.role === 'SUPER_ADMIN' ? 'Super Admin' : payload.role === 'ADMIN' ? 'Store Owner' : 'Support Agent',
+    avatar: payload.name.slice(0, 2).toUpperCase(),
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// Strict Auth Guard for protected APIs
+export async function requireAuth(req: NextRequest): Promise<{ user: User; response: null } | { user: null; response: NextResponse }> {
+  const user = await getVerifiedUserFromRequest(req);
+  if (!user) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { success: false, error: 'Unauthorized. Valid session or token required.' },
+        { status: 401 }
+      ),
+    };
+  }
+  return { user, response: null };
+}
+
+// Strict Admin RBAC Guard
+export async function requireAdmin(req: NextRequest): Promise<{ user: User; response: null } | { user: null; response: NextResponse }> {
+  const auth = await requireAuth(req);
+  if (auth.response || !auth.user) {
+    return auth;
+  }
+
+  if (auth.user.role !== 'ADMIN' && auth.user.role !== 'SUPER_ADMIN') {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { success: false, error: 'Forbidden. Admin permission required for this action.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { user: auth.user, response: null };
+}
+
 export function setSessionCookie(res: NextResponse, payload: Omit<SessionPayload, 'exp'>) {
   const token = signSessionToken(payload);
   res.cookies.set(COOKIE_NAME, token, {
@@ -176,3 +288,4 @@ export function clearSessionCookie(res: NextResponse) {
   });
   return res;
 }
+

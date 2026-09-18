@@ -1,5 +1,8 @@
 <div align="center">
-
+১-ক্লিক ডেমো লগইন প্যানেল:
+👑 Super Admin (superadmin@orderflow.com / admin123)
+💼 Store Owner / Merchant (owner@orderflow.com / admin123)
+💬 Live Chat Agent (agent@orderflow.com / agent123)
 # ⚡ OrderFlow BD 2.0
 ### Smart Bangladeshi F-Commerce & Social Commerce Automation Platform
 **Facebook Messenger & WhatsApp AI Sales Agent • Live Neon PostgreSQL Sync • Direct Customer Messaging • Courier Logistics**

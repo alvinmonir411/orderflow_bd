@@ -7,6 +7,8 @@ import {
   setSessionCookie,
   clearSessionCookie,
   getCurrentUser,
+  checkLoginRateLimit,
+  resetLoginRateLimit,
 } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
@@ -140,6 +142,16 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const clientIp = req.headers.get('x-forwarded-for') || 'local';
+      const rateLimitKey = `${clientIp}:${email.toLowerCase().trim()}`;
+      const rateCheck = checkLoginRateLimit(rateLimitKey, 5, 5 * 60 * 1000);
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { success: false, error: `অনেকবার ভুল চেষ্টা করা হয়েছে। অনুগ্রহ করে ${rateCheck.retryAfter || 300} সেকেন্ড পর আবার চেষ্টা করুন।` },
+          { status: 429 },
+        );
+      }
+
       const rows = await sql`
         SELECT id, "organizationId", name, email, "passwordHash", role, avatar, title, "isActive"
         FROM "User"
@@ -158,6 +170,7 @@ export async function POST(req: NextRequest) {
 
         const matchedDemo = demoDefaults[email.toLowerCase().trim()];
         if (matchedDemo && (password === 'admin123' || password === 'agent123')) {
+          resetLoginRateLimit(rateLimitKey);
           const userId = `usr-${matchedDemo.role.toLowerCase()}-demo`;
           const avatar = matchedDemo.name.slice(0, 2).toUpperCase();
 
@@ -201,10 +214,12 @@ export async function POST(req: NextRequest) {
       const isValidPassword = verifyPassword(password, userRow.passwordHash);
       if (!isValidPassword) {
         return NextResponse.json(
-          { success: false, error: 'ভুল পাসওয়ার্ড। আবার চেষ্টা করুন।' },
+          { success: false, error: 'ভুল ইমেইল অথবা পাসওয়ার্ড' },
           { status: 401 },
         );
       }
+
+      resetLoginRateLimit(rateLimitKey);
 
       const userPayload = {
         userId: userRow.id,
