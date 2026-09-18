@@ -285,6 +285,13 @@ export async function initDatabase() {
 
     // Ensure organizationId column exists on all existing tables in Neon DB
     await sql`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "storeId" TEXT DEFAULT 'store-1';`;
+    await sql`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "password" TEXT DEFAULT 'admin123';`;
+    await sql`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT DEFAULT 'admin123';`;
+    try { await sql`ALTER TABLE "User" ALTER COLUMN "storeId" DROP NOT NULL;`; } catch (_) {}
+    try { await sql`ALTER TABLE "User" ALTER COLUMN "password" DROP NOT NULL;`; } catch (_) {}
+    try { await sql`ALTER TABLE "User" ALTER COLUMN "role" TYPE TEXT;`; } catch (_) {}
+
     await sql`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
@@ -391,12 +398,12 @@ export async function initDatabase() {
 
     // Ensure Default Users exist (SUPER_ADMIN, ADMIN, USER)
     await sql`
-      INSERT INTO "User" ("id", "organizationId", "name", "email", "passwordHash", "role", "avatar", "title", "isActive", "createdAt")
+      INSERT INTO "User" ("id", "organizationId", "name", "email", "passwordHash", "password", "role", "avatar", "title", "isActive", "createdAt")
       VALUES
-        ('usr-super-1', 'org-1', 'Alvin Super Admin', 'superadmin@orderflow.com', 'admin123', 'SUPER_ADMIN', 'SA', 'Platform Owner', true, NOW()),
-        ('usr-admin-1', 'org-1', 'Alvin Monir', 'owner@orderflow.com', 'admin123', 'ADMIN', 'AM', 'Store Owner', true, NOW()),
-        ('usr-agent-1', 'org-1', 'Rahim Ahmed', 'agent@orderflow.com', 'agent123', 'USER', 'RA', 'Live Chat Specialist', true, NOW()),
-        ('usr-agent-2', 'org-1', 'Fatima Rahman', 'support@orderflow.com', 'agent123', 'USER', 'FR', 'Customer Support Executive', true, NOW())
+        ('usr-super-1', 'org-1', 'Alvin Super Admin', 'superadmin@orderflow.com', 'admin123', 'admin123', 'SUPER_ADMIN', 'SA', 'Platform Owner', true, NOW()),
+        ('usr-admin-1', 'org-1', 'Alvin Monir', 'owner@orderflow.com', 'admin123', 'admin123', 'ADMIN', 'AM', 'Store Owner', true, NOW()),
+        ('usr-agent-1', 'org-1', 'Rahim Ahmed', 'agent@orderflow.com', 'agent123', 'agent123', 'USER', 'RA', 'Live Chat Specialist', true, NOW()),
+        ('usr-agent-2', 'org-1', 'Fatima Rahman', 'support@orderflow.com', 'agent123', 'agent123', 'USER', 'FR', 'Customer Support Executive', true, NOW())
       ON CONFLICT ("id") DO NOTHING;
     `;
 
@@ -1134,12 +1141,16 @@ export async function createDbTeamMember(data: {
     const orgId = data.organizationId || 'org-1';
 
     await sql`
-      INSERT INTO "User" ("id", "organizationId", "name", "email", "passwordHash", "role", "avatar", "title", "phone", "isActive", "createdAt")
-      VALUES (${id}, ${orgId}, ${data.name}, ${data.email.toLowerCase().trim()}, ${passwordHash}, ${role}, ${avatar}, ${data.title || 'Support Staff'}, ${data.phone || ''}, true, NOW())
+      INSERT INTO "User" ("id", "organizationId", "storeId", "name", "email", "passwordHash", "password", "role", "avatar", "title", "phone", "isActive", "createdAt", "updatedAt")
+      VALUES (${id}, ${orgId}, ${`store-${orgId}`}, ${data.name}, ${data.email.toLowerCase().trim()}, ${passwordHash}, ${passwordHash}, ${role}, ${avatar}, ${data.title || 'Support Staff'}, ${data.phone || ''}, true, NOW(), NOW())
       ON CONFLICT ("email") DO UPDATE SET
         "name" = EXCLUDED."name",
         "role" = EXCLUDED."role",
         "title" = EXCLUDED."title",
+        "passwordHash" = EXCLUDED."passwordHash",
+        "password" = EXCLUDED."password",
+        "organizationId" = EXCLUDED."organizationId",
+        "storeId" = EXCLUDED."storeId",
         "updatedAt" = NOW();
     `;
     return { id, name: data.name, email: data.email, role, title: data.title || 'Support Staff' };

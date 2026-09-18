@@ -75,24 +75,26 @@ export async function POST(req: NextRequest) {
       }
 
       const orgName = organizationName || `${name.trim()}'s Store`;
-      const orgSlug = orgName
+      const baseSlug = orgName
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '') || `org-${Date.now()}`;
+        .replace(/^-|-$/g, '') || 'store';
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const uniqueSlug = `${baseSlug}-${randomSuffix}`;
       const orgId = `org-${Date.now()}`;
 
       // Create Organization
       await sql`
         INSERT INTO "Organization" ("id", "name", "slug", "plan", "createdAt", "updatedAt")
-        VALUES (${orgId}, ${orgName}, ${orgSlug}, 'PRO', NOW(), NOW())
-        ON CONFLICT ("slug") DO NOTHING;
+        VALUES (${orgId}, ${orgName}, ${uniqueSlug}, 'PRO', NOW(), NOW())
+        ON CONFLICT ("id") DO NOTHING;
       `;
 
       // Create Store
       await sql`
-        INSERT INTO "Store" ("id", "name", "slug", "phone", "currency", "createdAt", "updatedAt")
-        VALUES (${`store-${orgId}`}, ${orgName}, ${orgSlug}, '01700000000', 'BDT', NOW(), NOW())
+        INSERT INTO "Store" ("id", "name", "slug", "phone", "currency", "organizationId", "createdAt", "updatedAt")
+        VALUES (${`store-${orgId}`}, ${orgName}, ${uniqueSlug}, '01700000000', 'BDT', ${orgId}, NOW(), NOW())
         ON CONFLICT ("id") DO NOTHING;
       `;
 
@@ -102,12 +104,15 @@ export async function POST(req: NextRequest) {
       const passHash = hashPassword(password);
 
       await sql`
-        INSERT INTO "User" ("id", "organizationId", "name", "email", "passwordHash", "role", "avatar", "title", "isActive", "createdAt")
-        VALUES (${userId}, ${orgId}, ${name}, ${email.toLowerCase().trim()}, ${passHash}, 'ADMIN', ${avatar}, 'Store Owner', true, NOW())
+        INSERT INTO "User" ("id", "organizationId", "storeId", "name", "email", "passwordHash", "password", "role", "avatar", "title", "isActive", "createdAt", "updatedAt")
+        VALUES (${userId}, ${orgId}, ${`store-${orgId}`}, ${name}, ${email.toLowerCase().trim()}, ${passHash}, ${passHash}, 'ADMIN', ${avatar}, 'Store Owner', true, NOW(), NOW())
         ON CONFLICT ("email") DO UPDATE SET
           "name" = EXCLUDED."name",
           "passwordHash" = EXCLUDED."passwordHash",
-          "organizationId" = EXCLUDED."organizationId";
+          "password" = EXCLUDED."password",
+          "organizationId" = EXCLUDED."organizationId",
+          "storeId" = EXCLUDED."storeId",
+          "updatedAt" = NOW();
       `;
 
       const response = NextResponse.json({
