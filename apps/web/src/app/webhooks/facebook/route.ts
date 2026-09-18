@@ -23,6 +23,20 @@ interface UserSession {
 // In-memory conversation state for quick back-to-back inputs
 const userSessions: Record<string, UserSession> = {};
 
+// Cache of recently processed message IDs to prevent double/loop processing
+const processedMessageIds = new Set<string>();
+
+function isDuplicateMessage(mid?: string): boolean {
+  if (!mid) return false;
+  if (processedMessageIds.has(mid)) return true;
+  processedMessageIds.add(mid);
+  if (processedMessageIds.size > 2000) {
+    const first = processedMessageIds.values().next().value;
+    if (first) processedMessageIds.delete(first);
+  }
+  return false;
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const mode = searchParams.get('hub.mode');
@@ -48,7 +62,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('[Facebook Webhook Event Received]:', JSON.stringify(body));
 
     if (body.object === 'page') {
       const settings = await getBotSettings();
@@ -59,6 +72,8 @@ export async function POST(request: NextRequest) {
         process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
         '';
 
+      const configuredPageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '443213442199594';
+
       const geminiKey =
         settings.geminiApiKey ||
         process.env.GEMINI_API_KEY ||
@@ -66,16 +81,47 @@ export async function POST(request: NextRequest) {
         '';
 
       for (const entry of body.entry || []) {
-        for (const event of entry.messaging || []) {
-          const senderId = event.sender?.id;
-          if (!senderId || event.message?.is_echo) continue;
+        const pageId = entry.id || configuredPageId;
 
-          const text = event.message?.text || '';
+        for (const event of entry.messaging || []) {
+          // 1. STRICT ECHO & EVENT FILTER: Ignore delivery receipts, read receipts, reactions, etc.
+          if (event.delivery || event.read || event.reaction || event.account_linking || event.pass_thread_control) {
+            continue;
+          }
+
+          const senderId = event.sender?.id;
+          if (!senderId) continue;
+
+          // 2. CRITICAL ANTI-LOOP FILTER: Skip bot's own echo messages or messages sent by the Page itself!
+          if (event.message?.is_echo || senderId === pageId || senderId === configuredPageId) {
+            continue;
+          }
+
+          // 3. Skip non-message/non-postback payloads
+          if (!event.message && !event.postback) {
+            continue;
+          }
+
+          // 4. Skip duplicate webhook deliveries from Meta retry
+          const mid = event.message?.mid;
+          if (mid && isDuplicateMessage(mid)) {
+            console.log(`[Facebook Webhook] Skipping duplicate message ID: ${mid}`);
+            continue;
+          }
+
+          const text = (event.message?.text || '').trim();
           const payload = event.postback?.payload || event.message?.quick_reply?.payload;
           const incomingAttachment = event.message?.attachments?.[0];
           const incomingImageUrl = incomingAttachment?.type === 'image' ? incomingAttachment?.payload?.url : undefined;
 
-          // Automatically link active senderId to Customer in Neon DB so dashboard direct messaging works seamlessly!
+          // If there is no text, no button payload, and no image, DO NOT trigger fallback loop
+          if (!text && !payload && !incomingImageUrl) {
+            continue;
+          }
+
+          console.log(`[Facebook Webhook Processing Message from ${senderId}]: "${text}" (payload: ${payload})`);
+
+          // Automatically link active senderId to Customer in Neon DB
           try {
             const { getSql } = await import('@/lib/db');
             const sql = getSql();

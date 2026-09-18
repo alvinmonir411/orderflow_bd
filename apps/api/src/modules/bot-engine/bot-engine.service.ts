@@ -26,11 +26,16 @@ export class BotEngineService {
       }
 
       for (const event of messagingEvents) {
+        // Ignore delivery, read receipts, reactions
+        if (event.delivery || event.read || event.reaction || event.account_linking) continue;
+
         const senderId = event.sender?.id;
         if (!senderId) continue;
 
-        // Skip bot's own echo messages
-        if (event.message?.is_echo) continue;
+        // Skip bot's own echo messages and messages sent by the page itself
+        if (event.message?.is_echo || senderId === pageId || senderId === store?.facebookPageId) continue;
+
+        if (!event.message && !event.postback) continue;
 
         const pageToken = store?.facebookPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN;
 
@@ -39,7 +44,7 @@ export class BotEngineService {
             await this.processPayload(store, senderId, event.postback.payload, pageToken);
           } else if (event.message?.quick_reply) {
             await this.processPayload(store, senderId, event.message.quick_reply.payload, pageToken);
-          } else if (event.message?.text) {
+          } else if (event.message?.text && event.message.text.trim()) {
             await this.processText(store, senderId, event.message.text.trim(), pageToken);
           }
         } catch (error) {
