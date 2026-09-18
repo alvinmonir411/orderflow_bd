@@ -23,15 +23,10 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get('action');
 
   if (action === 'demo') {
+    // Super Admin is NOT listed — private platform owner account only
     return NextResponse.json({
       success: true,
       demoUsers: [
-        {
-          role: 'SUPER_ADMIN',
-          label: '\u{1F451} Super Admin',
-          description: 'SaaS Platform Owner & Full System Access',
-          email: 'superadmin@orderflow.com',
-        },
         {
           role: 'ADMIN',
           label: '\u{1F4BC} Store Owner / Merchant',

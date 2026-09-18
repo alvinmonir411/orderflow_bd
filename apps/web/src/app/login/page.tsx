@@ -11,7 +11,6 @@ import {
   Sparkles,
   Eye,
   EyeOff,
-  Crown,
   Briefcase,
   Headphones,
   Clock,
@@ -92,19 +91,8 @@ export default function LoginPage() {
     return `https://wa.me/8801700000000?text=${text}`;
   };
 
+  // Super Admin is private — only 2 demo roles shown publicly
   const demoCards = [
-    {
-      email: 'superadmin@orderflow.com',
-      label: 'Super Admin',
-      role: 'SUPER_ADMIN',
-      desc: 'Platform Owner',
-      icon: Crown,
-      gradient: 'from-indigo-950/80 to-slate-900',
-      border: 'border-indigo-500/40 hover:border-indigo-400',
-      iconColor: 'text-indigo-400',
-      textColor: 'text-indigo-300',
-      emoji: '\u{1F451}',
-    },
     {
       email: 'owner@orderflow.com',
       label: 'Store Owner',
