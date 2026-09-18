@@ -80,7 +80,10 @@ export async function loginWithFacebookPopup(): Promise<FacebookLoginResult> {
 
 function launchOAuthPopupFallback(): Promise<FacebookLoginResult> {
   return new Promise((resolve) => {
-    const redirectUri = `${window.location.origin}/api/facebook/oauth-callback`;
+    const redirectUri =
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'https://orderflowbd.vercel.app/api/facebook/oauth-callback'
+        : `${window.location.origin}/api/facebook/oauth-callback`;
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(
       redirectUri,
     )}&scope=${FACEBOOK_REQUIRED_SCOPES}&response_type=token&auth_type=rerequest&display=popup`;
