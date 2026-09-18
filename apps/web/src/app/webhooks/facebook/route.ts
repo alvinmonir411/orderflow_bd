@@ -397,16 +397,19 @@ STRICT SALES & BUSINESS RULES:
       });
     }
 
-    const isValidGeminiKey = apiKey && apiKey.trim().startsWith('AIzaSy');
+    const isValidGeminiKey = Boolean(apiKey && apiKey.trim().length > 10);
     if (!isValidGeminiKey) {
+      console.warn('[Gemini API Warning] No valid Gemini API key configured.');
       return { replyText: '' };
     }
 
-    // Try modern models in priority order
+    // Modern active Gemini models supported by Google AI Studio
     const modelsToTry = [
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+      'gemini-3.7-flash',
+      'gemini-flash-latest',
       'gemini-2.5-flash',
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
     ];
     let rawReply = '';
     let lastError: any = null;
@@ -1322,8 +1325,14 @@ async function sendFbQuickReplies(
     });
     const data = await res.json();
     console.log('[Facebook Quick Replies Result]:', data);
+
+    if (!res.ok || data.error) {
+      console.warn('[Facebook Quick Replies Error, falling back to simple text]:', data.error);
+      await sendFbMessage(recipientId, text, activeToken);
+    }
   } catch (err) {
-    console.error('[Facebook Quick Replies Error]:', err);
+    console.error('[Facebook Quick Replies Error, sending plain text fallback]:', err);
+    await sendFbMessage(recipientId, text, activeToken);
   }
 }
 
