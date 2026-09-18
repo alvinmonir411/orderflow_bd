@@ -278,34 +278,14 @@ export default function MessagesPage() {
                 💬 Comments
               </button>
               <button
-                onClick={() => setActiveChannelFilter('INSTAGRAM')}
-                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
-                  activeChannelFilter === 'INSTAGRAM'
-                    ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
-                    : 'bg-neutral-850 text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                📸 Instagram
-              </button>
-              <button
-                onClick={() => setActiveChannelFilter('WHATSAPP')}
-                className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
-                  activeChannelFilter === 'WHATSAPP'
-                    ? 'bg-green-500/20 text-green-300 border border-green-500/40'
-                    : 'bg-neutral-850 text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                🟢 WhatsApp
-              </button>
-              <button
                 onClick={() => setActiveChannelFilter('ORDERS')}
                 className={`px-3 py-1 rounded-lg font-semibold whitespace-nowrap transition-all ${
                   activeChannelFilter === 'ORDERS'
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                     : 'bg-neutral-850 text-neutral-400 hover:text-neutral-200'
                 }`}
               >
-                📦 অর্ডারস
+                📦 অর্ডার সমূহ
               </button>
             </div>
           </div>

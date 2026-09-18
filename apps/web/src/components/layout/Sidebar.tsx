@@ -35,13 +35,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       gradient: 'from-emerald-500/20 to-teal-500/10',
     },
     {
-      name: 'মেসেজ ও চ্যাট হাব',
-      sub: 'Messenger & WhatsApp',
+      name: 'মেসেঞ্জার লাইভ চ্যাট',
+      sub: 'Facebook Live Chat',
       href: '/messages',
       icon: MessageSquare,
       badge: 'Live',
-      badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      gradient: 'from-emerald-500/20 to-teal-500/10',
+      badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      gradient: 'from-blue-500/20 to-indigo-500/10',
     },
     {
       name: 'অর্ডার সমূহ',
@@ -49,8 +49,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       href: '/orders',
       icon: ShoppingCart,
       badge: 'Orders',
-      badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      gradient: 'from-blue-500/20 to-indigo-500/10',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      gradient: 'from-emerald-500/20 to-teal-500/10',
     },
     {
       name: 'প্রোডাক্ট ও স্টক',
@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       gradient: 'from-teal-500/20 to-cyan-500/10',
     },
     {
-      name: 'মেসেঞ্জার ও AI বট',
+      name: 'এআই সেলস বট সেটিংস',
       sub: 'Google Gemini Studio',
       href: '/bot-settings',
       icon: Bot,
@@ -70,11 +70,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       gradient: 'from-indigo-500/20 to-purple-500/10',
     },
     {
-      name: 'কুরিয়ার ও এসএমএস',
-      sub: 'Steadfast & Pathao',
+      name: 'ফেসবুক ইন্টিগ্রেশন',
+      sub: 'Page & Messenger Connect',
       href: '/integrations',
-      icon: Truck,
-      gradient: 'from-purple-500/20 to-pink-500/10',
+      icon: Zap,
+      gradient: 'from-blue-500/20 to-cyan-500/10',
     },
   ];
 

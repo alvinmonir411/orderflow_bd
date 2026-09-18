@@ -30,7 +30,9 @@ export async function GET() {
         }
       } catch (e) {}
     }
-    if (!pageName) pageName = 'Facebook Page';
+    if (!pageName || pageName === 'Facebook Page') {
+      pageName = pageId === '443213442199594' ? 'FastLain' : (pageName || 'Facebook Page');
+    }
 
     // Check Graph API live subscription
     let webhookSubscribed = false;

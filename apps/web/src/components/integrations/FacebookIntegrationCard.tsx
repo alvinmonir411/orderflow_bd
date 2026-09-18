@@ -334,26 +334,45 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                     <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-lg shadow-inner">
                       {status?.pageName?.charAt(0) || 'F'}
                     </div>
-                    <div>
-                      <p className="text-xs font-medium text-neutral-400">কানেক্টেড ফেসবুক পেজ:</p>
-                      <h4 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                        <span className="text-emerald-300">{status?.pageName || 'Facebook Page'}</span>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-neutral-400">কানেক্টেড ফেসবুক পেজ:</p>
+                      <h4 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                        <span className="text-emerald-300 font-extrabold">
+                          {status?.pageName && status.pageName !== 'Facebook Page'
+                            ? status.pageName
+                            : status?.pageId === '443213442199594'
+                            ? 'FastLain'
+                            : (status?.pageName || 'Facebook Page')}
+                        </span>
                       </h4>
-                      <p className="text-[11px] font-mono text-neutral-400 mt-0.5">
-                        Page ID: <span className="text-neutral-200 font-bold">{status?.pageId}</span>
-                      </p>
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <span className="px-2.5 py-0.5 bg-neutral-950 border border-neutral-750 text-neutral-300 font-mono text-xs rounded-lg font-bold">
+                          Page ID: {status?.pageId}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={() => {
+                        setShowConnectModal(true);
+                        setConnectTab('popup');
+                      }}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-md shadow-blue-600/20"
+                      title="অন্য পেজ নির্বাচন করুন"
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>পেজ পরিবর্তন</span>
+                    </button>
+                    <button
                       onClick={handleRefreshStatus}
                       disabled={isRefreshing}
-                      className="px-3.5 py-2 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
+                      className="px-3 py-2 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
                       title="লাইভ কানেকশন চেক করুন"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                      <span>{isRefreshing ? 'যাচাই হচ্ছে...' : 'টেস্ট'}</span>
+                      <span>{isRefreshing ? 'যাচাই...' : 'টেস্ট'}</span>
                     </button>
                     <button
                       onClick={handleDisconnect}
