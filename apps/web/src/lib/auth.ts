@@ -85,33 +85,12 @@ export async function getCurrentUser(req?: NextRequest): Promise<User | null> {
   }
 
   if (!token) {
-    // Return default demo user context for seamless zero-friction local developer experience
-    return {
-      id: 'usr-admin-1',
-      organizationId: 'org-1',
-      name: 'Alvin Monir',
-      email: 'owner@orderflow.com',
-      role: 'ADMIN',
-      title: 'Store Owner',
-      avatar: 'AM',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
+    return null;
   }
 
   const payload = verifySessionToken(token);
   if (!payload) {
-    return {
-      id: 'usr-admin-1',
-      organizationId: 'org-1',
-      name: 'Alvin Monir',
-      email: 'owner@orderflow.com',
-      role: 'ADMIN',
-      title: 'Store Owner',
-      avatar: 'AM',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
+    return null;
   }
 
   try {
