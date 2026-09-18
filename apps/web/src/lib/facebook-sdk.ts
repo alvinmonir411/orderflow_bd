@@ -12,7 +12,6 @@ export const FACEBOOK_REQUIRED_SCOPES = [
   'pages_show_list',
   'pages_messaging',
   'pages_manage_metadata',
-  'business_management',
   'public_profile',
 ].join(',');
 
@@ -75,48 +74,8 @@ export async function loginWithFacebookPopup(): Promise<FacebookLoginResult> {
     return { success: false, error: 'Window is not defined' };
   }
 
-  // Meta strictly enforces HTTPS for window.FB.login().
-  // On plain HTTP (e.g. http://localhost:3000), calling FB.login throws "FB.login can no longer be called from http pages".
-  // Therefore, on HTTP or if SDK is blocked, we seamlessly use the direct OAuth Dialog Popup!
-  if (window.location.protocol !== 'https:') {
-    return launchOAuthPopupFallback();
-  }
-
-  const isLoaded = await loadFacebookSdk();
-
-  if (!isLoaded || !window.FB) {
-    // If JS SDK is blocked (e.g. adblocker), open OAuth Dialog Popup directly
-    return launchOAuthPopupFallback();
-  }
-
-  return new Promise((resolve) => {
-    try {
-      window.FB.login(
-        (response: any) => {
-          if (response?.authResponse?.accessToken) {
-            resolve({
-              success: true,
-              accessToken: response.authResponse.accessToken,
-              userId: response.authResponse.userID,
-            });
-          } else {
-            resolve({
-              success: false,
-              error: response?.status === 'unknown' ? 'ফেসবুক লগইন বাতিল করা হয়েছে' : 'লগইন সফল হয়নি',
-            });
-          }
-        },
-        {
-          scope: FACEBOOK_REQUIRED_SCOPES,
-          return_scopes: true,
-          auth_type: 'rerequest',
-        },
-      );
-    } catch (err: any) {
-      console.warn('[FB.login Exception, switching to OAuth popup]:', err);
-      resolve(launchOAuthPopupFallback());
-    }
-  });
+  // Use direct OAuth Dialog Popup to avoid "JSSDK Option is Not Toggled" restrictions
+  return launchOAuthPopupFallback();
 }
 
 function launchOAuthPopupFallback(): Promise<FacebookLoginResult> {
@@ -124,7 +83,7 @@ function launchOAuthPopupFallback(): Promise<FacebookLoginResult> {
     const redirectUri = `${window.location.origin}/api/facebook/oauth-callback`;
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(
       redirectUri,
-    )}&scope=${FACEBOOK_REQUIRED_SCOPES}&response_type=token&auth_type=rerequest`;
+    )}&scope=${FACEBOOK_REQUIRED_SCOPES}&response_type=token&auth_type=rerequest&display=popup`;
 
     const width = 600;
     const height = 700;
