@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { AdminOrganization, SuperAdminStats, OrganizationStatus } from './types';
 
 export function getSql() {
   const connStr =
@@ -297,6 +298,13 @@ export async function initDatabase() {
     await sql`ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Store" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+
+    // Ensure organization status and approval columns exist
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'ACTIVE';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "ownerPhone" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "package" TEXT DEFAULT 'PRO';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "approvedAt" TIMESTAMP;`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "approvedBy" TEXT;`;
 
     // 8. Ensure Normalized Tag and ConversationTag tables exist
     await sql`
@@ -1577,5 +1585,239 @@ export async function upsertDbChannelConnection(
   }
 }
 
+// ==========================================
+// SUPER ADMIN MASTER MANAGEMENT
+// ==========================================
+export async function getDbAllOrganizations(statusFilter?: string): Promise<AdminOrganization[]> {
+  const sql = getSql();
+  try {
+    await initDatabase();
+    let rows;
+    if (statusFilter && statusFilter !== 'ALL') {
+      rows = await sql`
+        SELECT 
+          o.id,
+          o.name,
+          o.slug,
+          o.plan,
+          o.status,
+          o."ownerPhone",
+          o."approvedAt",
+          o."approvedBy",
+          o."createdAt",
+          u.name as "ownerName",
+          u.email as "ownerEmail",
+          u.phone as "userPhone",
+          (SELECT COUNT(*)::int FROM "User" WHERE "organizationId" = o.id) as "userCount",
+          (SELECT COUNT(*)::int FROM "Order" WHERE "organizationId" = o.id) as "orderCount",
+          (SELECT COUNT(*)::int FROM "Conversation" WHERE "organizationId" = o.id) as "conversationCount"
+        FROM "Organization" o
+        LEFT JOIN LATERAL (
+          SELECT name, email, phone FROM "User" 
+          WHERE "organizationId" = o.id 
+          ORDER BY "createdAt" ASC 
+          LIMIT 1
+        ) u ON TRUE
+        WHERE o.status = ${statusFilter}
+        ORDER BY o."createdAt" DESC;
+      `;
+    } else {
+      rows = await sql`
+        SELECT 
+          o.id,
+          o.name,
+          o.slug,
+          o.plan,
+          o.status,
+          o."ownerPhone",
+          o."approvedAt",
+          o."approvedBy",
+          o."createdAt",
+          u.name as "ownerName",
+          u.email as "ownerEmail",
+          u.phone as "userPhone",
+          (SELECT COUNT(*)::int FROM "User" WHERE "organizationId" = o.id) as "userCount",
+          (SELECT COUNT(*)::int FROM "Order" WHERE "organizationId" = o.id) as "orderCount",
+          (SELECT COUNT(*)::int FROM "Conversation" WHERE "organizationId" = o.id) as "conversationCount"
+        FROM "Organization" o
+        LEFT JOIN LATERAL (
+          SELECT name, email, phone FROM "User" 
+          WHERE "organizationId" = o.id 
+          ORDER BY "createdAt" ASC 
+          LIMIT 1
+        ) u ON TRUE
+        ORDER BY o."createdAt" DESC;
+      `;
+    }
 
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      plan: r.plan || 'PRO',
+      status: (r.status as OrganizationStatus) || 'ACTIVE',
+      ownerName: r.ownerName || 'Merchant Owner',
+      ownerEmail: r.ownerEmail || '',
+      ownerPhone: r.ownerPhone || r.userPhone || '01700000000',
+      userCount: Number(r.userCount) || 1,
+      orderCount: Number(r.orderCount) || 0,
+      conversationCount: Number(r.conversationCount) || 0,
+      approvedAt: r.approvedAt ? new Date(r.approvedAt).toISOString() : undefined,
+      approvedBy: r.approvedBy || undefined,
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+    }));
+  } catch (err) {
+    console.error('[DB getDbAllOrganizations Error]:', err);
+    return [];
+  }
+}
 
+export async function getDbAdminStats(): Promise<SuperAdminStats> {
+  const sql = getSql();
+  try {
+    await initDatabase();
+    const orgStats = await sql`
+      SELECT 
+        COUNT(*)::int as "totalOrganizations",
+        COUNT(CASE WHEN status = 'PENDING' THEN 1 END)::int as "pendingApprovals",
+        COUNT(CASE WHEN status = 'ACTIVE' OR status IS NULL THEN 1 END)::int as "activeBusinesses",
+        COUNT(CASE WHEN status = 'SUSPENDED' THEN 1 END)::int as "suspendedBusinesses"
+      FROM "Organization";
+    `;
+
+    const userStats = await sql`SELECT COUNT(*)::int as "totalUsers" FROM "User";`;
+    const orderStats = await sql`SELECT COUNT(*)::int as "totalOrders" FROM "Order";`;
+
+    const activeOrgs = await sql`
+      SELECT plan FROM "Organization" WHERE status = 'ACTIVE' OR status IS NULL;
+    `;
+    let estimatedMRR = 0;
+    for (const row of activeOrgs) {
+      if (row.plan === 'STARTER') estimatedMRR += 999;
+      else if (row.plan === 'BUSINESS') estimatedMRR += 2490;
+      else estimatedMRR += 4990;
+    }
+
+    const s = orgStats[0] || {};
+    return {
+      totalOrganizations: Number(s.totalOrganizations) || 0,
+      pendingApprovals: Number(s.pendingApprovals) || 0,
+      activeBusinesses: Number(s.activeBusinesses) || 0,
+      suspendedBusinesses: Number(s.suspendedBusinesses) || 0,
+      totalUsers: Number(userStats[0]?.totalUsers) || 0,
+      totalOrders: Number(orderStats[0]?.totalOrders) || 0,
+      estimatedMRR,
+    };
+  } catch (err) {
+    console.error('[DB getDbAdminStats Error]:', err);
+    return {
+      totalOrganizations: 1,
+      pendingApprovals: 0,
+      activeBusinesses: 1,
+      suspendedBusinesses: 0,
+      totalUsers: 4,
+      totalOrders: 0,
+      estimatedMRR: 4990,
+    };
+  }
+}
+
+export async function approveDbOrganization(orgId: string, approverUserId = 'superadmin') {
+  const sql = getSql();
+  try {
+    await sql`
+      UPDATE "Organization"
+      SET "status" = 'ACTIVE', "approvedAt" = NOW(), "approvedBy" = ${approverUserId}, "updatedAt" = NOW()
+      WHERE "id" = ${orgId};
+    `;
+    await sql`
+      UPDATE "User"
+      SET "isActive" = true, "updatedAt" = NOW()
+      WHERE "organizationId" = ${orgId};
+    `;
+    return true;
+  } catch (err) {
+    console.error('[DB approveDbOrganization Error]:', err);
+    return false;
+  }
+}
+
+export async function suspendDbOrganization(orgId: string) {
+  const sql = getSql();
+  try {
+    await sql`
+      UPDATE "Organization"
+      SET "status" = 'SUSPENDED', "updatedAt" = NOW()
+      WHERE "id" = ${orgId};
+    `;
+    await sql`
+      UPDATE "User"
+      SET "isActive" = false, "updatedAt" = NOW()
+      WHERE "organizationId" = ${orgId} AND "role" != 'SUPER_ADMIN';
+    `;
+    return true;
+  } catch (err) {
+    console.error('[DB suspendDbOrganization Error]:', err);
+    return false;
+  }
+}
+
+export async function reactivateDbOrganization(orgId: string) {
+  const sql = getSql();
+  try {
+    await sql`
+      UPDATE "Organization"
+      SET "status" = 'ACTIVE', "updatedAt" = NOW()
+      WHERE "id" = ${orgId};
+    `;
+    await sql`
+      UPDATE "User"
+      SET "isActive" = true, "updatedAt" = NOW()
+      WHERE "organizationId" = ${orgId};
+    `;
+    return true;
+  } catch (err) {
+    console.error('[DB reactivateDbOrganization Error]:', err);
+    return false;
+  }
+}
+
+export async function deleteDbOrganization(orgId: string) {
+  const sql = getSql();
+  try {
+    if (orgId === 'org-1') {
+      return false; // Protect demo master organization
+    }
+    await sql`DELETE FROM "ChatMessage" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "InternalNote" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "ConversationTimeline" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "ConversationTag" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "Conversation" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "Tag" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "OrderItem" WHERE "orderId" IN (SELECT id FROM "Order" WHERE "organizationId" = ${orgId});`;
+    await sql`DELETE FROM "Order" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "ProductVariant" WHERE "productId" IN (SELECT id FROM "Product" WHERE "storeId" IN (SELECT id FROM "Store" WHERE "organizationId" = ${orgId}));`;
+    await sql`DELETE FROM "Product" WHERE "storeId" IN (SELECT id FROM "Store" WHERE "organizationId" = ${orgId});`;
+    await sql`DELETE FROM "ChannelConnection" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "BotSettings" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "Store" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "User" WHERE "organizationId" = ${orgId};`;
+    await sql`DELETE FROM "Organization" WHERE "id" = ${orgId};`;
+    return true;
+  } catch (err) {
+    console.error('[DB deleteDbOrganization Error]:', err);
+    return false;
+  }
+}
+
+export async function getPendingOrganizationsCount(): Promise<number> {
+  const sql = getSql();
+  try {
+    const res = await sql`
+      SELECT COUNT(*)::int as count FROM "Organization" WHERE status = 'PENDING';
+    `;
+    return Number(res[0]?.count) || 0;
+  } catch {
+    return 0;
+  }
+}

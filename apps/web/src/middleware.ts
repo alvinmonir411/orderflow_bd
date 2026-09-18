@@ -6,6 +6,7 @@ const JWT_SECRET = process.env.AUTH_SECRET || 'orderflow_bd_saas_enterprise_jwt_
 
 // Protected SaaS dashboard routes that require active authentication
 const PROTECTED_ROUTES = [
+  '/admin',
   '/dashboard',
   '/orders',
   '/messages',

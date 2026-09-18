@@ -288,6 +288,70 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* New Store Quick Setup Checklist (Shown when 0 orders exist) */}
+      {allOrders.length === 0 && (
+        <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900/90 to-teal-950/30 border border-emerald-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">🎉 স্বাগতম! আপনার অ্যাকাউন্ট প্রস্তুত</h3>
+                <p className="text-xs text-slate-300">মাত্র ৩টি সহজ ধাপে আপনার ফেসবুক পেজ কানেক্ট করে অটোমেশন চালু করুন:</p>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full font-bold w-fit">
+              Ready for Setup
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+            <Link
+              href="/integrations"
+              className="p-4 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all group block"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white group-hover:text-emerald-300 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center text-[10px] font-mono">1</span>
+                  <span>ফেসবুক পেজ কানেক্ট</span>
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">পেজ আইডি ও টোকেন দিয়ে মেসেঞ্জার লাইভ চ্যাট যুক্ত করুন</p>
+            </Link>
+
+            <Link
+              href="/bot-settings"
+              className="p-4 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all group block"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white group-hover:text-emerald-300 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center text-[10px] font-mono">2</span>
+                  <span>AI সেলস বট কনফিগার</span>
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">Gemini AI প্রম্পট, ডেলিভারি চার্জ ও FAQ উত্তর নির্ধারণ করুন</p>
+            </Link>
+
+            <Link
+              href="/bot-settings"
+              className="p-4 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all group block"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white group-hover:text-emerald-300 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[10px] font-mono">3</span>
+                  <span>Steadfast কুরিয়ার API</span>
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">Steadfast API Key দিয়ে ১-ক্লিক অটো কুরিয়ার বুকিং চালু করুন</p>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Live Interactive Messenger Bot Simulator Card (Collapsible) */}
       {showBotTester && (
         <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">

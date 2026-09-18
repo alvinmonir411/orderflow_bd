@@ -14,17 +14,50 @@ export interface User {
   updatedAt?: string;
 }
 
+export type OrganizationStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED';
+
 export interface Organization {
   id: string;
   name: string;
   slug: string;
   plan: 'STARTER' | 'BUSINESS' | 'PRO' | 'ENTERPRISE';
+  status?: OrganizationStatus;
+  ownerPhone?: string;
   fbPageId?: string;
   fbPageName?: string;
   fbPageToken?: string;
   maxTeamMembers: number;
   maxConversationsPerMonth: number;
+  approvedAt?: string;
+  approvedBy?: string;
   createdAt: string;
+}
+
+export interface AdminOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  plan: 'STARTER' | 'BUSINESS' | 'PRO' | 'ENTERPRISE';
+  status: OrganizationStatus;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  userCount: number;
+  orderCount: number;
+  conversationCount: number;
+  approvedAt?: string;
+  approvedBy?: string;
+  createdAt: string;
+}
+
+export interface SuperAdminStats {
+  totalOrganizations: number;
+  pendingApprovals: number;
+  activeBusinesses: number;
+  suspendedBusinesses: number;
+  totalUsers: number;
+  totalOrders: number;
+  estimatedMRR: number;
 }
 
 export type OrderStatus =

@@ -34,12 +34,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  const [pendingCount, setPendingCount] = useState(0);
+
   useEffect(() => {
     fetch('/api/auth')
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.user) {
           setCurrentUser(data.user);
+          if (data.user.role === 'SUPER_ADMIN') {
+            fetch('/api/admin/organizations')
+              .then((res) => res.json())
+              .then((adminData) => {
+                if (adminData.success && adminData.stats) {
+                  setPendingCount(adminData.stats.pendingApprovals || 0);
+                }
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {});
@@ -60,7 +72,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+
   const navigation = [
+    ...(isSuperAdmin
+      ? [
+          {
+            name: '👑 সুপার অ্যাডমিন',
+            sub: 'অনুমোদন ও মাস্টার কন্ট্রোল',
+            href: '/admin',
+            icon: Crown,
+            highlight: true,
+            badge: pendingCount > 0 ? `${pendingCount} Pending` : 'Super Admin',
+            badgeColor: pendingCount > 0 ? 'bg-amber-500/25 text-amber-300 border-amber-500/40 animate-pulse' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+            gradient: 'from-indigo-500/20 to-purple-500/10',
+          },
+        ]
+      : []),
     {
       name: 'ড্যাশবোর্ড',
       sub: 'Overview & Metrics',

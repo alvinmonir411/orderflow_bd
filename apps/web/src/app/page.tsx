@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -230,7 +230,7 @@ export default function LandingPage() {
               href="/register"
               className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
             >
-              <span>ফ্রি শুরু করুন</span>
+              <span>শুরু করুন</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -275,7 +275,7 @@ export default function LandingPage() {
               href="/register"
               className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center gap-2.5 group"
             >
-              <span>🚀 ফ্রি রেজিস্টার করুন</span>
+              <span>🚀 শুরু করুন</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
 
@@ -932,7 +932,7 @@ export default function LandingPage() {
               href="/dashboard"
               className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              <span>🚀 ফ্রি ড্যাশবোর্ডে প্রবেশ করুন</span>
+              <span>🚀 ড্যাশবোর্ডে প্রবেশ করুন</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -8,16 +8,15 @@ import {
   Mail,
   Lock,
   ArrowRight,
-  ShieldCheck,
   Sparkles,
-  Users,
-  CheckCircle2,
-  AlertCircle,
   Eye,
   EyeOff,
   Crown,
   Briefcase,
   Headphones,
+  Clock,
+  MessageCircle,
+  MousePointerClick,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -27,30 +26,29 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [demoUsers, setDemoUsers] = useState<any[]>([]);
+  const [demoLoadingEmail, setDemoLoadingEmail] = useState<string | null>(null);
+  const [pendingError, setPendingError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/auth?action=demo')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && data.demoUsers) {
-          setDemoUsers(data.demoUsers);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleLogin = async (e?: React.FormEvent, customEmail?: string, customPassword?: string) => {
+  const handleLogin = async (e?: React.FormEvent, customEmail?: string, isDemo = false) => {
     if (e) e.preventDefault();
     const loginEmail = customEmail || email;
-    const loginPass = customPassword || password;
 
-    if (!loginEmail || !loginPass) {
-      toast.error('ইমেইল ও পাসওয়ার্ড পূরণ করুন');
+    if (!loginEmail) {
+      toast.error('ইমেইল পূরণ করুন');
+      return;
+    }
+    if (!isDemo && !password) {
+      toast.error('পাসওয়ার্ড পূরণ করুন');
       return;
     }
 
-    setIsLoading(true);
+    if (isDemo) {
+      setDemoLoadingEmail(loginEmail);
+    } else {
+      setIsLoading(true);
+    }
+    setPendingError(null);
+
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
@@ -58,30 +56,80 @@ export default function LoginPage() {
         body: JSON.stringify({
           action: 'login',
           email: loginEmail,
-          password: loginPass,
+          // Demo accounts: send empty password; backend ignores it
+          password: isDemo ? '' : password,
         }),
       });
 
       const data = await res.json();
       if (data.success) {
-        toast.success(`স্বাগতম ${data.user?.name || ''}! লগইন সফল হয়েছে।`);
-        router.push('/dashboard');
+        toast.success(`স্বাগতম ${data.user?.name || ''}! লগইন সফল হয়েছে।`);
+        if (data.user?.role === 'SUPER_ADMIN') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
         router.refresh();
       } else {
-        toast.error(data.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
+        if (data.isPending) {
+          setPendingError(data.error || 'আপনার অ্যাকাউন্টটি অনুমোদনের অপেক্ষায় রয়েছে');
+        } else {
+          toast.error(data.error || 'লগইন ব্যর্থ হয়েছে। সঠিক তথ্য দিন।');
+        }
       }
     } catch (err) {
-      toast.error('সার্ভারে যোগাযোগ করতে সমস্যা হয়েছে');
+      toast.error('সার্ভারে যোগাযোগ করতে সমস্যা হয়েছে');
     } finally {
       setIsLoading(false);
+      setDemoLoadingEmail(null);
     }
   };
 
-  const handleQuickDemo = (demo: any) => {
-    setEmail(demo.email);
-    setPassword(demo.password);
-    handleLogin(undefined, demo.email, demo.password);
+  const getWhatsAppHelpLink = () => {
+    const text = encodeURIComponent(
+      `আসসালামু আলাইকুম Super Admin,\nআমি OrderFlow BD তে লগইন করার চেষ্টা করছি (${email}), কিন্তু অ্যাকাউন্টটি এখনো অনুমোদনের অপেক্ষায় রয়েছে। অনুগ্রহ করে অ্যাকাউন্টটি সক্রিয় (Approve) করে দিন।`,
+    );
+    return `https://wa.me/8801700000000?text=${text}`;
   };
+
+  const demoCards = [
+    {
+      email: 'superadmin@orderflow.com',
+      label: 'Super Admin',
+      role: 'SUPER_ADMIN',
+      desc: 'Platform Owner',
+      icon: Crown,
+      gradient: 'from-indigo-950/80 to-slate-900',
+      border: 'border-indigo-500/40 hover:border-indigo-400',
+      iconColor: 'text-indigo-400',
+      textColor: 'text-indigo-300',
+      emoji: '\u{1F451}',
+    },
+    {
+      email: 'owner@orderflow.com',
+      label: 'Store Owner',
+      role: 'ADMIN',
+      desc: 'Merchant Admin',
+      icon: Briefcase,
+      gradient: 'from-emerald-950/80 to-slate-900',
+      border: 'border-emerald-500/40 hover:border-emerald-400',
+      iconColor: 'text-emerald-400',
+      textColor: 'text-emerald-300',
+      emoji: '\u{1F4BC}',
+    },
+    {
+      email: 'agent@orderflow.com',
+      label: 'Support Agent',
+      role: 'USER',
+      desc: 'Live Chat Staff',
+      icon: Headphones,
+      gradient: 'from-blue-950/80 to-slate-900',
+      border: 'border-blue-500/40 hover:border-blue-400',
+      iconColor: 'text-blue-400',
+      textColor: 'text-blue-300',
+      emoji: '\u{1F4AC}',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#06080e] text-white flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden">
@@ -91,7 +139,7 @@ export default function LoginPage() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-teal-900/10 via-transparent to-transparent pointer-events-none" />
 
       {/* Main Container */}
-      <div className="w-full max-w-md relative z-10 space-y-6">
+      <div className="w-full max-w-md relative z-10 space-y-5">
         {/* Brand Header */}
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex items-center gap-3 group">
@@ -111,74 +159,95 @@ export default function LoginPage() {
         </div>
 
         {/* 1-Click Demo Quick Access Panel */}
-        <div className="bg-[#0b0f19]/90 border border-emerald-500/30 rounded-3xl p-4.5 shadow-2xl backdrop-blur-xl space-y-3">
+        <div className="bg-[#0b0f19]/90 border border-emerald-500/30 rounded-3xl p-4 shadow-2xl backdrop-blur-xl space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span>১-ক্লিক ডেমো লগইন (Quick Demo Access):</span>
+              <span>১-ক্লিক ডেমো লগইন — কোনো পাসওয়ার্ড লাগবে না:</span>
             </span>
             <span className="text-[10px] bg-emerald-500/15 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono">
-              Ready
+              Demo
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo({ email: 'superadmin@orderflow.com', password: 'admin123' })}
-              className="p-2.5 bg-gradient-to-b from-indigo-950/80 to-slate-900 border border-indigo-500/40 hover:border-indigo-400 rounded-2xl text-left transition-all hover:scale-[1.02] shadow-sm cursor-pointer group"
-            >
-              <div className="flex items-center gap-1.5 text-indigo-300 text-xs font-bold">
-                <Crown className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>Super Admin</span>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1 truncate">Platform Owner</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo({ email: 'owner@orderflow.com', password: 'admin123' })}
-              className="p-2.5 bg-gradient-to-b from-emerald-950/80 to-slate-900 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl text-left transition-all hover:scale-[1.02] shadow-sm cursor-pointer group"
-            >
-              <div className="flex items-center gap-1.5 text-emerald-300 text-xs font-bold">
-                <Briefcase className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Store Owner</span>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1 truncate">Merchant Admin</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo({ email: 'agent@orderflow.com', password: 'agent123' })}
-              className="p-2.5 bg-gradient-to-b from-blue-950/80 to-slate-900 border border-blue-500/40 hover:border-blue-400 rounded-2xl text-left transition-all hover:scale-[1.02] shadow-sm cursor-pointer group"
-            >
-              <div className="flex items-center gap-1.5 text-blue-300 text-xs font-bold">
-                <Headphones className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>Support Agent</span>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1 truncate">Live Chat Staff</p>
-            </button>
+            {demoCards.map((card) => {
+              const Icon = card.icon;
+              const isThisLoading = demoLoadingEmail === card.email;
+              return (
+                <button
+                  key={card.email}
+                  type="button"
+                  id={`demo-${card.role.toLowerCase()}`}
+                  onClick={() => handleLogin(undefined, card.email, true)}
+                  disabled={!!demoLoadingEmail || isLoading}
+                  className={`p-3 bg-gradient-to-b ${card.gradient} border ${card.border} rounded-2xl text-left transition-all hover:scale-[1.03] shadow-sm cursor-pointer group disabled:opacity-60 disabled:cursor-not-allowed relative overflow-hidden`}
+                >
+                  <div className={`flex items-center gap-1.5 ${card.textColor} text-xs font-bold`}>
+                    <Icon className={`w-3.5 h-3.5 ${card.iconColor} shrink-0`} />
+                    <span>{card.label}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 truncate">{card.desc}</p>
+                  <div className={`absolute bottom-2 right-2 transition-all ${isThisLoading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {isThisLoading ? (
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    ) : (
+                      <MousePointerClick className="w-3 h-3 text-slate-500" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
+
+          <p className="text-[10px] text-slate-500 text-center">
+            ✨ Demo অ্যাকাউন্টে পাসওয়ার্ড ছাড়াই এক ক্লিকে প্রবেশ করুন
+          </p>
         </div>
 
-        {/* Login Form Card */}
+        {/* Pending Approval Alert Box */}
+        {pendingError && (
+          <div className="bg-amber-950/40 border border-amber-500/40 rounded-2xl p-4 space-y-2.5 text-amber-200 text-xs animate-in fade-in duration-200">
+            <div className="flex items-start gap-2.5">
+              <Clock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-white text-xs">{pendingError}</p>
+                <p className="text-[11px] text-amber-300/80 mt-0.5">
+                  পেমেন্ট সম্পন্ন করার পর সুপার অ্যাডমিন আপনার শপটি চালু করে দেবেন। দ্রুত অনুমোদনের জন্য সরাসরি হোয়াটসঅ্যাপ করুন:
+                </p>
+              </div>
+            </div>
+            <a
+              href={getWhatsAppHelpLink()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl text-[11px] transition-all"
+            >
+              <MessageCircle className="w-3.5 h-3.5 fill-slate-950" />
+              <span>সুপার অ্যাডমিনকে মেসেজ পাঠান (WhatsApp)</span>
+            </a>
+          </div>
+        )}
+
+        {/* Login Form Card (Real Accounts) */}
         <div className="bg-[#0b0f19]/95 border border-slate-800/90 rounded-[2rem] p-6 sm:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.8)] backdrop-blur-2xl space-y-6">
           <div className="space-y-1">
-            <h2 className="text-xl font-black text-white">অ্যাকাউন্টে লগইন করুন</h2>
+            <h2 className="text-xl font-black text-white">রিয়েল অ্যাকাউন্টে লগইন করুন</h2>
             <p className="text-xs text-slate-400">
-              আপনার ইমেইল ও পাসওয়ার্ড প্রদান করে ড্যাশবোর্ডে প্রবেশ করুন
+              নতুন মার্চেন্ট অ্যাকাউন্টে ইমেইল ও পাসওয়ার্ড দিয়ে প্রবেশ করুন
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+              <label htmlFor="login-email" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
                 ইমেইল এড্রেস
               </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -192,16 +261,17 @@ export default function LoginPage() {
             {/* Password Field */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  পাসওয়ার্ড
+                <label htmlFor="login-password" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  পাসওয়ার্ড
                 </label>
                 <span className="text-[11px] text-emerald-400 hover:underline cursor-pointer">
-                  পাসওয়ার্ড ভুলে গেছেন?
+                  পাসওয়ার্ড ভুলে গেছেন?
                 </span>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -212,7 +282,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -222,7 +292,8 @@ export default function LoginPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              id="login-submit"
+              disabled={isLoading || !!demoLoadingEmail}
               className="w-full py-3.5 px-6 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-2xl text-sm transition-all shadow-[0_10px_25px_rgba(16,185,129,0.3)] active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <span>{isLoading ? 'লগইন হচ্ছে...' : 'লগইন করুন'}</span>
@@ -234,7 +305,7 @@ export default function LoginPage() {
           <div className="pt-4 border-t border-slate-800/80 text-center text-xs text-slate-400">
             নতুন ব্যবসা শুরু করছেন?{' '}
             <Link href="/register" className="text-emerald-400 hover:underline font-bold">
-              ফ্রি রেজিস্টার করুন
+              রেজিস্টার করুন
             </Link>
           </div>
         </div>
