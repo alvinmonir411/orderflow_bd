@@ -6,7 +6,7 @@ import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 
 // These routes render WITHOUT sidebar/navbar — fully standalone pages
-const SHELL_FREE_ROUTES = ['/', '/login', '/register', '/admin'];
+const SHELL_FREE_ROUTES = ['/', '/login', '/register', '/admin', '/demo'];
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
