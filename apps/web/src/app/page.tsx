@@ -207,6 +207,9 @@ export default function LandingPage() {
             <a href="#features" className="hover:text-emerald-400 transition-colors">
               ফিচারসমূহ
             </a>
+            <a href="#crm-saas" className="hover:text-emerald-400 transition-colors">
+              CRM ও টিম ম্যানেজমেন্ট
+            </a>
             <a href="#calculator" className="hover:text-emerald-400 transition-colors">
               খরচ ও সময় ক্যালকুলেটর
             </a>
@@ -216,13 +219,19 @@ export default function LandingPage() {
           </nav>
 
           {/* Action CTAs */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Link
-              href="/dashboard"
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
+              href="/login"
+              className="px-4 py-2 text-sm font-bold text-neutral-300 hover:text-white bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-750 rounded-xl transition-all"
             >
-              <span>ড্যাশবোর্ড ডেমো দেখুন</span>
-              <ArrowRight className="w-4 h-4" />
+              লগইন / ডেমো
+            </Link>
+            <Link
+              href="/register"
+              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
+            >
+              <span>ফ্রি শুরু করুন</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
@@ -242,7 +251,7 @@ export default function LandingPage() {
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
             <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span>Google Gemini 2.5 AI চালিত বাংলাদেশের ১ম এফ-কমার্স অটোমেশন</span>
+            <span>AI F-Commerce Automation & Multi-Tenant SaaS Platform</span>
           </div>
 
           {/* Main Headline */}
@@ -252,31 +261,31 @@ export default function LandingPage() {
               <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
                 ১-ক্লিকে Steadfast কুরিয়ার বুকিং
               </span>{' '}
-              ও সেন্ট্রালাইজড ড্যাশবোর্ড!
+              ও অ্যাডভান্সড CRM ড্যাশবোর্ড!
             </h1>
             <p className="text-base sm:text-xl text-neutral-300 leading-relaxed max-w-3xl mx-auto font-normal">
               পেজে শত শত কাস্টমার মেসেজ দিলেও আর একটি সেলও মিস হবে না। Google Gemini AI মানুষের মতো
-              মিষ্টি বাংলায় কথা বলে ১:১ সাইজে ছবি দেখিয়ে অর্ডার নিবে এবং সরাসরি Steadfast কুরিয়ারে বুকিং করবে।
+              মিষ্টি বাংলায় কথা বলে ১:১ সাইজে ছবি দেখিয়ে অর্ডার নিবে, ড্যাশবোর্ডে টিম অ্যাসাইনমেন্ট ও ট্যাগিং করবে এবং সরাসরি Steadfast কুরিয়ারে বুকিং করবে।
             </p>
           </div>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
             <Link
-              href="/dashboard"
+              href="/register"
               className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-500/25 active:scale-95 transition-all flex items-center justify-center gap-2.5 group"
             >
-              <span>🚀 লাইভ ড্যাশবোর্ড ওপেন করুন</span>
+              <span>🚀 ফ্রি রেজিস্টার করুন</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
 
-            <a
-              href="#how-it-works"
+            <Link
+              href="/login"
               className="w-full sm:w-auto px-7 py-4 bg-neutral-900/90 hover:bg-neutral-850 text-neutral-200 hover:text-white border border-neutral-750 hover:border-neutral-600 font-bold text-base rounded-2xl transition-all shadow-md flex items-center justify-center gap-2"
             >
-              <Play className="w-4 h-4 text-emerald-400 fill-emerald-400" />
-              <span>স্টেপ-বাই-স্টেপ সিমুলেশন দেখুন</span>
-            </a>
+              <Zap className="w-4 h-4 text-emerald-400 fill-emerald-400" />
+              <span>১-ক্লিক ডেমো অ্যাকাউন্ট ট্রাই করুন</span>
+            </Link>
           </div>
 
           {/* Quick Metrics Pills */}
@@ -714,6 +723,74 @@ export default function LandingPage() {
             <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
               ১০ ডিজিট বা অসম্পূর্ণ ফোন নাম্বার দিলে AI নিজ দায়িত্বে কাস্টমারকে বলে সঠিক ১১ ডিজিট নাম্বার ও পরিষ্কার ঠিকানা নিশ্চিত করে।
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 4.5. CRM & Multi-Tenant SaaS Section */}
+      <section id="crm-saas" className="py-20 bg-[#090b12] border-t border-neutral-800/80 relative overflow-hidden">
+        <div className="absolute top-1/2 left-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-14 relative z-10">
+          <div className="text-center space-y-3 max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold rounded-full">
+              <Users className="w-3.5 h-3.5" />
+              <span>Multi-Tenant Enterprise Architecture</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-neutral-100 tracking-tight">
+              সম্পূর্ণ টিম ও ইনবক্স কন্ট্রোল —{' '}
+              <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
+                একটি সেন্ট্রালাইজড CRM সল্যুশন
+              </span>
+            </h2>
+            <p className="text-sm sm:text-base text-neutral-400">
+              একাধিক কর্মী, পেজ ও চ্যাট হ্যান্ডেল করুন কোনো কনফিউশন ছাড়াই। রোল-বেসড অ্যাক্সেস এবং কাস্টম ট্যাগের মাধ্যমে দ্রুত ডিল ক্লোজ করুন।
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-[#10131f] border border-neutral-800/80 rounded-3xl p-6 space-y-4 hover:border-indigo-500/40 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center font-black">
+                👥
+              </div>
+              <h3 className="text-lg font-bold text-neutral-100">৩-লেভেল রোল ও টিম ম্যানেজমেন্ট</h3>
+              <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                Super Admin, Store Owner/Admin এবং Support Agent রোল। এজেন্টরা শুধুমাত্র অনুমোদিত চ্যাট ও অর্ডার দেখতে পারবে, কোনো কনফিগারেশন পরিবর্তন করতে পারবে না।
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-500/15 text-amber-300 rounded-md border border-amber-500/30">👑 Super Admin</span>
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-indigo-500/15 text-indigo-300 rounded-md border border-indigo-500/30">💼 Admin</span>
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-500/15 text-emerald-300 rounded-md border border-emerald-500/30">💬 Agent</span>
+              </div>
+            </div>
+
+            <div className="bg-[#10131f] border border-neutral-800/80 rounded-3xl p-6 space-y-4 hover:border-indigo-500/40 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 text-rose-400 flex items-center justify-center font-black">
+                🏷️
+              </div>
+              <h3 className="text-lg font-bold text-neutral-100">অ্যাডভান্সড ৩-কলাম CRM ইনবক্স</h3>
+              <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                চ্যাট স্ট্যাটাস পাইপলাইন (Open, Pending, Resolved), টিম অ্যাসাইনমেন্ট, হট লিড / ভিআইপি ট্যাগ এবং কাস্টমার হিস্ট্রি টাইমলাইন এক স্ক্রিনে।
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-rose-500/15 text-rose-300 rounded-md border border-rose-500/30">🔥 Hot Lead</span>
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-purple-500/15 text-purple-300 rounded-md border border-purple-500/30">💎 VIP</span>
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-500/15 text-amber-300 rounded-md border border-amber-500/30">⏰ Follow Up</span>
+              </div>
+            </div>
+
+            <div className="bg-[#10131f] border border-neutral-800/80 rounded-3xl p-6 space-y-4 hover:border-indigo-500/40 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-black">
+                🔒
+              </div>
+              <h3 className="text-lg font-bold text-neutral-100">প্রাইভেট ইন্টারনাল নোটস ও সিকিউরিটি</h3>
+              <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+                টিমের সদস্যরা নিজেদের মধ্যে যেকোনো কথোপকথনে গোপন নোট রাখতে পারবে যা কাস্টমার কখনোই দেখবে না। সাথে PBKDF2 এনক্রিপশন ও রেট লিমিটিং।
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-neutral-800 text-neutral-300 rounded-md border border-neutral-700">🔒 Zero Leak</span>
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-teal-500/15 text-teal-300 rounded-md border border-teal-500/30">⚡ HttpOnly Cookies</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>

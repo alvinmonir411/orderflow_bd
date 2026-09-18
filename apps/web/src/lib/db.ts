@@ -1402,6 +1402,9 @@ export async function setDbConversationTags(
   }
 }
 
+// Backwards compatibility alias
+export const updateDbConversationTags = setDbConversationTags;
+
 // ==========================================
 // INTERNAL NOTES & TIMELINE (Normalized)
 // ==========================================
