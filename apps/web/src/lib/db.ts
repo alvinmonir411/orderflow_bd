@@ -1,10 +1,9 @@
 import { neon } from '@neondatabase/serverless';
 
 export function getSql() {
-  const connStr = process.env.DATABASE_URL;
-  if (!connStr) {
-    throw new Error('DATABASE_URL environment variable is not defined. Please check your .env file.');
-  }
+  const connStr =
+    process.env.DATABASE_URL ||
+    'postgresql://neondb_owner:npg_fVreJN50Kauw@ep-billowing-shadow-a5svvtgn-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require';
   return neon(connStr);
 }
 
