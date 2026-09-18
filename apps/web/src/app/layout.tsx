@@ -22,8 +22,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="bn" className="dark">
-      <body className={`${inter.variable} ${hindSiliguri.variable} font-sans bg-[#090a0f] text-neutral-100 antialiased min-h-screen`}>
+    <html lang="bn" className="dark" suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className={`${inter.variable} ${hindSiliguri.variable} font-sans bg-[#090a0f] text-neutral-100 antialiased min-h-screen`}
+      >
         <AppShell>{children}</AppShell>
         <Toaster
           position="top-right"
