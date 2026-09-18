@@ -635,6 +635,42 @@ async function processMessengerEvent(
     return;
   }
 
+  // 5b. IF USER ASKS FOR PRODUCT LIST / WHAT PRODUCTS WE HAVE:
+  const isProductListQuery =
+    lowerText.includes('ki ki product') ||
+    lowerText.includes('ki product') ||
+    lowerText.includes('product list') ||
+    lowerText.includes('list dao') ||
+    lowerText.includes('list den') ||
+    lowerText.includes('collection') ||
+    lowerText.includes('ki ache') ||
+    lowerText.includes('ki ki ache') ||
+    lowerText.includes('dress ki ki') ||
+    lowerText.includes('কি কি প্রোডাক্ট') ||
+    lowerText.includes('প্রোডাক্ট লিস্ট') ||
+    lowerText.includes('কালেকশন') ||
+    lowerText.includes('লিস্ট দাও') ||
+    lowerText.includes('লিস্ট দিন') ||
+    lowerText.includes('কি কি আছে');
+
+  if (isProductListQuery) {
+    const topProds = liveProducts.length > 0 ? liveProducts : [
+      { id: '1', title: 'জয়পুরি কটন আনস্টিচড থ্রি-পিস', basePrice: 1250, category: 'থ্রি-পিস' },
+      { id: '2', title: 'প্রিমিয়াম কাশ্মীরি কুর্তি', basePrice: 850, category: 'কুর্তি' },
+      { id: '3', title: 'ডিজাইনার পার্টি গাউন', basePrice: 1500, category: 'গাউন' },
+    ];
+
+    const listText = topProds.slice(0, 8).map((p: any, i: number) => {
+      const cat = p.category ? ` (${p.category})` : '';
+      return `${i + 1}. 👗 ${p.title} - ৳${p.basePrice}${cat}`;
+    }).join('\n');
+
+    const reply = `আসসালামু আলাইকুম! 🌸 আমাদের স্টোরে বর্তমান রানিং স্পেশাল কালেকশন:\n\n${listText}\n\n💡 যেকোনো প্রোডাক্টের ফুল HD ছবি দেখতে 'ছবি দেখাও' লিখুন, অথবা পছন্দের প্রোডাক্ট নির্বাচন করতে নিচে চাপ দিন 👇`;
+    recordChatTurn(senderId, rawText, reply);
+    await sendFbQuickReplies(senderId, reply, getDynamicQuickReplies(), pageToken);
+    return;
+  }
+
   // 6. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
   const isBusinessKeywords = 
     lowerText.includes('order') ||
