@@ -88,9 +88,6 @@ const INITIAL_DEMO_ORDERS: Order[] = [
     deliveryCharge: 100,
     discount: 0,
     totalPrice: 1850,
-    courierProvider: 'STEADFAST',
-    courierTrackingId: 'STDF88231',
-    consignmentId: 'CID-991201',
     courierStatus: 'ডেলিভার্ড ও ক্যাশ কালেক্টেড',
     createdAt: '2026-09-18T09:15:00.000Z',
     items: [
@@ -120,10 +117,7 @@ const INITIAL_DEMO_ORDERS: Order[] = [
     deliveryCharge: 80,
     discount: 0,
     totalPrice: 2400,
-    courierProvider: 'PATHAO',
-    courierTrackingId: 'PT-44912',
-    consignmentId: 'CID-991200',
-    courierStatus: 'রাইডার পিকআপ সম্পন্ন (ইন-ট্রানজিট)',
+    courierStatus: 'ডেলিভারি চলমান (ইন-ট্রানজিট)',
     createdAt: '2026-09-18T10:02:00.000Z',
     items: [
       {
@@ -152,10 +146,7 @@ const INITIAL_DEMO_ORDERS: Order[] = [
     deliveryCharge: 120,
     discount: 0,
     totalPrice: 1200,
-    courierProvider: 'STEADFAST',
-    courierTrackingId: 'STDF88219',
-    consignmentId: 'CID-991198',
-    courierStatus: 'পার্সেল রেডি ফর পিকআপ',
+    courierStatus: 'অর্ডার প্রস্তুত হচ্ছে',
     createdAt: '2026-09-18T10:45:00.000Z',
     items: [
       {
@@ -184,10 +175,7 @@ const INITIAL_DEMO_ORDERS: Order[] = [
     deliveryCharge: 130,
     discount: 0,
     totalPrice: 1550,
-    courierProvider: 'STEADFAST',
-    courierTrackingId: 'STDF88210',
-    consignmentId: 'CID-991195',
-    courierStatus: 'কুরিয়ার বুকিং জেনারেট হয়েছে',
+    courierStatus: 'কনফার্মড',
     createdAt: '2026-09-18T11:10:00.000Z',
     items: [
       {
@@ -216,9 +204,6 @@ const INITIAL_DEMO_ORDERS: Order[] = [
     deliveryCharge: 100,
     discount: 0,
     totalPrice: 2950,
-    courierProvider: 'STEADFAST',
-    courierTrackingId: 'STDF88195',
-    consignmentId: 'CID-991180',
     courierStatus: 'ডেলিভার্ড ও ক্যাশ কালেক্টেড',
     createdAt: '2026-09-18T08:30:00.000Z',
     items: [
@@ -226,7 +211,7 @@ const INITIAL_DEMO_ORDERS: Order[] = [
         id: 'item-5',
         orderId: 'ord-5',
         productId: 'p-5',
-        product: { title: 'স্মার্ট ফিটনেস ব্যান্ড ওয়াচ প্রো', basePrice: 2850 },
+        product: { title: 'স্মার্ট ফিটনেস ব্যান্ড Watch Pro', basePrice: 2850 },
         variant: { name: 'কালো সিলিকন স্ট্র্যাপ' },
         quantity: 1,
         unitPrice: 2850,
@@ -276,10 +261,7 @@ const INITIAL_DEMO_ORDERS: Order[] = [
     deliveryCharge: 70,
     discount: 0,
     totalPrice: 2020,
-    courierProvider: 'STEADFAST',
-    courierTrackingId: 'STDF88172',
-    consignmentId: 'CID-991165',
-    courierStatus: 'পার্সেল ইন-ট্রানজিট',
+    courierStatus: 'ডেলিভারি চলমান',
     createdAt: '2026-09-18T09:40:00.000Z',
     items: [
       {
@@ -317,13 +299,12 @@ const INITIAL_BOT_MSGS: DemoChatMessage[] = [
 ];
 
 export default function DemoDashboardPage() {
-  const [activeNav, setActiveNav] = useState<'overview' | 'messages' | 'orders' | 'products' | 'bot' | 'courier'>('overview');
+  const [activeNav, setActiveNav] = useState<'overview' | 'messages' | 'orders' | 'products' | 'bot'>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>(INITIAL_DEMO_ORDERS);
   const [orderFilter, setOrderFilter] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'IN_TRANSIT' | 'DELIVERED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
-  const [copiedTracking, setCopiedTracking] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // AI Chat simulation state
@@ -370,13 +351,6 @@ export default function DemoDashboardPage() {
     });
   }, [orders, orderFilter, searchQuery]);
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedTracking(text);
-    toast.success(`ট্র্যাকিং কোড (${text}) কপি করা হয়েছে`);
-    setTimeout(() => setCopiedTracking(null), 2000);
-  };
-
   const handleRefreshData = () => {
     setIsRefreshing(true);
     setTimeout(() => {
@@ -390,25 +364,22 @@ export default function DemoDashboardPage() {
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: 'CONFIRMED' } : o))
     );
-    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার Steadfast বা Pathao কুরিয়ারে বুকিং করতে পারেন।');
+    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার ডেলিভারির জন্য পাঠাতে পারেন।');
   };
 
-  const handleDispatchCourier = (orderId: string, provider: 'STEADFAST' | 'PATHAO') => {
-    const tracking = provider === 'STEADFAST' ? `STDF${Math.floor(10000 + Math.random() * 90000)}` : `PT-${Math.floor(10000 + Math.random() * 90000)}`;
+  const handleDispatchDelivery = (orderId: string) => {
     setOrders((prev) =>
       prev.map((o) =>
         o.id === orderId
           ? {
               ...o,
               status: 'IN_TRANSIT',
-              courierProvider: provider,
-              courierTrackingId: tracking,
-              courierStatus: `${provider} রাইডার পিকআপ সম্পন্ন (ইন-ট্রানজিট)`,
+              courierStatus: 'ডেলিভারি চলমান (ইন-ট্রানজিট)',
             }
           : o
       )
     );
-    toast.success(`${provider} কুরিয়ারে বুকিং সম্পন্ন! ট্র্যাকিং কোড: ${tracking}`);
+    toast.success('অর্ডারটি ডেলিভারির জন্য পাঠানো হয়েছে (ইন-ট্রানজিট)!');
   };
 
   const handleMarkDelivered = (orderId: string) => {
@@ -448,7 +419,7 @@ export default function DemoDashboardPage() {
       });
 
       const data = await res.json();
-      const botReply = data.reply || 'ধন্যবাদ আপনার মেসেজের জন্য! আমাদের ডেলিভারি টিম খুব দ্রুত এটি প্রসেস করছে।';
+      const botReply = data.reply || 'ধন্যবাদ আপনার মেসেজের জন্য! আমাদের সেলস টিম খুব দ্রুত এটি প্রসেস করছে।';
       const quickReplies = data.quickReplies;
 
       setChatMessages((prev) => [
@@ -479,10 +450,7 @@ export default function DemoDashboardPage() {
           deliveryCharge: data.orderData.deliveryCharge || 70,
           discount: 0,
           totalPrice: data.orderData.totalPrice || 1320,
-          courierProvider: 'STEADFAST',
-          courierTrackingId: `STDF${Math.floor(10000 + Math.random() * 90000)}`,
-          consignmentId: `CID-${Math.floor(100000 + Math.random() * 900000)}`,
-          courierStatus: 'পার্সেল রেডি ফর পিকআপ',
+          courierStatus: 'অর্ডার প্রস্তুত হচ্ছে',
           createdAt: new Date().toISOString(),
           items: [
             {
@@ -501,7 +469,7 @@ export default function DemoDashboardPage() {
         };
 
         setOrders((prev) => [newOrder, ...prev]);
-        toast.success(`🎉 এআই মেসেঞ্জার চ্যাট থেকে নতুন অর্ডার #OF-${newOrderNum} সিস্টেমে অটো-এন্ট্রি নিয়েছে!`);
+        toast.success(`🎉 এআই মেসেঞ্জার চ্যাট থেকে নতুন অর্ডার #OF-${newOrderNum} সিস্টেমে যুক্ত হয়েছে!`);
       }
     } catch (err) {
       // Fallback
@@ -595,15 +563,6 @@ export default function DemoDashboardPage() {
       badge: 'Gemini AI',
       badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
       gradient: 'from-indigo-500/20 to-purple-500/10',
-    },
-    {
-      id: 'courier',
-      name: 'কুরিয়ার ইন্টিগ্রেশন',
-      sub: 'Steadfast & Pathao APIs',
-      icon: Zap,
-      badge: 'Active',
-      badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      gradient: 'from-blue-500/20 to-cyan-500/10',
     },
   ];
 
@@ -798,11 +757,10 @@ export default function DemoDashboardPage() {
 
             {/* Quick Status Badges & CTAs */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Integration status pills */}
               <div className="hidden xl:flex items-center gap-2">
                 <div className="px-2.5 py-1 bg-slate-900/80 border border-emerald-500/30 rounded-xl flex items-center gap-1.5 text-xs text-emerald-400 font-mono">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span>Steadfast ৳৪২,৫০০</span>
+                  <span>ক্যাশ অন ডেলিভারি (COD)</span>
                 </div>
                 <div className="px-2.5 py-1 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center gap-1.5 text-xs text-indigo-300">
                   <Bot className="w-3.5 h-3.5 text-indigo-400" />
@@ -901,7 +859,7 @@ export default function DemoDashboardPage() {
                   </div>
                 </div>
 
-                {/* 6 Key Business Metrics KPI Cards (Matching Original Dashboard) */}
+                {/* 6 Key Business Metrics KPI Cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
                   {/* Card 1: Today's Orders */}
                   <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0e1422] to-[#080d16] border border-emerald-500/25 p-4 space-y-2 shadow-xl hover:border-emerald-500/40 transition-all group">
@@ -966,7 +924,7 @@ export default function DemoDashboardPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        কুরিয়ারে ডেলিভারি
+                        ডেলিভারি চলমান
                       </span>
                       <div className="w-7 h-7 bg-purple-500/15 border border-purple-500/30 text-purple-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Truck className="w-3.5 h-3.5" />
@@ -977,7 +935,7 @@ export default function DemoDashboardPage() {
                         <span>{metrics.dispatchedCount}</span>
                         <span className="text-xs font-semibold text-slate-400 font-sans">টি</span>
                       </div>
-                      <p className="text-[11px] text-purple-300 mt-1">Steadfast / Pathao</p>
+                      <p className="text-[11px] text-purple-300 mt-1">ক্যাশ অন ডেলিভারি (COD)</p>
                     </div>
                     <div className="w-full h-1 bg-slate-800 rounded-full mt-2 overflow-hidden">
                       <div className="h-full bg-purple-400 rounded-full" style={{ width: '60%' }} />
@@ -1144,7 +1102,7 @@ export default function DemoDashboardPage() {
                         <ShoppingBag className="w-5 h-5 text-emerald-400" />
                         <span>আজকের রিসেন্ট অর্ডারসমূহ</span>
                       </h3>
-                      <p className="text-xs text-slate-400">১-ক্লিকে কনফার্ম, কুরিয়ার বুকিং ও ক্যাশমেমো প্রিন্ট করুন</p>
+                      <p className="text-xs text-slate-400">১-ক্লিকে কনফার্ম, ডেলিভারিতে পাঠানো ও ক্যাশমেমো প্রিন্ট করুন</p>
                     </div>
                     <button
                       onClick={() => setActiveNav('orders')}
@@ -1163,7 +1121,7 @@ export default function DemoDashboardPage() {
                           <th className="py-3 px-3">কাস্টমার</th>
                           <th className="py-3 px-3">পণ্য</th>
                           <th className="py-3 px-3">মূল্য</th>
-                          <th className="py-3 px-3">কুরিয়ার</th>
+                          <th className="py-3 px-3">পেমেন্ট মেথড</th>
                           <th className="py-3 px-3">স্ট্যাটাস</th>
                           <th className="py-3 px-3 text-right">অ্যাকশন</th>
                         </tr>
@@ -1185,13 +1143,7 @@ export default function DemoDashboardPage() {
                               {formatBDTEn(order.totalPrice)}
                             </td>
                             <td className="py-3 px-3">
-                              {order.courierTrackingId ? (
-                                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-300">
-                                  {order.courierProvider}: {order.courierTrackingId}
-                                </span>
-                              ) : (
-                                <span className="text-amber-400/80 text-[11px]">বুকিং পেন্ডিং</span>
-                              )}
+                              <span className="text-emerald-400 font-medium text-[11px]">ক্যাশ অন ডেলিভারি (COD)</span>
                             </td>
                             <td className="py-3 px-3">{getStatusBadge(order.status)}</td>
                             <td className="py-3 px-3 text-right">
@@ -1206,10 +1158,10 @@ export default function DemoDashboardPage() {
                                 )}
                                 {order.status === 'CONFIRMED' && (
                                   <button
-                                    onClick={() => handleDispatchCourier(order.id, 'STEADFAST')}
-                                    className="px-2.5 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                    onClick={() => handleDispatchDelivery(order.id)}
+                                    className="px-2.5 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
                                   >
-                                    Steadfast
+                                    ডেলিভারিতে পাঠান
                                   </button>
                                 )}
                                 <button
@@ -1344,8 +1296,6 @@ export default function DemoDashboardPage() {
                             অর্ডার নং: <span className="font-mono font-bold text-emerald-300">#OF-8940</span>
                             <br />
                             মোট মূল্য: ৳২৪০০ (ক্যাশ অন ডেলিভারি)
-                            <br />
-                            কুরিয়ার: Pathao Express (ট্র্যাকিং: PT-44912)
                           </p>
                         </div>
                       </div>
@@ -1374,10 +1324,10 @@ export default function DemoDashboardPage() {
                   <div>
                     <h2 className="text-xl font-black text-white flex items-center gap-2">
                       <ShoppingBag className="w-5 h-5 text-emerald-400" />
-                      <span>অর্ডার ম্যানেজমেন্ট ও ৫-স্টেপ কুরিয়ার পাইপলাইন</span>
+                      <span>অর্ডার ম্যানেজমেন্ট ও ৫-স্টেপ অর্ডার পাইপলাইন</span>
                     </h2>
                     <p className="text-xs text-slate-400">
-                      মোট {orders.length} টি ডেমো অর্ডার • লাইভ ফিল্টারিং, ১-ক্লিক কুরিয়ার বুকিং ও ক্যাশমেমো প্রিন্ট
+                      মোট {orders.length} টি ডেমো অর্ডার • লাইভ ফিল্টারিং, ১-ক্লিক ডেলিভারি স্ট্যাটাস ও ক্যাশমেমো প্রিন্ট
                     </p>
                   </div>
 
@@ -1427,7 +1377,7 @@ export default function DemoDashboardPage() {
                         <th className="py-3.5 px-3">ঠিকানা</th>
                         <th className="py-3.5 px-3">অর্ডারকৃত পণ্য</th>
                         <th className="py-3.5 px-3">মূল্য (COD)</th>
-                        <th className="py-3.5 px-3">কুরিয়ার ট্র্যাকিং</th>
+                        <th className="py-3.5 px-3">পেমেন্ট মেথড</th>
                         <th className="py-3.5 px-3">স্ট্যাটাস</th>
                         <th className="py-3.5 px-3 text-right">অ্যাকশন</th>
                       </tr>
@@ -1469,25 +1419,7 @@ export default function DemoDashboardPage() {
                               <span className="text-[10px] text-emerald-400 font-normal">ক্যাশ অন ডেলিভারি</span>
                             </td>
                             <td className="py-4 px-3">
-                              {order.courierTrackingId ? (
-                                <div className="space-y-1">
-                                  <button
-                                    onClick={() => handleCopy(order.courierTrackingId!)}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded font-mono text-[11px] border border-slate-700 transition-all cursor-pointer"
-                                    title="কপি করুন"
-                                  >
-                                    <span>{order.courierTrackingId}</span>
-                                    {copiedTracking === order.courierTrackingId ? (
-                                      <Check className="w-3 h-3 text-emerald-400" />
-                                    ) : (
-                                      <Copy className="w-3 h-3 text-slate-400" />
-                                    )}
-                                  </button>
-                                  <p className="text-[10px] text-slate-400">{order.courierStatus}</p>
-                                </div>
-                              ) : (
-                                <span className="text-slate-500">বুকিং পেন্ডিং</span>
-                              )}
+                              <span className="text-emerald-400 font-medium text-[11px]">ক্যাশ অন ডেলিভারি (COD)</span>
                             </td>
                             <td className="py-4 px-3">{getStatusBadge(order.status)}</td>
                             <td className="py-4 px-3 text-right">
@@ -1501,22 +1433,12 @@ export default function DemoDashboardPage() {
                                   </button>
                                 )}
                                 {order.status === 'CONFIRMED' && (
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      onClick={() => handleDispatchCourier(order.id, 'STEADFAST')}
-                                      className="px-2 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                      title="Steadfast কুরিয়ারে বুক করুন"
-                                    >
-                                      Steadfast
-                                    </button>
-                                    <button
-                                      onClick={() => handleDispatchCourier(order.id, 'PATHAO')}
-                                      className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                                      title="Pathao কুরিয়ারে বুক করুন"
-                                    >
-                                      Pathao
-                                    </button>
-                                  </div>
+                                  <button
+                                    onClick={() => handleDispatchDelivery(order.id)}
+                                    className="px-2.5 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                  >
+                                    ডেলিভারিতে পাঠান
+                                  </button>
                                 )}
                                 {order.status === 'IN_TRANSIT' && (
                                   <button
@@ -1756,89 +1678,6 @@ export default function DemoDashboardPage() {
                         <span>পাঠান</span>
                         <Send className="w-3.5 h-3.5" />
                       </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ---------------------------------------------------- */}
-            {/* VIEW 6: COURIER INTEGRATION (STEADFAST & PATHAO) */}
-            {/* ---------------------------------------------------- */}
-            {activeNav === 'courier' && (
-              <div className="bg-[#0b0f19]/90 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-6">
-                <div>
-                  <h2 className="text-xl font-black text-white flex items-center gap-2">
-                    <Truck className="w-5 h-5 text-teal-400" />
-                    <span>Steadfast ও Pathao কুরিয়ার অটোমেশন এপিআই</span>
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    ড্যাশবোর্ডে ১-ক্লিকে কুরিয়ার বুকিং, ইনভয়েস প্রিন্ট ও রিটার্ন ফ্রড চেক
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Steadfast Card */}
-                  <div className="p-5 bg-slate-950/70 border border-emerald-500/30 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs">
-                          SF
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white text-sm">Steadfast Courier API</h4>
-                          <p className="text-[11px] text-emerald-400">স্বয়ংক্রিয় ১-ক্লিক পার্সেল এন্ট্রি</p>
-                        </div>
-                      </div>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded-full">
-                        সক্রিয়
-                      </span>
-                    </div>
-                    <div className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">বর্তমান ওয়ালেট ব্যালেন্স:</span>
-                        <span className="font-mono font-bold text-white">৳ ৪২,৫০০</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">আজকের ডেলিভারি সম্পন্ন:</span>
-                        <span className="font-mono font-bold text-emerald-400">১৮ টি পার্সেল</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">গড় ডেলিভারি সময়:</span>
-                        <span className="font-mono font-bold text-slate-300">১.৮ দিন (ঢাকা ও মেট্রো)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pathao Card */}
-                  <div className="p-5 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center font-black text-xs">
-                          PT
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white text-sm">Pathao Courier Webhook</h4>
-                          <p className="text-[11px] text-slate-400">রিয়েল-টাইম রাইডার ট্র্যাকিং</p>
-                        </div>
-                      </div>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded-full">
-                        সংযুক্ত
-                      </span>
-                    </div>
-                    <div className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">আজকের পিকআপ রিকোয়েস্ট:</span>
-                        <span className="font-mono font-bold text-white">১২ টি পার্সেল</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">ওয়েবহুক স্ট্যাটাস:</span>
-                        <span className="font-mono font-bold text-emerald-400">Active (200 OK)</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">ক্যাশ রিকনসিলিয়েশন:</span>
-                        <span className="font-mono font-bold text-slate-300">অটোমেটিক ব্যাংক ট্রান্সফার</span>
-                      </div>
                     </div>
                   </div>
                 </div>

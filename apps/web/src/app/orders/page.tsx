@@ -104,27 +104,21 @@ export default function OrdersPage() {
   // Step 1: Confirm Order
   const handleConfirmOrder = async (orderId: string) => {
     await api.updateOrderStatus(orderId, 'CONFIRMED');
-    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার কুরিয়ারে পাঠাতে পারেন।');
+    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার ডেলিভারির জন্য পাঠাতে পারেন।');
     loadOrders();
   };
 
-  // Step 2: Dispatch to Courier (Steadfast / Pathao)
-  const handleDispatchSteadfast = async (orderId: string) => {
-    const updated = await api.dispatchSteadfast(orderId);
-    toast.success(`Steadfast কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং: ${updated.courierTrackingId}`);
-    loadOrders();
-  };
-
-  const handleDispatchPathao = async (orderId: string) => {
-    const updated = await api.dispatchPathao(orderId);
-    toast.success(`Pathao কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং: ${updated.courierTrackingId}`);
+  // Step 2: Dispatch for Delivery
+  const handleDispatchDelivery = async (orderId: string) => {
+    await api.updateOrderStatus(orderId, 'IN_TRANSIT');
+    toast.success('অর্ডারটি ডেলিভারির জন্য পাঠানো হয়েছে (ইন-ট্রানজিট)!');
     loadOrders();
   };
 
   // Step 3: Rider Received (In Transit)
   const handleRiderReceived = async (orderId: string) => {
     await api.updateOrderStatus(orderId, 'IN_TRANSIT');
-    toast.success('কুরিয়ার রাইডার পার্সেল রিসিভ করেছে! অন দ্য ওয়ে ডেলিভারি হচ্ছে।');
+    toast.success('পার্সেল অন দ্য ওয়ে ডেলিভারি হচ্ছে।');
     loadOrders();
   };
 
@@ -868,24 +862,16 @@ export default function OrdersPage() {
                             </>
                           )}
 
-                          {/* Step 2: Confirmed -> Courier Dispatch */}
+                          {/* Step 2: Confirmed -> In Transit */}
                           {order.status === 'CONFIRMED' && (
                             <>
                               <button
-                                onClick={() => handleDispatchSteadfast(order.id)}
-                                title="Steadfast কুরিয়ারে বুকিং করুন"
-                                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                                onClick={() => handleDispatchDelivery(order.id)}
+                                title="ডেলিভারির জন্য পাঠান"
+                                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
                               >
                                 <Truck className="w-3.5 h-3.5" />
-                                Steadfast
-                              </button>
-                              <button
-                                onClick={() => handleDispatchPathao(order.id)}
-                                title="Pathao কুরিয়ারে বুকিং করুন"
-                                className="px-3 py-1.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
-                              >
-                                <Truck className="w-3.5 h-3.5" />
-                                Pathao
+                                ডেলিভারিতে পাঠান
                               </button>
                               <button
                                 onClick={() => setSelectedCancelOrder(order)}

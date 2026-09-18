@@ -97,27 +97,21 @@ export default function DashboardPage() {
   // Step 1: Confirm Order
   const handleConfirmOrder = async (orderId: string) => {
     await api.updateOrderStatus(orderId, 'CONFIRMED');
-    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার কুরিয়ারে পাঠাতে পারেন।');
+    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার ডেলিভারির জন্য পাঠাতে পারেন।');
     loadData();
   };
 
-  // Step 2: Courier Dispatch
-  const handleDispatchSteadfast = async (orderId: string) => {
-    const updated = await api.dispatchSteadfast(orderId);
-    toast.success(`Steadfast কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং কোড: ${updated.courierTrackingId}`);
+  // Step 2: Dispatch for Delivery
+  const handleDispatchDelivery = async (orderId: string) => {
+    await api.updateOrderStatus(orderId, 'IN_TRANSIT');
+    toast.success('অর্ডারটি ডেলিভারির জন্য পাঠানো হয়েছে (ইন-ট্রানজিট)!');
     loadData();
   };
 
-  const handleDispatchPathao = async (orderId: string) => {
-    const updated = await api.dispatchPathao(orderId);
-    toast.success(`Pathao কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং কোড: ${updated.courierTrackingId}`);
-    loadData();
-  };
-
-  // Step 3: Rider Received
+  // Step 3: Rider Received / On the way
   const handleRiderReceived = async (orderId: string) => {
     await api.updateOrderStatus(orderId, 'IN_TRANSIT');
-    toast.success('কুরিয়ার রাইডার পার্সেল রিসিভ করেছে! অন দ্য ওয়ে ডেলিভারি হচ্ছে।');
+    toast.success('পার্সেল অন দ্য ওয়ে ডেলিভারি হচ্ছে।');
     loadData();
   };
 
@@ -336,17 +330,17 @@ export default function DashboardPage() {
             </Link>
 
             <Link
-              href="/bot-settings"
+              href="/products"
               className="p-4 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all group block"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white group-hover:text-emerald-300 flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[10px] font-mono">3</span>
-                  <span>Steadfast কুরিয়ার API</span>
+                  <span>প্রোডাক্ট ও স্টক যুক্ত করুন</span>
                 </span>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">Steadfast API Key দিয়ে ১-ক্লিক অটো কুরিয়ার বুকিং চালু করুন</p>
+              <p className="text-[11px] text-slate-400 mt-1.5">আপনার শপের ড্রেস ও পণ্যের ক্যাটালগ এবং স্টক যুক্ত করুন</p>
             </Link>
           </div>
         </div>
@@ -422,13 +416,14 @@ export default function DashboardPage() {
         </Link>
 
         {/* 3. Dispatched / In Courier */}
+        {/* 3. Dispatched / In Transit */}
         <Link
           href="/orders"
           className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#161022] to-[#0c0915] border border-purple-500/25 p-4 space-y-2 shadow-xl hover:border-purple-500/50 transition-all group block cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              কুরিয়ারে ডেলিভারি
+              ডেলিভারি চলমান
             </span>
             <div className="w-7 h-7 bg-purple-500/15 border border-purple-500/30 text-purple-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
               <Truck className="w-3.5 h-3.5" />
@@ -439,7 +434,7 @@ export default function DashboardPage() {
               <span>{metrics?.dispatchedCount ?? 0}</span>
               <span className="text-xs font-semibold text-slate-400 font-sans">টি</span>
             </div>
-            <p className="text-[11px] text-purple-300 mt-1">Steadfast / Pathao</p>
+            <p className="text-[11px] text-purple-300 mt-1">ক্যাশ অন ডেলিভারি (COD)</p>
           </div>
           <div className="w-full h-1 bg-slate-800 rounded-full mt-2 overflow-hidden">
             <div 
@@ -670,14 +665,14 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Highlight 3: 1-Click Courier Sync */}
+        {/* Highlight 3: 1-Click Invoice & Memo */}
         <div className="p-5 bg-gradient-to-br from-[#101726] to-[#080d17] border border-slate-800/90 rounded-2xl space-y-2 shadow-lg">
           <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
-            <Truck className="w-5 h-5" />
+            <Printer className="w-5 h-5" />
           </div>
-          <h4 className="text-sm font-bold text-white">Steadfast ও Pathao অটো বুকিং</h4>
+          <h4 className="text-sm font-bold text-white">১-ক্লিক ক্যাশমেমো ও চালান প্রিন্ট</h4>
           <p className="text-xs text-slate-400 leading-relaxed">
-            এক্সেল শিটে হাত দিয়ে লেখার দরকার নেই। কনফার্ম চাপার সাথে সাথে কুরিয়ারে বুকিং হয়ে ট্র্যাকিং কোড জেনারেট হয়।
+            এক্সেল শিটে হাত দিয়ে লেখার দরকার নেই। যেকোনো অর্ডারের চালান ও ক্যাশমেমো প্রিন্টারে ১-ক্লিকে প্রিন্ট করুন।
           </p>
         </div>
       </div>
@@ -693,7 +688,7 @@ export default function DashboardPage() {
               </h3>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              ১-ক্লিক কনফার্মেশন, কুরিয়ার বুকিং ও ক্যাশ মেমো প্রিন্ট
+              ১-ক্লিক কনফার্মেশন, ডেলিভারি স্ট্যাটাস ও ক্যাশ মেমো প্রিন্ট
             </p>
           </div>
           <Link
@@ -850,15 +845,15 @@ export default function DashboardPage() {
                             </>
                           )}
 
-                          {/* Step 2: Confirmed -> Courier Dispatch / Cancel */}
+                          {/* Step 2: Confirmed -> Dispatched / In Transit */}
                           {order.status === 'CONFIRMED' && (
                             <>
                               <button
-                                onClick={() => handleDispatchSteadfast(order.id)}
-                                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                                onClick={() => handleDispatchDelivery(order.id)}
+                                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
                               >
                                 <Truck className="w-3.5 h-3.5" />
-                                Steadfast
+                                ডেলিভারিতে পাঠান
                               </button>
                               <button
                                 onClick={() => setSelectedCancelOrder(order)}
