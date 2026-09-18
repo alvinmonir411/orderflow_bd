@@ -15,11 +15,13 @@ import {
   Layers,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Info,
   Check,
   AlertCircle,
   Trash2,
-  LogIn,
+  Settings,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { loginWithFacebookPopup, loadFacebookSdk } from '@/lib/facebook-sdk';
@@ -53,6 +55,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isLoggingInFb, setIsLoggingInFb] = useState(false);
+  const [showDevSettings, setShowDevSettings] = useState(false);
 
   // Connect Modal State
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -94,9 +97,9 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
         const data = await res.json();
         setStatus(data);
         if (data.connected && data.webhookSubscribed) {
-          toast.success('🎉 ফেসবুক পেজ ও ওয়েবহুক সম্পূর্ণ সক্রিয় ও লাইভ রয়েছে!');
+          toast.success('🎉 ফেসবুক পেজ ও মেসেঞ্জার বট সম্পূর্ণ সক্রিয় রয়েছে!');
         } else if (data.connected) {
-          toast.success('ফেসবুক পেজ কানেক্টেড আছে');
+          toast.success(`ফেসবুক পেজ '${data.pageName || 'Facebook Page'}' কানেক্টেড আছে`);
         } else {
           toast.info('কোনো ফেসবুক পেজ কানেক্ট করা নেই');
         }
@@ -139,19 +142,14 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
 
       const data = await res.json();
       if (res.ok && data.success && data.pages && data.pages.length > 0) {
-        if (data.pages.length === 1) {
-          // Exactly 1 page found -> Auto-connect immediately!
-          const singlePage = data.pages[0];
-          await handleConnectSelectedPage(singlePage);
-        } else {
-          // Multiple pages found -> Open selection modal
-          setDiscoveredPages(data.pages);
-          setShowConnectModal(true);
-          setConnectTab('popup');
-          toast.success(`🎉 ${data.pages.length}টি পেজ পাওয়া গেছে! নিচে আপনার পছন্দের পেজটি নির্বাচন করুন।`);
-        }
+        setDiscoveredPages(data.pages);
+        setShowConnectModal(true);
+        setConnectTab('popup');
+        toast.success(`🎉 ${data.pages.length}টি পেজ পাওয়া গেছে! নিচে আপনার পছন্দের পেজটি সিলেক্ট করে কানেক্ট করুন।`);
       } else {
         toast.error(data.error || 'কোনো পেজ খুঁজে পাওয়া যায়নি। পেজের এডমিন এক্সেস নিশ্চিত করুন।');
+        setShowConnectModal(true);
+        setConnectTab('popup');
       }
     } catch (err) {
       console.error('[Facebook 1-Click Login Error]:', err);
@@ -287,22 +285,22 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
 
   return (
     <>
-      <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-6 shadow-xl flex flex-col justify-between relative overflow-hidden">
+      <div className="bg-[#10121a] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl flex flex-col justify-between relative overflow-hidden">
         {/* Ambient Top Glow */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="space-y-5 relative z-10">
+        <div className="space-y-4 relative z-10">
           {/* Card Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-600/30">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-600/30">
                 f
               </div>
               <div>
                 <h3 className="font-extrabold text-neutral-100 text-base sm:text-lg flex items-center gap-2">
                   <span>Facebook Page & Messenger Bot</span>
                 </h3>
-                <p className="text-xs text-neutral-400">মেটা বিজনেস, মেসেঞ্জার অটোমেশন ও অর্ডার সিঙ্ক</p>
+                <p className="text-xs text-neutral-400">মেটা বিজনেস, মেসেঞ্জার অটোমেশন ও অটো-অর্ডার সিঙ্ক</p>
               </div>
             </div>
 
@@ -328,39 +326,39 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
 
           {/* Card Body */}
           {isConnected ? (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {/* Connected Page Details Box */}
-              <div className="p-4 bg-gradient-to-r from-blue-950/25 via-neutral-900/90 to-neutral-900 border border-blue-500/25 rounded-2xl space-y-3.5">
-                <div className="flex items-center justify-between">
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-950/30 via-neutral-900/90 to-neutral-900 border border-blue-500/30 rounded-2xl space-y-3.5 shadow-lg">
+                <div className="flex items-center justify-between flex-wrap gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-lg shadow-inner">
                       {status?.pageName?.charAt(0) || 'F'}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-neutral-400">কানেক্টেড ফেসবুক পেজ:</p>
-                      <h4 className="text-base font-black text-neutral-100 flex items-center gap-1.5">
-                        <span className="text-emerald-300">{status?.pageName || 'FastLain'}</span>
+                      <p className="text-xs font-medium text-neutral-400">কানেক্টেড ফেসবুক পেজ:</p>
+                      <h4 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                        <span className="text-emerald-300">{status?.pageName || 'Facebook Page'}</span>
                       </h4>
-                      <p className="text-[11px] font-mono text-neutral-400">
-                        Page ID: <span className="text-neutral-200">{status?.pageId}</span>
+                      <p className="text-[11px] font-mono text-neutral-400 mt-0.5">
+                        Page ID: <span className="text-neutral-200 font-bold">{status?.pageId}</span>
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={handleRefreshStatus}
                       disabled={isRefreshing}
-                      className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1"
+                      className="px-3.5 py-2 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
                       title="লাইভ কানেকশন চেক করুন"
                     >
-                      <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                       <span>{isRefreshing ? 'যাচাই হচ্ছে...' : 'টেস্ট'}</span>
                     </button>
                     <button
                       onClick={handleDisconnect}
                       disabled={isDisconnecting}
-                      className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-xl text-xs transition-all active:scale-95"
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/15 border border-red-500/25 rounded-xl text-xs transition-all active:scale-95 shadow-sm"
                       title="পেজ ডিসকানেক্ট করুন"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -369,62 +367,89 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                 </div>
 
                 {/* Subscribed Webhook Badges */}
-                <div className="pt-2 border-t border-neutral-800/80 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-neutral-400 text-[11px] font-medium">লাইভ ইভেন্টস:</span>
-                  <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-mono rounded-lg flex items-center gap-1">
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span>messages</span>
-                  </span>
-                  <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-mono rounded-lg flex items-center gap-1">
-                    <Check className="w-3 h-3 text-emerald-400" />
-                    <span>messaging_postbacks</span>
+                <div className="pt-2.5 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-400 text-[11px] font-medium">মেসেঞ্জার বট:</span>
+                    <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] font-medium rounded-lg flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span>অটো-রিপ্লাই ও লাইভ চ্যাট সক্রিয়</span>
+                    </span>
+                  </div>
+
+                  <span className="text-[11px] text-neutral-400">
+                    সব মেসেজ স্বয়ংক্রিয়ভাবে প্রসেস হচ্ছে
                   </span>
                 </div>
               </div>
 
-              {/* Webhook Endpoint Info Box */}
-              <div className="p-3.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-2.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-300 font-bold">Meta Webhook Callback URL:</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(status?.webhookUrl || 'https://orderflowbd.vercel.app/webhooks/facebook', 'Webhook URL')}
-                    className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
-                  >
-                    <Copy className="w-3 h-3" />
-                    <span>কপি করুন</span>
-                  </button>
-                </div>
-                <p className="text-xs font-mono text-emerald-400 bg-neutral-950 px-3 py-2 rounded-xl border border-neutral-800 break-all select-all">
-                  {status?.webhookUrl || 'https://orderflowbd.vercel.app/webhooks/facebook'}
-                </p>
+              {/* Developer Settings Collapsible Accordion */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowDevSettings(!showDevSettings)}
+                  className="w-full flex items-center justify-between text-[11px] font-medium text-neutral-400 hover:text-neutral-200 py-1.5 px-3 bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800/80 rounded-xl transition-all"
+                >
+                  <span className="flex items-center gap-1.5 text-neutral-300">
+                    <Settings className="w-3.5 h-3.5 text-blue-400" />
+                    <span>অ্যাডভান্সড ডেভেলপার সেটিংস (ঐচ্ছিক - কোনো কিছু বসানোর প্রয়োজন নেই)</span>
+                  </span>
+                  {showDevSettings ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
 
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-neutral-300 font-bold">Verify Token:</span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(status?.verifyToken || 'orderflow_bd_verify_token', 'Verify Token')}
-                    className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
-                  >
-                    <Copy className="w-3 h-3" />
-                    <span>কপি করুন</span>
-                  </button>
-                </div>
-                <p className="text-xs font-mono text-emerald-400 bg-neutral-950 px-3 py-2 rounded-xl border border-neutral-800 break-all select-all">
-                  {status?.verifyToken || 'orderflow_bd_verify_token'}
-                </p>
+                {showDevSettings && (
+                  <div className="mt-2.5 p-3.5 bg-neutral-950/90 border border-neutral-800 rounded-2xl space-y-2.5 text-xs animate-in fade-in duration-200">
+                    <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] pb-1 border-b border-neutral-850 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>আপনার পেজে স্বয়ংক্রিয়ভাবে চ্যাটবট সাবস্ক্রাইব করা হয়েছে। কোনো টেকনিক্যাল সেটিংস পরিবর্তন করতে হবে না।</span>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-neutral-300 font-bold text-[11px]">Meta Webhook Callback URL:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(status?.webhookUrl || 'https://orderflowbd.vercel.app/webhooks/facebook', 'Webhook URL')}
+                          className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-md text-[10px] font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                        >
+                          <Copy className="w-2.5 h-2.5" />
+                          <span>কপি</span>
+                        </button>
+                      </div>
+                      <p className="text-[11px] font-mono text-emerald-400 bg-neutral-900/90 px-2.5 py-1.5 rounded-lg border border-neutral-800 break-all select-all">
+                        {status?.webhookUrl || 'https://orderflowbd.vercel.app/webhooks/facebook'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-neutral-300 font-bold text-[11px]">Verify Token:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(status?.verifyToken || 'orderflow_bd_verify_token', 'Verify Token')}
+                          className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 border border-neutral-700 rounded-md text-[10px] font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                        >
+                          <Copy className="w-2.5 h-2.5" />
+                          <span>কপি</span>
+                        </button>
+                      </div>
+                      <p className="text-[11px] font-mono text-emerald-400 bg-neutral-900/90 px-2.5 py-1.5 rounded-lg border border-neutral-800 break-all select-all">
+                        {status?.verifyToken || 'orderflow_bd_verify_token'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
             <div className="p-5 bg-neutral-900/80 border border-neutral-800 rounded-2xl space-y-3">
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
-                  <Sparkles className="w-4 h-4" />
+                <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400 shrink-0 mt-0.5 shadow-sm">
+                  <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-neutral-100">১-ক্লিক নো-কোড ফেসবুক পেজ কানেক্ট</h4>
                   <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
-                    নিচের <strong>"Continue with Facebook"</strong> বাটনে ক্লিক করে আপনার পেজটি নির্বাচন করুন। কোনো টোকেন কপি করা ছাড়াই সিস্টেম স্বয়ংক্রিয়ভাবে বট সক্রিয় করে দিবে।
+                    নিচের <strong>"Continue with Facebook"</strong> বাটনে চাপ দিয়ে আপনার যেকোনো পেজ নির্বাচন করুন। কোনো টোকেন কপি করা ছাড়াই সিস্টেম স্বয়ংক্রিয়ভাবে চ্যাটবট সক্রিয় করে দিবে।
                   </p>
                 </div>
               </div>
@@ -435,7 +460,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
         {/* Card Footer Actions */}
         <div className="pt-2 relative z-10 flex flex-col gap-2">
           {isConnected ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <button
                 onClick={handleFacebookLoginPopup}
                 disabled={isLoggingInFb}
@@ -444,22 +469,25 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                 {isLoggingInFb ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>ফেসবুক লগইন হচ্ছে...</span>
+                    <span>পেজ লোড হচ্ছে...</span>
                   </>
                 ) : (
                   <>
                     <span className="font-bold text-base leading-none">f</span>
-                    <span>১-ক্লিক পেজ রিকানেক্ট</span>
+                    <span>পেজ পরিবর্তন / সিলেক্ট করুন</span>
                   </>
                 )}
               </button>
 
               <button
-                onClick={() => setShowConnectModal(true)}
+                onClick={() => {
+                  setShowConnectModal(true);
+                  setConnectTab('popup');
+                }}
                 className="w-full py-3 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 hover:text-white border border-neutral-700 font-bold text-xs rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                <Key className="w-3.5 h-3.5 text-blue-400" />
-                <span>অন্য অপশন / পেজ মোডাল</span>
+                <Layers className="w-3.5 h-3.5 text-blue-400" />
+                <span>পেজ তালিকা ও বিকল্প অপশন</span>
               </button>
             </div>
           ) : (
@@ -472,7 +500,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                 {isLoggingInFb ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>ফেসবুক লগইন হচ্ছে...</span>
+                    <span>ফেসবুক পেজ লোড হচ্ছে...</span>
                   </>
                 ) : (
                   <>
@@ -483,18 +511,21 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
               </button>
 
               <button
-                onClick={() => setShowConnectModal(true)}
+                onClick={() => {
+                  setShowConnectModal(true);
+                  setConnectTab('token');
+                }}
                 className="w-full py-2 text-neutral-400 hover:text-neutral-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Key className="w-3.5 h-3.5 text-neutral-500" />
-                <span>টোকেন বা ম্যানুয়াল পেজ আইডি দিয়ে কানেক্ট করতে চান? এখানে ক্লিক করুন</span>
+                <span>টোকেন বা ম্যানুয়াল পেজ আইডি দিয়ে কানেক্ট করতে চাইলে এখানে ক্লিক করুন</span>
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* ================= CONNECT FACEBOOK PAGE MODAL ================= */}
+      {/* ================= CONNECT / SWITCH FACEBOOK PAGE MODAL ================= */}
       {showConnectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-xl bg-[#10131d] border border-neutral-800/90 rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -508,15 +539,14 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                   f
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-neutral-100">ফেসবুক পেজ কানেক্ট করুন</h3>
-                  <p className="text-xs text-neutral-400">লগইন করুন অথবা টোকেন দিয়ে পেজ সিলেক্ট করুন</p>
+                  <h3 className="text-lg font-black text-neutral-100">ফেসবুক পেজ নির্বাচন করুন</h3>
+                  <p className="text-xs text-neutral-400">আপনার যেকোনো ফেসবুক পেজ সিলেক্ট করে ১-ক্লিকে চ্যাটবট কানেক্ট করুন</p>
                 </div>
               </div>
 
               <button
                 onClick={() => {
                   setShowConnectModal(false);
-                  setDiscoveredPages([]);
                 }}
                 className="p-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-xl transition-all"
               >
@@ -535,7 +565,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                 }`}
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>১-ক্লিক লগইন</span>
+                <span>১-ক্লিক পেজসমূহ</span>
               </button>
               <button
                 onClick={() => setConnectTab('token')}
@@ -563,87 +593,130 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto py-1 relative z-10 space-y-4">
-              {/* TAB 1: 1-CLICK FACEBOOK POPUP LOGIN */}
+              {/* TAB 1: 1-CLICK FACEBOOK POPUP LOGIN & PAGE PICKER */}
               {connectTab === 'popup' && (
                 <div className="space-y-4">
-                  <div className="p-5 bg-gradient-to-r from-blue-950/40 via-neutral-900 to-neutral-900 border border-blue-500/30 rounded-2xl space-y-3 text-center">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 mx-auto">
-                      <Sparkles className="w-6 h-6" />
-                    </div>
-                    <h4 className="text-base font-extrabold text-neutral-100">
-                      কোনো কোডিং বা টোকেন ছাড়া ১-ক্লিকে কানেক্ট করুন
-                    </h4>
-                    <p className="text-xs text-neutral-300 leading-relaxed max-w-md mx-auto">
-                      নিচের বাটনে চাপ দিলে একটি অফিসিয়াল মেটা পপ-আপ আসবে। আপনার ফেসবুক পেজ সিলেক্ট করে Agree চাপলেই স্বয়ংক্রিয়ভাবে চ্যাটবট সক্রিয় হয়ে যাবে।
-                    </p>
+                  {/* Discovered Pages List */}
+                  {discoveredPages.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
+                          <Layers className="w-4 h-4 text-emerald-400" />
+                          <span>আপনার পেজসমূহ ({discoveredPages.length}টি পাওয়া গেছে):</span>
+                        </p>
 
-                    <button
-                      type="button"
-                      onClick={handleFacebookLoginPopup}
-                      disabled={isLoggingInFb}
-                      className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2.5"
-                    >
-                      {isLoggingInFb ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>ফেসবুক লগইন উইন্ডো চলছে...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-bold text-lg leading-none">f</span>
-                          <span>Continue with Facebook</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Discovered Pages if multiple */}
-                  {discoveredPages.length > 0 && (
-                    <div className="space-y-2.5 pt-2">
-                      <p className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>আপনার পেজসমূহ ({discoveredPages.length}টি):</span>
-                      </p>
-
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {discoveredPages.map((page) => (
-                          <div
-                            key={page.id}
-                            className="p-3.5 bg-neutral-900/90 border border-neutral-800 hover:border-blue-500/50 rounded-2xl flex items-center justify-between gap-3 transition-all"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-sm">
-                                {page.name.charAt(0)}
-                              </div>
-                              <div>
-                                <h4 className="text-sm font-extrabold text-neutral-100">{page.name}</h4>
-                                <p className="text-[11px] font-mono text-neutral-400">
-                                  ID: {page.id} {page.category ? `• ${page.category}` : ''}
-                                </p>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleConnectSelectedPage(page)}
-                              disabled={isConnectingPage === page.id}
-                              className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
-                            >
-                              {isConnectingPage === page.id ? (
-                                <>
-                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                  <span>কানেক্ট হচ্ছে...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>⚡ কানেক্ট করুন</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        ))}
+                        <button
+                          type="button"
+                          onClick={handleFacebookLoginPopup}
+                          disabled={isLoggingInFb}
+                          className="text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 transition-colors"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isLoggingInFb ? 'animate-spin' : ''}`} />
+                          <span>রি-স্ক্যান / অন্য একাউন্ট</span>
+                        </button>
                       </div>
+
+                      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                        {discoveredPages.map((page) => {
+                          const isCurrentActive = status?.pageId === page.id;
+
+                          return (
+                            <div
+                              key={page.id}
+                              className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                                isCurrentActive
+                                  ? 'bg-gradient-to-r from-emerald-950/40 via-neutral-900 to-neutral-900 border-emerald-500/50 shadow-md'
+                                  : 'bg-neutral-900/90 border-neutral-800 hover:border-blue-500/50 hover:bg-neutral-850/80'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-base shrink-0 shadow-sm overflow-hidden">
+                                  {page.picture ? (
+                                    <img src={page.picture} alt={page.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{page.name.charAt(0)}</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-extrabold text-neutral-100">{page.name}</h4>
+                                    {isCurrentActive && (
+                                      <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold rounded-md">
+                                        সক্রিয় পেজ
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] font-mono text-neutral-400 mt-0.5">
+                                    Page ID: <span className="text-neutral-300 font-medium">{page.id}</span>
+                                    {page.category ? ` • ${page.category}` : ''}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleConnectSelectedPage(page)}
+                                disabled={isConnectingPage === page.id}
+                                className={`px-4 py-2.5 text-xs font-black rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5 shrink-0 ${
+                                  isCurrentActive
+                                    ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700'
+                                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/20'
+                                }`}
+                              >
+                                {isConnectingPage === page.id ? (
+                                  <>
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    <span>কানেক্ট হচ্ছে...</span>
+                                  </>
+                                ) : isCurrentActive ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>রিকানেক্ট</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Zap className="w-3.5 h-3.5" />
+                                    <span>⚡ এই পেজটি কানেক্ট করুন</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-gradient-to-r from-blue-950/40 via-neutral-900 to-neutral-900 border border-blue-500/30 rounded-2xl space-y-4 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 mx-auto shadow-inner">
+                        <Sparkles className="w-7 h-7" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-base font-extrabold text-neutral-100">
+                          ফেসবুক লগইন করে পেজ সিলেক্ট করুন
+                        </h4>
+                        <p className="text-xs text-neutral-300 leading-relaxed max-w-md mx-auto">
+                          নিচের বাটনে চাপ দিলে আপনার ফেসবুক পেজসমূহের লিস্ট আসবে। সেখান থেকে আপনি যেকোনো পেজ সিলেক্ট করে কানেক্ট করতে পারবেন।
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleFacebookLoginPopup}
+                        disabled={isLoggingInFb}
+                        className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2.5"
+                      >
+                        {isLoggingInFb ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>ফেসবুক লগইন উইন্ডো লোড হচ্ছে...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-bold text-lg leading-none">f</span>
+                            <span>Continue with Facebook</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -657,7 +730,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
                           <Key className="w-3.5 h-3.5 text-blue-400" />
-                          <span>ফেসবুক টোকেন দিন (User Token বা Page Access Token)</span>
+                          <span>ফেসবুক অ্যাক্সেস টোকেন দিন</span>
                         </label>
                         <a
                           href="https://developers.facebook.com/tools/explorer"
@@ -696,7 +769,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                     </button>
                   </form>
 
-                  {/* Discovered Pages List */}
+                  {/* Discovered Pages List from Token */}
                   {discoveredPages.length > 0 && (
                     <div className="space-y-2.5 pt-2">
                       <p className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
@@ -769,7 +842,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                           ২. উপরে <strong>Meta App</strong> নির্বাচন করুন (যেমন: <code className="text-emerald-400">orderflow</code>)।
                         </p>
                         <p>
-                          ৩. <strong>User or Page</strong> ড্রপডাউন থেকে আপনার পেজ (যেমন: <code className="text-emerald-400">FastLain</code>) সিলেক্ট করুন অথবা <strong>Generate Access Token</strong> বাটনে চাপ দিন।
+                          ৩. <strong>User or Page</strong> ড্রপডাউন থেকে আপনার পেজ সিলেক্ট করুন অথবা <strong>Generate Access Token</strong> বাটনে চাপ দিন।
                         </p>
                         <p>
                           ৪. এরপর টোকেনটি কপি করে উপরের বক্সে পেস্ট করে <strong>"🔍 পেজ খুঁজুন ও ভেরিফাই করুন"</strong> চাপুন।
@@ -791,7 +864,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                       type="text"
                       value={manualPageName}
                       onChange={(e) => setManualPageName(e.target.value)}
-                      placeholder="যেমন: FastLain"
+                      placeholder="আপনার পেজের নাম লিখুন"
                       className="w-full bg-[#0a0c12] border border-neutral-750 rounded-xl px-4 py-2.5 text-xs text-neutral-100 font-sans focus:outline-none focus:border-blue-500 shadow-inner"
                     />
                   </div>
@@ -835,7 +908,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                     ) : (
                       <>
                         <Check className="w-4 h-4" />
-                        <span>পেজ কানেক্ট ও ওয়েবহুক সাবস্ক্রাইব করুন</span>
+                        <span>পেজ কানেক্ট ও সেভ করুন</span>
                       </>
                     )}
                   </button>

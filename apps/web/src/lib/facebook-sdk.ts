@@ -124,7 +124,7 @@ function launchOAuthPopupFallback(): Promise<FacebookLoginResult> {
     const redirectUri = `${window.location.origin}/api/facebook/oauth-callback`;
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(
       redirectUri,
-    )}&scope=${FACEBOOK_REQUIRED_SCOPES}&response_type=token`;
+    )}&scope=${FACEBOOK_REQUIRED_SCOPES}&response_type=token&auth_type=rerequest`;
 
     const width = 600;
     const height = 700;

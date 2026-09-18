@@ -79,8 +79,8 @@ export async function POST(request: NextRequest) {
           pagesCount: 1,
           pages: [
             {
-              id: pId || '443213442199594',
-              name: pName === 'Facebook Page' ? (pId === '443213442199594' ? 'FastLain' : 'Facebook Page') : pName,
+              id: pId || 'facebook_page',
+              name: pName || 'Facebook Page',
               category: pCategory,
               picture: pPic,
               pageToken: cleanToken,
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (action === 'connect_page' || (pageId && pageToken)) {
       const targetPageId = (pageId || '').trim();
       const targetPageToken = (pageToken || '').trim();
-      const targetPageName = (pageName || (targetPageId === '443213442199594' ? 'FastLain' : 'Facebook Page')).trim();
+      const targetPageName = (pageName || 'Facebook Page').trim();
 
       if (!targetPageId || !targetPageToken) {
         return NextResponse.json({ success: false, error: 'Page ID এবং Page Access Token আবশ্যক' }, { status: 400 });

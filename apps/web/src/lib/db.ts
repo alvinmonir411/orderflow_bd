@@ -149,6 +149,7 @@ export async function initDatabase() {
     `;
 
     // Ensure newly added columns exist in existing database tables
+    await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "fbPageName" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "steadfastApiKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "steadfastSecretKey" TEXT DEFAULT '';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "pathaoClientId" TEXT DEFAULT '';`;
@@ -249,7 +250,7 @@ export async function getBotSettings() {
         geminiApiKey: row.geminiApiKey || process.env.GEMINI_API_KEY || '',
         fbPageToken: row.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '',
         fbPageId: row.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '',
-        fbPageName: row.fbPageName || (row.fbPageId === '443213442199594' ? 'FastLain' : 'Facebook Page'),
+        fbPageName: row.fbPageName || (row.fbPageId ? 'Facebook Page' : ''),
         deliveryTimeDhaka: row.deliveryTimeDhaka || '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)',
         deliveryTimeOutside: row.deliveryTimeOutside || '২ থেকে ৩ কার্যদিবস',
         deliveryFeeDhaka: Number(row.deliveryFeeDhaka) || 120,
@@ -283,7 +284,7 @@ export async function getBotSettings() {
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     fbPageToken: process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '',
     fbPageId: process.env.DEFAULT_FACEBOOK_PAGE_ID || '',
-    fbPageName: process.env.DEFAULT_FACEBOOK_PAGE_ID === '443213442199594' ? 'FastLain' : 'Facebook Page',
+    fbPageName: process.env.DEFAULT_FACEBOOK_PAGE_ID ? 'Facebook Page' : '',
     deliveryTimeDhaka: '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)',
     deliveryTimeOutside: '২ থেকে ৩ কার্যদিবস',
     deliveryFeeDhaka: 120,

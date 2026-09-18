@@ -66,7 +66,7 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
           if (data) {
             setFbPageToken(data.fbPageToken || '');
             setFbPageId(data.fbPageId || '');
-            setFbPageName(data.fbPageName || (data.fbPageId === '443213442199594' ? 'FastLain' : 'Facebook Page'));
+            setFbPageName(data.fbPageName || 'Facebook Page');
             setSteadfastApiKey(data.steadfastApiKey || '');
             setSteadfastSecret(data.steadfastSecretKey || '');
             setDeliveryDhaka(Number(data.deliveryFeeDhaka) || 120);
@@ -317,7 +317,7 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
                       </div>
                       <div>
                         <p className="text-sm font-bold text-neutral-100">
-                          {fbPageName || 'FastLain'} <span className="text-xs font-mono text-neutral-400">(ID: {fbPageId})</span>
+                          {fbPageName || 'Facebook Page'} <span className="text-xs font-mono text-neutral-400">(ID: {fbPageId})</span>
                         </p>
                         <p className="text-xs text-emerald-400 font-medium flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" />

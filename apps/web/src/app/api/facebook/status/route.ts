@@ -8,7 +8,7 @@ export async function GET() {
     const settings = await getBotSettings();
     const token = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
     const pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
-    const pageName = settings.fbPageName || (pageId === '443213442199594' ? 'FastLain' : 'Facebook Page');
+    let pageName = settings.fbPageName || '';
 
     if (!token || token.length < 10) {
       return NextResponse.json({
@@ -19,6 +19,18 @@ export async function GET() {
         message: 'কোনো ফেসবুক পেজ কানেক্ট করা নেই',
       });
     }
+
+    // If pageName is missing, fetch real page name from Meta Graph API
+    if (!pageName || pageName === 'Facebook Page') {
+      try {
+        const meRes = await fetch(`https://graph.facebook.com/v20.0/me?fields=name&access_token=${token}`);
+        const meData = await meRes.json();
+        if (meData?.name) {
+          pageName = meData.name;
+        }
+      } catch (e) {}
+    }
+    if (!pageName) pageName = 'Facebook Page';
 
     // Check Graph API live subscription
     let webhookSubscribed = false;
