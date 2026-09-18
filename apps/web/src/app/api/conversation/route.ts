@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings, getSql, getDbOrders, getDbChatThreads, getDbChatMessagesBySender } from '@/lib/db';
+import {
+  getBotSettings,
+  getSql,
+  getDbOrders,
+  getDbChatThreads,
+  getDbChatMessagesBySender,
+  getDbConversations,
+  upsertDbConversation,
+  updateDbConversationAssignment,
+  updateDbConversationStatus,
+  updateDbConversationTags,
+  addDbInternalNote,
+  getDbInternalNotes,
+  addDbConversationTimeline,
+  getDbConversationTimeline,
+} from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,19 +24,41 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const psid = searchParams.get('psid');
     const orderId = searchParams.get('orderId');
-    const isList = searchParams.get('list') === 'true' || (!psid && !orderId);
+    const convId = searchParams.get('convId');
+    const isList = searchParams.get('list') === 'true' || (!psid && !orderId && !convId);
 
     const settings = await getBotSettings();
     const pageToken = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN;
     const pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
     const sql = getSql();
 
+    // If requesting details (internal notes and timeline) for a specific conversation
+    if (convId) {
+      const [notes, timeline] = await Promise.all([
+        getDbInternalNotes(convId),
+        getDbConversationTimeline(convId),
+      ]);
+      return NextResponse.json({
+        success: true,
+        convId,
+        notes,
+        timeline,
+      });
+    }
+
     // If requesting the FULL list of real conversations
     if (isList) {
-      const [orders, dbThreads] = await Promise.all([
+      const [orders, dbThreads, dbConversations] = await Promise.all([
         getDbOrders(),
         getDbChatThreads(),
+        getDbConversations('org-1'),
       ]);
+
+      const convMap = new Map<string, any>();
+      for (const c of dbConversations) {
+        convMap.set(c.senderId, c);
+        convMap.set(c.id, c);
+      }
 
       let fbConversations: any[] = [];
 
@@ -46,11 +84,12 @@ export async function GET(request: NextRequest) {
         if (!dbt.senderId) continue;
         seenPsids.add(dbt.senderId);
 
-        // Fetch message timeline for this sender
         const msgs = await getDbChatMessagesBySender(dbt.senderId);
         const matchedOrder = orders.find(
-          (o) => o.psid === dbt.senderId || (o.customerPhone && dbt.senderId.includes(o.customerPhone))
+          (o) => o.psid === dbt.senderId || (o.customerPhone && dbt.senderId.includes(o.customerPhone)),
         );
+
+        const dbC = convMap.get(dbt.senderId) || {};
 
         threads.push({
           id: `thread-${dbt.senderId}`,
@@ -68,7 +107,11 @@ export async function GET(request: NextRequest) {
           orderNumber: matchedOrder?.orderNumber || 1049,
           orderStatus: matchedOrder?.status || 'PENDING_CONFIRMATION',
           totalSpent: matchedOrder?.totalPrice || 1870,
-          isAiActive: true,
+          isAiActive: dbC.isAiActive !== undefined ? dbC.isAiActive : true,
+          status: dbC.status || 'OPEN',
+          assignedToId: dbC.assignedToId || null,
+          assignedToName: dbC.assignedToName || null,
+          tags: dbC.tags || ['🔥 Hot Lead'],
           messages: msgs.map((m: any) => ({
             id: m.id,
             sender: m.sender,
@@ -104,6 +147,8 @@ export async function GET(request: NextRequest) {
               }))
           : [];
 
+        const dbC = (custPsid ? convMap.get(custPsid) : null) || convMap.get(ord.id) || {};
+
         threads.push({
           id: `thread-order-${ord.id}`,
           customerName: ord.customerName || ord.customer?.name || 'কাস্টমার',
@@ -121,6 +166,10 @@ export async function GET(request: NextRequest) {
           orderStatus: ord.status,
           totalSpent: ord.totalPrice,
           isAiActive: true,
+          status: dbC.status || (ord.status === 'DELIVERED' ? 'RESOLVED' : ord.status === 'CANCELLED' ? 'CLOSED' : 'OPEN'),
+          assignedToId: dbC.assignedToId || 'usr-admin-1',
+          assignedToName: dbC.assignedToName || 'Alvin Monir',
+          tags: dbC.tags || ['💎 VIP', '🛍️ Interested'],
           messages: noteMessages.length > 0 ? noteMessages : [
             {
               id: `m-init-${ord.id}`,
@@ -158,6 +207,8 @@ export async function GET(request: NextRequest) {
           time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
         }));
 
+        const dbC = convMap.get(senderId) || {};
+
         threads.push({
           id: `thread-fb-${senderId}`,
           customerName: sender?.name || 'ফেসবুক গ্রাহক',
@@ -171,6 +222,10 @@ export async function GET(request: NextRequest) {
           lastTime: new Date(fbConv.updated_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
           unread: fbConv.unread_count > 0,
           isAiActive: true,
+          status: dbC.status || 'OPEN',
+          assignedToId: dbC.assignedToId || null,
+          assignedToName: dbC.assignedToName || null,
+          tags: dbC.tags || ['⏰ Follow Up'],
           messages: threadMsgs,
         });
       }
@@ -201,7 +256,6 @@ export async function GET(request: NextRequest) {
     let profileData = null;
 
     if (targetPsid) {
-      // First check local DB
       const dbMsgs = await getDbChatMessagesBySender(targetPsid);
       if (dbMsgs.length > 0) {
         messages = dbMsgs.map((m: any) => ({
@@ -222,26 +276,6 @@ export async function GET(request: NextRequest) {
         } catch (e) {
           console.error('[Fetch Profile Error]:', e);
         }
-
-        if (messages.length === 0) {
-          try {
-            const convUrl = `https://graph.facebook.com/v20.0/me/conversations?user_id=${targetPsid}&fields=messages{message,from,created_time}&access_token=${pageToken}`;
-            const cRes = await fetch(convUrl);
-            if (cRes.ok) {
-              const cData = await cRes.json();
-              const rawMsgs = cData?.data?.[0]?.messages?.data || [];
-              messages = rawMsgs.reverse().map((m: any) => ({
-                id: m.id,
-                text: m.message,
-                senderName: m.from?.name,
-                sender: (pageId && m.from?.id === pageId) || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
-                time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-              }));
-            }
-          } catch (e) {
-            console.error('[Fetch Conversation Error]:', e);
-          }
-        }
       }
     }
 
@@ -255,5 +289,69 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[API GET /api/conversation Error]:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+    const actorName = user?.name || 'Admin';
+    const body = await request.json();
+    const { action, convId, senderId, assignedToId, assignedToName, status, tags, noteContent } = body;
+
+    const targetConvId = convId || (senderId ? `conv-${senderId}` : `conv-${Date.now()}`);
+
+    // 1. UPDATE ASSIGNMENT
+    if (action === 'assign') {
+      await updateDbConversationAssignment(targetConvId, assignedToId || null, assignedToName || null, actorName);
+      return NextResponse.json({
+        success: true,
+        message: assignedToName ? `চ্যাটটি ${assignedToName}-কে অ্যাসাইন করা হয়েছে` : 'চ্যাটটি আনঅ্যাসাইন করা হয়েছে',
+      });
+    }
+
+    // 2. UPDATE STATUS
+    if (action === 'status') {
+      await updateDbConversationStatus(targetConvId, status, actorName);
+      return NextResponse.json({
+        success: true,
+        message: `স্ট্যাটাস '${status}' এ আপডেট করা হয়েছে`,
+      });
+    }
+
+    // 3. UPDATE TAGS
+    if (action === 'tags') {
+      await updateDbConversationTags(targetConvId, tags || [], actorName);
+      return NextResponse.json({
+        success: true,
+        message: 'কাস্টম ট্যাগ সফলভাবে সেভ হয়েছে',
+      });
+    }
+
+    // 4. ADD INTERNAL NOTE
+    if (action === 'add_note') {
+      if (!noteContent || !noteContent.trim()) {
+        return NextResponse.json({ success: false, error: 'নোটের বিবরণ লিখুন' }, { status: 400 });
+      }
+
+      const note = await addDbInternalNote(
+        targetConvId,
+        user?.organizationId || 'org-1',
+        user?.id || 'usr-admin-1',
+        actorName,
+        noteContent.trim(),
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'ইন্টারনাল নোট সংরক্ষিত হয়েছে',
+        note,
+      });
+    }
+
+    return NextResponse.json({ success: false, error: 'অজানা অ্যাকশন' }, { status: 400 });
+  } catch (err: any) {
+    console.error('[API POST /api/conversation Error]:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

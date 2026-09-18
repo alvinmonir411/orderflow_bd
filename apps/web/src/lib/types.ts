@@ -1,3 +1,32 @@
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'USER';
+
+export interface User {
+  id: string;
+  organizationId: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatar?: string;
+  phone?: string;
+  title?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  plan: 'STARTER' | 'BUSINESS' | 'PRO' | 'ENTERPRISE';
+  fbPageId?: string;
+  fbPageName?: string;
+  fbPageToken?: string;
+  maxTeamMembers: number;
+  maxConversationsPerMonth: number;
+  createdAt: string;
+}
+
 export type OrderStatus =
   | 'PENDING_CONFIRMATION'
   | 'CONFIRMED'
@@ -8,7 +37,27 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'RETURNED';
 
-export type ChannelType = 'FACEBOOK_MESSENGER' | 'WHATSAPP' | 'MANUAL_ENTRY' | 'MANUAL';
+export type ChannelType = 'FACEBOOK_MESSENGER' | 'FACEBOOK_COMMENT' | 'WHATSAPP' | 'INSTAGRAM' | 'MANUAL_ENTRY' | 'MANUAL';
+
+export type ConversationStatus = 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED';
+
+export interface InternalNote {
+  id: string;
+  conversationId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface ConversationTimelineEvent {
+  id: string;
+  conversationId: string;
+  actorName: string;
+  actionType: 'ASSIGNED' | 'STATUS_CHANGED' | 'TAG_ADDED' | 'TAG_REMOVED' | 'ORDER_CREATED' | 'NOTE_ADDED' | 'MESSAGE_SENT';
+  description: string;
+  createdAt: string;
+}
 
 export interface ProductVariant {
   id: string;
@@ -53,6 +102,7 @@ export interface Order {
   id: string;
   orderNumber: number;
   storeId: string;
+  organizationId?: string;
   customerId: string;
   channel: ChannelType;
   status: OrderStatus;

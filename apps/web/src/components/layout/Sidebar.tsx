@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -15,8 +15,14 @@ import {
   ChevronRight,
   ExternalLink,
   MessageSquare,
+  Users,
+  LogOut,
+  Crown,
+  Briefcase,
+  Headphones,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -25,6 +31,34 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const pathname = usePathname();
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      });
+      toast.success('সফলভাবে লগআউট হয়েছেন');
+      router.push('/login');
+      router.refresh();
+    } catch {
+      router.push('/login');
+    }
+  };
 
   const navigation = [
     {
@@ -36,16 +70,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     },
     {
       name: 'মেসেঞ্জার লাইভ চ্যাট',
-      sub: 'Facebook Live Chat',
+      sub: 'Facebook Live Chat Hub',
       href: '/messages',
       icon: MessageSquare,
-      badge: 'Live',
+      badge: 'CRM Hub',
       badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       gradient: 'from-blue-500/20 to-indigo-500/10',
     },
     {
       name: 'অর্ডার সমূহ',
-      sub: 'Live Orders & Sync',
+      sub: '5-Step Pipeline & Sync',
       href: '/orders',
       icon: ShoppingCart,
       badge: 'Orders',
@@ -58,6 +92,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       href: '/products',
       icon: Boxes,
       gradient: 'from-teal-500/20 to-cyan-500/10',
+    },
+    {
+      name: 'টিম ও রোল ম্যানেজমেন্ট',
+      sub: 'Multi-User Access Control',
+      href: '/team',
+      icon: Users,
+      badge: 'Admin',
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+      gradient: 'from-purple-500/20 to-pink-500/10',
     },
     {
       name: 'এআই সেলস বট সেটিংস',
@@ -77,6 +120,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       gradient: 'from-blue-500/20 to-cyan-500/10',
     },
   ];
+
+  const getRoleIcon = (role?: string) => {
+    if (role === 'SUPER_ADMIN') return Crown;
+    if (role === 'ADMIN') return Briefcase;
+    return Headphones;
+  };
+
+  const RoleIcon = getRoleIcon(currentUser?.role);
 
   return (
     <>
@@ -107,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   OrderFlow
                 </h1>
                 <span className="px-1.5 py-0.5 text-[10px] font-black bg-gradient-to-r from-emerald-400 to-teal-300 text-neutral-950 rounded-md shadow-sm">
-                  BD 2.0
+                  SaaS 2.0
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400 font-medium tracking-wide">
@@ -118,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Nav Menu */}
-        <nav className="flex-1 p-3.5 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-3.5 space-y-1.5 overflow-y-auto">
           <p className="px-3 text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-2 flex items-center justify-between">
             <span>মূল মেনু</span>
             <span className="text-[10px] text-emerald-400 font-mono font-medium">LIVE MODE</span>
@@ -134,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  'relative flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-medium transition-all group overflow-hidden border',
+                  'relative flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-medium transition-all group overflow-hidden border',
                   isActive
                     ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-transparent text-emerald-300 border-emerald-500/30 shadow-lg shadow-emerald-500/5'
                     : 'text-neutral-300 hover:text-neutral-100 hover:bg-neutral-800/40 border-transparent',
@@ -181,23 +232,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           })}
         </nav>
 
-        {/* Store Quick Status Footer */}
-        <div className="p-3.5 m-3.5 bg-gradient-to-br from-neutral-900/90 via-neutral-900/60 to-emerald-950/20 border border-neutral-800/90 rounded-2xl relative overflow-hidden shadow-lg">
+        {/* User Profile & Logout Section */}
+        <div className="p-3 m-3 bg-[#0a0d16] border border-neutral-800/90 rounded-2xl relative overflow-hidden shadow-lg space-y-2.5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-bold text-neutral-200">ফেসবুক বট সক্রিয়</span>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-sm shrink-0">
+                {currentUser?.avatar || currentUser?.name?.slice(0, 2).toUpperCase() || 'OF'}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate leading-tight">
+                  {currentUser?.name || 'Alvin Monir'}
+                </p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <RoleIcon className="w-2.5 h-2.5 text-emerald-400" />
+                  <span className="text-[10px] text-slate-400 font-mono capitalize">
+                    {currentUser?.role || 'Admin'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span className="text-[10px] px-2 py-0.5 font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-md">
-              Moner Kotha
-            </span>
+
+            <button
+              onClick={handleLogout}
+              title="লগআউট করুন"
+              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed">
-            মেসেঞ্জারে কাস্টমারের তথ্য আসা মাত্র লাইভ ড্যাশবোর্ডে যোগ হবে।
-          </p>
         </div>
       </aside>
     </>
