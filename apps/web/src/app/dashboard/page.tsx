@@ -7,6 +7,7 @@ import { Order, DashboardMetrics } from '@/lib/types';
 import { formatBDTEn } from '@/lib/utils';
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge';
 import { InvoiceModal } from '@/components/orders/InvoiceModal';
+import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { LiveBotTester } from '@/components/bot/LiveBotTester';
 import {
   Package,
@@ -39,6 +40,10 @@ import {
   Send,
   MapPin,
   Flame,
+  Bike,
+  PackageCheck,
+  AlertCircle,
+  FileText,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -59,6 +64,7 @@ export default function DashboardPage() {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
   const [selectedMessageOrder, setSelectedMessageOrder] = useState<Order | null>(null);
+  const [selectedCancelOrder, setSelectedCancelOrder] = useState<Order | null>(null);
   const [showBotTester, setShowBotTester] = useState(false);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -88,21 +94,43 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Step 1: Confirm Order
   const handleConfirmOrder = async (orderId: string) => {
     await api.updateOrderStatus(orderId, 'CONFIRMED');
-    toast.success('অর্ডারটি কনফার্ম করা হয়েছে! কাস্টমারকে মেসেঞ্জার ও এসএমএস নোটিফিকেশন পাঠানো হয়েছে।');
+    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার কুরিয়ারে পাঠাতে পারেন।');
     loadData();
   };
 
+  // Step 2: Courier Dispatch
   const handleDispatchSteadfast = async (orderId: string) => {
     const updated = await api.dispatchSteadfast(orderId);
-    toast.success(`Steadfast কুরিয়ারে বুকিং সম্পন্ন! ট্র্যাকিং কোড: ${updated.courierTrackingId}`);
+    toast.success(`Steadfast কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং কোড: ${updated.courierTrackingId}`);
     loadData();
   };
 
   const handleDispatchPathao = async (orderId: string) => {
     const updated = await api.dispatchPathao(orderId);
-    toast.success(`Pathao কুরিয়ারে বুকিং সম্পন্ন! ট্র্যাকিং কোড: ${updated.courierTrackingId}`);
+    toast.success(`Pathao কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং কোড: ${updated.courierTrackingId}`);
+    loadData();
+  };
+
+  // Step 3: Rider Received
+  const handleRiderReceived = async (orderId: string) => {
+    await api.updateOrderStatus(orderId, 'IN_TRANSIT');
+    toast.success('কুরিয়ার রাইডার পার্সেল রিসিভ করেছে! অন দ্য ওয়ে ডেলিভারি হচ্ছে।');
+    loadData();
+  };
+
+  // Step 4: Delivered
+  const handleMarkDelivered = async (orderId: string) => {
+    await api.updateOrderStatus(orderId, 'DELIVERED');
+    toast.success('ডেলিভারি সম্পন্ন হয়েছে ও ক্যাশ কালেকশন কনফার্মড! 🎉');
+    loadData();
+  };
+
+  // Step 5: Cancel or Return with Note
+  const handleConfirmCancelWithNote = async (orderId: string, status: 'CANCELLED' | 'RETURNED', note: string) => {
+    await api.updateOrderStatus(orderId, status, note);
     loadData();
   };
 
@@ -726,30 +754,103 @@ export default function DashboardPage() {
                       </td>
 
                       {/* Status Badge */}
-                      <td className="py-4 px-5 align-top">
+                      <td className="py-4 px-5 align-top space-y-1">
                         <OrderStatusBadge status={order.status} />
+                        {order.notes && (
+                          <div className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/25 px-2 py-0.5 rounded-md flex items-center gap-1 max-w-[180px] truncate" title={order.notes}>
+                            <AlertCircle className="w-2.5 h-2.5 text-rose-400 shrink-0" />
+                            <span className="truncate">{order.notes}</span>
+                          </div>
+                        )}
                       </td>
 
-                      {/* Actions */}
+                      {/* 5-Step Actions */}
                       <td className="py-4 px-5 text-right align-top">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Step 1: Pending -> Confirm / Cancel */}
                           {order.status === 'PENDING_CONFIRMATION' && (
-                            <button
-                              onClick={() => handleConfirmOrder(order.id)}
-                              className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              কনফার্ম
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleConfirmOrder(order.id)}
+                                className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                কনফার্ম
+                              </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                className="px-2 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                              >
+                                বাতিল
+                              </button>
+                            </>
                           )}
 
+                          {/* Step 2: Confirmed -> Courier Dispatch / Cancel */}
                           {order.status === 'CONFIRMED' && (
+                            <>
+                              <button
+                                onClick={() => handleDispatchSteadfast(order.id)}
+                                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                                Steadfast
+                              </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                className="px-2 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                              >
+                                বাতিল
+                              </button>
+                            </>
+                          )}
+
+                          {/* Step 3: Dispatched -> Rider Received */}
+                          {order.status === 'DISPATCHED_TO_COURIER' && (
+                            <>
+                              <button
+                                onClick={() => handleRiderReceived(order.id)}
+                                className="px-3 py-1.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                              >
+                                <Bike className="w-3.5 h-3.5" />
+                                রাইডার রিসিভ
+                              </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                className="px-2 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                              >
+                                রিটার্ন
+                              </button>
+                            </>
+                          )}
+
+                          {/* Step 4: In Transit -> Delivered */}
+                          {order.status === 'IN_TRANSIT' && (
+                            <>
+                              <button
+                                onClick={() => handleMarkDelivered(order.id)}
+                                className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                              >
+                                <PackageCheck className="w-3.5 h-3.5" />
+                                ডেলিভারড
+                              </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                className="px-2 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                              >
+                                রিটার্ন
+                              </button>
+                            </>
+                          )}
+
+                          {/* Step 5: Cancelled/Returned - edit note */}
+                          {(order.status === 'CANCELLED' || order.status === 'RETURNED') && (
                             <button
-                              onClick={() => handleDispatchSteadfast(order.id)}
-                              className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                              onClick={() => setSelectedCancelOrder(order)}
+                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-semibold cursor-pointer flex items-center gap-1"
                             >
-                              <Truck className="w-3.5 h-3.5" />
-                              Steadfast
+                              <FileText className="w-3 h-3 text-slate-400" />
+                              <span>নোট</span>
                             </button>
                           )}
 
@@ -792,6 +893,14 @@ export default function DashboardPage() {
         onClose={() => setSelectedMessageOrder(null)}
         order={selectedMessageOrder}
         onMessageSent={loadData}
+      />
+
+      {/* Cancel Order with Note Modal */}
+      <CancelOrderModal
+        isOpen={!!selectedCancelOrder}
+        onClose={() => setSelectedCancelOrder(null)}
+        order={selectedCancelOrder}
+        onConfirmCancel={handleConfirmCancelWithNote}
       />
 
       {/* Store Setup Wizard Modal */}

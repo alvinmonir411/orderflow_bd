@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { orderId, status, courierProvider, courierTrackingId } = body;
+    const { orderId, status, courierProvider, courierTrackingId, notes } = body;
 
     if (!orderId) {
       return NextResponse.json({ success: false, error: 'orderId is required' }, { status: 400 });
@@ -50,6 +50,7 @@ export async function PATCH(request: NextRequest) {
     const success = await updateDbOrderStatus(orderId, status, {
       courierProvider,
       courierTrackingId,
+      notes,
     });
 
     return NextResponse.json({ success });

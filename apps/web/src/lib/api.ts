@@ -220,23 +220,23 @@ class StorageApi {
     return this.getProductsFromStorage();
   }
 
-  async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
+  async updateOrderStatus(orderId: string, status: Order['status'], notes?: string): Promise<Order> {
     try {
       await fetch('/api/orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, status }),
+        body: JSON.stringify({ orderId, status, notes }),
       });
     } catch (e) {}
 
     const orders = this.getOrdersFromStorage();
     const index = orders.findIndex((o) => o.id === orderId);
     if (index !== -1) {
-      orders[index] = { ...orders[index], status };
+      orders[index] = { ...orders[index], status, notes: notes !== undefined ? notes : orders[index].notes };
       this.saveOrdersToStorage(orders);
       return orders[index];
     }
-    return { id: orderId, status } as Order;
+    return { id: orderId, status, notes } as Order;
   }
 
   async dispatchSteadfast(orderId: string): Promise<Order> {

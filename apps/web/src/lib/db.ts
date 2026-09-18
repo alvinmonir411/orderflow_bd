@@ -687,7 +687,7 @@ export async function insertDbOrder(data: {
 export async function updateDbOrderStatus(
   orderId: string,
   status: string,
-  extra?: { courierProvider?: string; courierTrackingId?: string },
+  extra?: { courierProvider?: string; courierTrackingId?: string; notes?: string },
 ) {
   const sql = getSql();
   try {
@@ -698,6 +698,16 @@ export async function updateDbOrderStatus(
           "status" = ${status}::"OrderStatus",
           "courierProvider" = ${extra.courierProvider}::"CourierProvider",
           "courierTrackingId" = ${extra.courierTrackingId || null},
+          "notes" = COALESCE(${extra.notes || null}, "notes"),
+          "updatedAt" = NOW()
+        WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
+      `;
+    } else if (extra?.notes !== undefined) {
+      await sql`
+        UPDATE "Order"
+        SET 
+          "status" = ${status}::"OrderStatus",
+          "notes" = ${extra.notes},
           "updatedAt" = NOW()
         WHERE "id" = ${orderId} OR "orderNumber"::text = ${orderId}
       `;

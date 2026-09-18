@@ -6,6 +6,7 @@ import { Order, OrderStatus } from '@/lib/types';
 import { formatBDTEn } from '@/lib/utils';
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge';
 import { InvoiceModal } from '@/components/orders/InvoiceModal';
+import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import {
   Search,
   Filter,
@@ -43,6 +44,11 @@ import {
   MessageSquare,
   Flame,
   CheckCheck,
+  Bike,
+  PackageCheck,
+  XCircle,
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DirectMessageModal } from '@/components/orders/DirectMessageModal';
@@ -55,6 +61,7 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
   const [selectedMessageOrder, setSelectedMessageOrder] = useState<Order | null>(null);
+  const [selectedCancelOrder, setSelectedCancelOrder] = useState<Order | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -94,21 +101,43 @@ export default function OrdersPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
-    await api.updateOrderStatus(orderId, newStatus);
-    toast.success('অর্ডারের স্ট্যাটাস আপডেট হয়েছে!');
+  // Step 1: Confirm Order
+  const handleConfirmOrder = async (orderId: string) => {
+    await api.updateOrderStatus(orderId, 'CONFIRMED');
+    toast.success('অর্ডার কনফার্ম করা হয়েছে! এবার কুরিয়ারে পাঠাতে পারেন।');
     loadOrders();
   };
 
+  // Step 2: Dispatch to Courier (Steadfast / Pathao)
   const handleDispatchSteadfast = async (orderId: string) => {
     const updated = await api.dispatchSteadfast(orderId);
-    toast.success(`Steadfast কুরিয়ারে বুকিং সম্পন্ন! ট্র্যাকিং: ${updated.courierTrackingId}`);
+    toast.success(`Steadfast কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং: ${updated.courierTrackingId}`);
     loadOrders();
   };
 
   const handleDispatchPathao = async (orderId: string) => {
     const updated = await api.dispatchPathao(orderId);
-    toast.success(`Pathao কুরিয়ারে বুকিং সম্পন্ন! ট্র্যাকিং: ${updated.courierTrackingId}`);
+    toast.success(`Pathao কুরিয়ারে পাঠানো হয়েছে! ট্র্যাকিং: ${updated.courierTrackingId}`);
+    loadOrders();
+  };
+
+  // Step 3: Rider Received (In Transit)
+  const handleRiderReceived = async (orderId: string) => {
+    await api.updateOrderStatus(orderId, 'IN_TRANSIT');
+    toast.success('কুরিয়ার রাইডার পার্সেল রিসিভ করেছে! অন দ্য ওয়ে ডেলিভারি হচ্ছে।');
+    loadOrders();
+  };
+
+  // Step 4: Delivered
+  const handleMarkDelivered = async (orderId: string) => {
+    await api.updateOrderStatus(orderId, 'DELIVERED');
+    toast.success('ডেলিভারি সফলভাবে সম্পন্ন হয়েছে ও ক্যাশ কালেকশন কনফার্মড! 🎉');
+    loadOrders();
+  };
+
+  // Step 5: Cancel or Return with Note
+  const handleConfirmCancelWithNote = async (orderId: string, status: 'CANCELLED' | 'RETURNED', note: string) => {
+    await api.updateOrderStatus(orderId, status, note);
     loadOrders();
   };
 
@@ -153,7 +182,7 @@ export default function OrdersPage() {
       return;
     }
 
-    const headers = ['Order Number', 'Date', 'Customer Name', 'Phone', 'Address', 'Channel', 'Items', 'Total Price', 'Status', 'Courier', 'Tracking'];
+    const headers = ['Order Number', 'Date', 'Customer Name', 'Phone', 'Address', 'Channel', 'Items', 'Total Price', 'Status', 'Courier', 'Tracking', 'Notes'];
     const rows = filteredOrders.map((o) => [
       `#OF-${o.orderNumber}`,
       new Date(o.createdAt).toLocaleDateString('en-GB'),
@@ -166,6 +195,7 @@ export default function OrdersPage() {
       o.status,
       o.courierProvider || 'N/A',
       o.courierTrackingId || 'N/A',
+      `"${(o.notes || '').replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
@@ -226,7 +256,11 @@ export default function OrdersPage() {
   // Filter & Sort Logic
   const filteredOrders = orders
     .filter((order) => {
-      if (activeTab !== 'ALL' && order.status !== activeTab) return false;
+      if (activeTab === 'CANCELLED_OR_RETURNED') {
+        if (order.status !== 'CANCELLED' && order.status !== 'RETURNED') return false;
+      } else if (activeTab !== 'ALL' && order.status !== activeTab) {
+        return false;
+      }
       if (channelFilter !== 'ALL' && order.channel !== channelFilter) return false;
       if (searchTerm) {
         const raw = searchTerm.toLowerCase().trim();
@@ -246,8 +280,9 @@ export default function OrdersPage() {
         const matchName = (order.customerName || '').toLowerCase().includes(raw);
         const matchPhone = (order.customerPhone || '').replace(/[^0-9]/g, '').includes(clean);
         const matchAddress = (order.deliveryAddress || '').toLowerCase().includes(raw);
+        const matchNote = (order.notes || '').toLowerCase().includes(raw);
 
-        return matchName || matchPhone || matchAddress || matchOrderNum;
+        return matchName || matchPhone || matchAddress || matchOrderNum || matchNote;
       }
       return true;
     })
@@ -259,6 +294,7 @@ export default function OrdersPage() {
       return 0;
     });
 
+  // 5-Step Order Lifecycle Tabs
   const tabs = [
     { id: 'ALL', label: 'সব অর্ডার', count: orders.length },
     {
@@ -269,26 +305,32 @@ export default function OrdersPage() {
     },
     {
       id: 'CONFIRMED',
-      label: 'কনফার্মড',
+      label: '১. কনফার্মড',
       count: orders.filter((o) => o.status === 'CONFIRMED').length,
       badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
     },
     {
       id: 'DISPATCHED_TO_COURIER',
-      label: 'কুরিয়ারে পাঠানো',
+      label: '২. কুরিয়ারে পাঠানো',
       count: orders.filter((o) => o.status === 'DISPATCHED_TO_COURIER').length,
       badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
     },
     {
+      id: 'IN_TRANSIT',
+      label: '৩. রাইডার রিসিভ',
+      count: orders.filter((o) => o.status === 'IN_TRANSIT').length,
+      badgeColor: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+    },
+    {
       id: 'DELIVERED',
-      label: 'ডেলিভারড',
+      label: '৪. ডেলিভারড',
       count: orders.filter((o) => o.status === 'DELIVERED').length,
       badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
     },
     {
-      id: 'CANCELLED',
-      label: 'বাতিল',
-      count: orders.filter((o) => o.status === 'CANCELLED').length,
+      id: 'CANCELLED_OR_RETURNED',
+      label: 'বাতিল / নোট',
+      count: orders.filter((o) => o.status === 'CANCELLED' || o.status === 'RETURNED').length,
       badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
     },
   ];
@@ -297,7 +339,7 @@ export default function OrdersPage() {
   const totalFilteredValue = filteredOrders.reduce((acc, curr) => acc + Number(curr.totalPrice || 0), 0);
   const pendingFilteredCount = orders.filter((o) => o.status === 'PENDING_CONFIRMATION').length;
   const inTransitFilteredCount = orders.filter((o) => o.status === 'DISPATCHED_TO_COURIER' || o.status === 'IN_TRANSIT').length;
-  const confirmedFilteredCount = orders.filter((o) => o.status === 'CONFIRMED').length;
+  const deliveredFilteredCount = orders.filter((o) => o.status === 'DELIVERED').length;
 
   // Helper for customer avatar initials
   const getInitials = (name?: string) => {
@@ -693,24 +735,39 @@ export default function OrdersPage() {
                           </div>
                         </div>
 
-                        {/* Customer Badges */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          <div className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
-                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                            <span>১০০% ডেলিভারি সাকসেস</span>
+                        {/* Customer Badges & Cancel/Return Note Display */}
+                        <div className="flex flex-col gap-1 pt-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
+                              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                              <span>১০০% ডেলিভারি সাকসেস</span>
+                            </div>
+
+                            {order.channel === 'FACEBOOK_MESSENGER' && (
+                              <a
+                                href={`https://business.facebook.com/latest/inbox/messenger?mailbox_id=${process.env.NEXT_PUBLIC_DEFAULT_FACEBOOK_PAGE_ID || ''}&selected_item_id=${order.psid || '28626322373646425'}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="ফেসবুক ইনবক্সে এই কাস্টমারের চ্যাট ওপেন করুন"
+                                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 font-semibold transition-colors"
+                              >
+                                <MessageCircle className="w-3 h-3 text-blue-400" />
+                                <span>ফেসবুক চ্যাট ↗</span>
+                              </a>
+                            )}
                           </div>
 
-                          {order.channel === 'FACEBOOK_MESSENGER' && (
-                            <a
-                              href={`https://business.facebook.com/latest/inbox/messenger?mailbox_id=${process.env.NEXT_PUBLIC_DEFAULT_FACEBOOK_PAGE_ID || ''}&selected_item_id=${order.psid || '28626322373646425'}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="ফেসবুক ইনবক্সে এই কাস্টমারের চ্যাট ওপেন করুন"
-                              className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 font-semibold transition-colors"
-                            >
-                              <MessageCircle className="w-3 h-3 text-blue-400" />
-                              <span>ফেসবুক চ্যাট ↗</span>
-                            </a>
+                          {/* Cancellation / Return Note Pill if exists */}
+                          {order.notes && (
+                            <div className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-1.5 shadow-sm">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold text-[10px] uppercase tracking-wider block text-rose-400">
+                                  নোট / কারণ:
+                                </span>
+                                <p className="text-[11px] text-rose-200 leading-snug">{order.notes}</p>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -788,47 +845,113 @@ export default function OrdersPage() {
                         )}
                       </td>
 
-                      {/* Actions */}
+                      {/* 5-Step Pipeline Actions: Confirm -> Courier -> Rider Recv -> Delivered / Cancel Note */}
                       <td className="py-4 px-4 align-top text-right space-y-2">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          {/* Step 1: Pending -> Confirm */}
                           {order.status === 'PENDING_CONFIRMATION' && (
-                            <button
-                              onClick={() => handleStatusChange(order.id, 'CONFIRMED')}
-                              className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>কনফার্ম</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleConfirmOrder(order.id)}
+                                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>কনফার্ম</span>
+                              </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                title="অর্ডার বাতিল করুন ও নোট লিখুন"
+                                className="px-2.5 py-1.5 bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl transition-all text-xs font-bold cursor-pointer"
+                              >
+                                বাতিল
+                              </button>
+                            </>
                           )}
 
+                          {/* Step 2: Confirmed -> Courier Dispatch */}
                           {order.status === 'CONFIRMED' && (
                             <>
                               <button
                                 onClick={() => handleDispatchSteadfast(order.id)}
-                                className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                                title="Steadfast কুরিয়ারে বুকিং করুন"
+                                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
                               >
                                 <Truck className="w-3.5 h-3.5" />
                                 Steadfast
                               </button>
                               <button
                                 onClick={() => handleDispatchPathao(order.id)}
-                                className="px-3.5 py-1.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
+                                title="Pathao কুরিয়ারে বুকিং করুন"
+                                className="px-3 py-1.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1 cursor-pointer"
                               >
                                 <Truck className="w-3.5 h-3.5" />
                                 Pathao
                               </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                title="অর্ডার বাতিল বা রিটার্ন নোট"
+                                className="px-2 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                              >
+                                বাতিল
+                              </button>
                             </>
                           )}
 
+                          {/* Step 3: Dispatched to Courier -> Rider Received (In Transit) */}
                           {order.status === 'DISPATCHED_TO_COURIER' && (
+                            <>
+                              <button
+                                onClick={() => handleRiderReceived(order.id)}
+                                title="কুরিয়ার রাইডার পার্সেল রিসিভ করেছে"
+                                className="px-3 py-1.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Bike className="w-3.5 h-3.5" />
+                                <span>রাইডার রিসিভ</span>
+                              </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                title="পার্সেল রিটার্ন বা বাতিল নোট"
+                                className="px-2 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                              >
+                                রিটার্ন/নোট
+                              </button>
+                            </>
+                          )}
+
+                          {/* Step 4: In Transit -> Delivered */}
+                          {order.status === 'IN_TRANSIT' && (
+                            <>
+                              <button
+                                onClick={() => handleMarkDelivered(order.id)}
+                                title="কাস্টমার পার্সেল পেয়েছে ও ক্যাশ পেমেন্ট সম্পন্ন"
+                                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <PackageCheck className="w-3.5 h-3.5" />
+                                <span>ডেলিভারড</span>
+                              </button>
+                              <button
+                                onClick={() => setSelectedCancelOrder(order)}
+                                title="কাস্টমার পার্সেল নেয়নি / রিটার্ন এসেছে"
+                                className="px-2.5 py-1.5 bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                              >
+                                রিটার্ন/বাতিল
+                              </button>
+                            </>
+                          )}
+
+                          {/* Step 5: If Cancelled or Returned - edit note option */}
+                          {(order.status === 'CANCELLED' || order.status === 'RETURNED') && (
                             <button
-                              onClick={() => handleStatusChange(order.id, 'DELIVERED')}
-                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
+                              onClick={() => setSelectedCancelOrder(order)}
+                              title="নোট সম্পাদনা করুন"
+                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-semibold cursor-pointer flex items-center gap-1"
                             >
-                              ডেলিভারড মার্ক
+                              <FileText className="w-3 h-3 text-slate-400" />
+                              <span>নোট এডিট</span>
                             </button>
                           )}
 
+                          {/* Direct Message Customer Button */}
                           <button
                             onClick={() => setSelectedMessageOrder(order)}
                             title="সরাসরি গ্রাহককে মেসেজ পাঠান (Messenger / WhatsApp / SMS)"
@@ -838,6 +961,7 @@ export default function OrdersPage() {
                             <span className="hidden sm:inline">মেসেজ</span>
                           </button>
 
+                          {/* Invoice Print Button */}
                           <button
                             onClick={() => setSelectedInvoiceOrder(order)}
                             title="ইনভয়েস প্রিন্ট"
@@ -1038,6 +1162,14 @@ export default function OrdersPage() {
         onClose={() => setSelectedMessageOrder(null)}
         order={selectedMessageOrder}
         onMessageSent={loadOrders}
+      />
+
+      {/* Cancel Order with Note Modal */}
+      <CancelOrderModal
+        isOpen={!!selectedCancelOrder}
+        onClose={() => setSelectedCancelOrder(null)}
+        order={selectedCancelOrder}
+        onConfirmCancel={handleConfirmCancelWithNote}
       />
     </div>
   );
