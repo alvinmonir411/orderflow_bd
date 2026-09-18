@@ -357,25 +357,15 @@ DELIVERY & STORE POLICIES:
 
 ACTIVE CUSTOMER CONTEXT:
 ${recentOrder
-        ? `IMPORTANT: This customer has ALREADY confirmed an active previous Order #${recentOrder.orderNumber}:
+        ? `IMPORTANT: This customer has an active recent Order #${recentOrder.orderNumber}:
 - Ordered Product: "${recentOrder.productTitle}"
 - Order Total: ৳${recentOrder.totalPrice}
 - Status: ${recentOrder.status}
-- Customer Name: "${recentOrder.customerName || 'সম্মানিত কাস্টমার'}"
+- Customer Name: "${recentOrder.customerName || 'সম্মানিত গ্রাহক'}"
 - Saved Phone Number: "${recentOrder.customerPhone || 'N/A'}"
 - Saved Delivery Address: "${recentOrder.deliveryAddress || 'ঢাকা'}"
-- Date: ${recentOrder.createdAt}
-
-CUSTOMER RE-ORDER / REUSE POLICIES:
-- If customer says "ager name adress number use kro", "ager moto pathan", "use previous info", "ager address e", "ager thikana use koro", or wants to order a new product with their saved information:
-  1. Check what new product from our live dashboard catalog they mentioned (or if already in session: "${session.selectedProduct || ''}").
-  2. If they mentioned a product, DO NOT ask for their product name again!
-  3. DO NOT ask for size if it is unstitched three-piece/saree or if size is not needed!
-  4. Immediately CONFIRM the new order using their saved details and append:
-     JSON_START{"orderConfirmed":true,"product":"${session.selectedProduct || recentOrder.productTitle}","price":${session.price || 1250},"customerName":"${recentOrder.customerName || 'সম্মানিত কাস্টমার'}","phone":"${recentOrder.customerPhone || '01700000000'}","address":"${recentOrder.deliveryAddress || 'ঢাকা'}"}JSON_END
-  5. In your text reply, congratulate them warmly, state that the new order for the chosen product is confirmed with their saved details (#${recentOrder.orderNumber}), state the total bill breakdown (product price + ৳${settings.deliveryFeeDhaka || 120} delivery = total, Cash on Delivery), and state delivery timeline.
-- If customer asks post-order delivery time/status questions about their existing order #${recentOrder.orderNumber}, answer warmly referring to Order #${recentOrder.orderNumber}.`
-        : `No previous order found. Selected Product: ${session.selectedProduct || 'None yet'}, Name: ${session.customerName || 'Unknown'}, Address: ${session.deliveryAddress || 'Unknown'}`
+- Date: ${recentOrder.createdAt}`
+        : `No confirmed previous order found yet. Selected Product in Session: "${session.selectedProduct || 'None yet'}", Customer Name: "${session.customerName || 'সম্মানিত গ্রাহক'}", Address: "${session.deliveryAddress || 'Unknown'}"`
       }
 
 CONVERSATION PROGRESS:
@@ -383,19 +373,19 @@ CONVERSATION PROGRESS:
 - Currently Selected Product in Session: ${session.selectedProduct || 'None yet'}
 
 STRICT SALES & BUSINESS RULES:
-1. Speak in warm, natural Bengali (with tasteful emojis). Keep replies concise and sales-focused (2-3 sentences max).
-2. Answer customer queries based on the ENTIRE live dashboard product catalog above.
-   - When asked what products we have ("ki product ache", "ki ki ache", "collection ki ki", "ড্রেস কি কি আছে", "কি কি প্রোডাক্ট আছে"), give them an attractive categorized summary highlighting 3-4 top items with live prices from the catalog (e.g. থ্রি-পিস, কুর্তি, শাড়ি, পার্টি গাউন) and invite them to pick one!
-   - When asked for images/photos ("tumi ki amake image dite paro", "chobi dekhaw"), assure them that we have high quality photos of all our products and highlight top trending items from our live catalog!
-   - Quote accurate prices from the live catalog for any product they ask about.
-3. Maintain continuous conversation context. Always remember what products or questions were discussed in earlier chat turns.
-4. DO NOT engage in unnecessary casual chit-chat, personal talks, or philosophical debates. Always steer the conversation back to our products and shopping.
-5. If the customer asks repetitive product queries without deciding after multiple turns (turn >= 3), answer their question and explicitly invite them to call our helpline (📞 ${settings.helplinePhone || '01700000000'}) or drop their address to place the order.
-6. If they are placing a NEW order:
-   - If phone number is incomplete (wrong number of digits), point out the specific mistake politely.
-   - When all info (Name, 11-digit phone, Address, Product) is ready to confirm (either provided now or requested to reuse from previous order):
-     Congratulate them and append:
-     JSON_START{"orderConfirmed":true,"product":"...","price":850,"customerName":"...","phone":"...","address":"..."}JSON_END`;
+1. Speak in warm, polite, natural Bengali (with tasteful emojis). Keep replies concise and sales-focused (2-3 sentences max).
+2. RESPECTFUL GENDER-NEUTRAL ADDRESS: Never assume gender or randomly call customer "আপু" or "স্যার". Address respectfully as "সম্মানিত গ্রাহক" or by their name (e.g. "${session.customerName || recentOrder?.customerName || 'সম্মানিত গ্রাহক'} ভাইয়া/আপু").
+3. NEVER LOSE SELECTED PRODUCT OR ASK REPETITIVE QUESTIONS:
+   - If the customer refers to an already chosen item or price (e.g. "agei na 1750 takar ta", "1750 takar ta", "gown ta", "oi ta", "ager ta"), immediately acknowledge that exact product! NEVER ask them to pick another category or saree!
+   - If customer mentions a size (e.g. "L", "M", "XL", "38", "40", "42") and their details are already provided, CONFIRM the order with that size immediately!
+   - If customer gives phone & address, CONFIRM the order immediately!
+4. LIVE CATALOG ACCURACY:
+   - If asked for sarees, mention sarees. If asked for gowns, mention gowns. If asked for kurtis, mention kurtis.
+   - Quote accurate prices from the live catalog above.
+5. ORDER CONFIRMATION PROTOCOL:
+   When order details (Name, 11-digit phone, Address, Product) are ready:
+   Congratulate them warmly with order summary and append:
+   JSON_START{"orderConfirmed":true,"product":"...","price":850,"customerName":"...","phone":"...","address":"..."}JSON_END`;
 
     // Construct multi-turn contents from session.history
     const pastTurns = (session.history || []).slice(-8);
@@ -856,6 +846,31 @@ async function processMessengerEvent(
     }
   }
 
+  // 10b. Check if user is sending a size (e.g. "L", "M", "XL", "XXL", "38", "40", "42", "size L", "M size")
+  const sizeKeywords = ['m', 'l', 'xl', 'xxl', 'xxxl', 's', '38', '40', '42', '44', '46', 'medium', 'large', 'small'];
+  const cleanWord = lowerText.replace(/^(size|সাইজ|সাইজের)?\s*/i, '').replace(/\s*(size|সাইজ)?$/i, '').trim();
+  const isSizeInput = sizeKeywords.includes(cleanWord) || /^(?:size|সাইজ)\s*[:=]?\s*(m|l|xl|xxl|s|38|40|42|44)$/i.test(lowerText);
+  const detectedSize = isSizeInput ? cleanWord.toUpperCase() : null;
+
+  if (detectedSize) {
+    if (recentOrder) {
+      const custName = recentOrder.customerName || 'সম্মানিত গ্রাহক';
+      const reply =
+        `🎉 ধন্যবাদ ${custName}! আপনার সাইজ (${detectedSize}) সফলভাবে গ্রহণ করা হয়েছে এবং আপনার অর্ডারে (#OF-${recentOrder.orderNumber}) যুক্ত করা হয়েছে। 🌸\n\n` +
+        `📦 অর্ডার নম্বর: #OF-${recentOrder.orderNumber}\n` +
+        `👗 প্রোডাক্ট: ${recentOrder.productTitle} (সাইজ: ${detectedSize})\n` +
+        `📍 ডেলিভারি ঠিকানা: ${recentOrder.deliveryAddress}\n` +
+        `📞 মোবাইল: ${recentOrder.customerPhone}\n` +
+        `💰 মোট বিল: ৳${recentOrder.totalPrice} (ক্যাশ অন ডেলিভারি)\n` +
+        `🚚 ঢাকা সিটিতে ২৪-৪৮ ঘণ্টা ও ঢাকার বাইরে ২-৩ কার্যদিবসের মধ্যে কুরিয়ারের মাধ্যমে পৌঁছে যাবে।\n\n` +
+        `কুরিয়ারে দেওয়ার পর আপনাকে ট্র্যাকিং কোডসহ এসএমএস পাঠিয়ে দেওয়া হবে। ধন্যবাদ সাথে থাকার জন্য! ❤️`;
+
+      await recordChatTurn(senderId, rawText, reply, { customerName: custName, channel });
+      await sendFbMessage(senderId, reply, pageToken);
+      return;
+    }
+  }
+
   // 11. IF USER ASKS TO SEE PHOTOS / PICTURES (IMAGE QUERY):
   const isImageRequest =
     lowerText.includes('image') ||
@@ -885,23 +900,32 @@ async function processMessengerEvent(
     let targetProducts = liveProducts.filter((p: any) => p.images && p.images.length > 0 && p.images[0]);
     if (targetProducts.length === 0) targetProducts = liveProducts;
 
-    let matchedSpecificProds = targetProducts.filter((p: any) => {
-      const pTitle = p.title.toLowerCase();
-      const pCat = (p.category || '').toLowerCase();
-      const words = pTitle.split(/\s+/).filter((w: string) => w.length >= 3);
-      return (
-        (session.selectedProduct && pTitle.includes(session.selectedProduct.toLowerCase())) ||
-        lowerText.includes(pTitle) ||
-        lowerText.includes(pCat) ||
-        words.some((w: string) => lowerText.includes(w))
-      );
-    });
+    const isSareeQuery = lowerText.includes('saree') || lowerText.includes('shari') || lowerText.includes('sari') || lowerText.includes('শাড়ি') || lowerText.includes('শাড়ী');
+    const isGownQuery = lowerText.includes('gown') || lowerText.includes('frock') || lowerText.includes('গাউন') || lowerText.includes('ফ্রক');
+    const isKurtiQuery = lowerText.includes('kurti') || lowerText.includes('kurtis') || lowerText.includes('tunic') || lowerText.includes('কুর্তি') || lowerText.includes('টিউনিক');
+    const isThreePieceQuery = lowerText.includes('three piece') || lowerText.includes('3 piece') || lowerText.includes('3-piece') || lowerText.includes('থ্রি-পিস') || lowerText.includes('থ্রিপিস') || lowerText.includes('আনস্টিচড') || lowerText.includes('unstitched') || lowerText.includes('কাফতান');
+    const isBorkaQuery = lowerText.includes('borka') || lowerText.includes('abaya') || lowerText.includes('hijab') || lowerText.includes('বোরকা') || lowerText.includes('আবায়া');
 
-    let displayList = matchedSpecificProds.length > 0 ? matchedSpecificProds : targetProducts;
-    if (displayList.length < 5) {
-      const others = targetProducts.filter((p: any) => !displayList.some((d: any) => d.id === p.id));
-      displayList = [...displayList, ...others];
+    let categoryFilteredProds: any[] = [];
+    let categoryName = '';
+    if (isSareeQuery) {
+      categoryFilteredProds = targetProducts.filter((p: any) => (p.category || '').includes('শাড়ি') || p.title.includes('শাড়ি'));
+      categoryName = 'শাড়ির';
+    } else if (isGownQuery) {
+      categoryFilteredProds = targetProducts.filter((p: any) => (p.category || '').includes('গাউন') || p.title.includes('গাউন') || p.title.includes('ফ্রক'));
+      categoryName = 'পার্টি গাউনের';
+    } else if (isKurtiQuery) {
+      categoryFilteredProds = targetProducts.filter((p: any) => (p.category || '').includes('কুর্তি') || p.title.includes('কুর্তি') || p.title.includes('টিউনিক'));
+      categoryName = 'কুর্তি';
+    } else if (isThreePieceQuery) {
+      categoryFilteredProds = targetProducts.filter((p: any) => (p.category || '').includes('থ্রি-পিস') || p.title.includes('থ্রি-পিস') || p.title.includes('কাফতান'));
+      categoryName = 'থ্রি-পিসের';
+    } else if (isBorkaQuery) {
+      categoryFilteredProds = targetProducts.filter((p: any) => (p.category || '').includes('বোরকা') || p.title.includes('বোরকা'));
+      categoryName = 'বোরকা';
     }
+
+    let displayList = categoryFilteredProds.length > 0 ? categoryFilteredProds : targetProducts;
 
     const elements = displayList.slice(0, 10).map((p: any) => {
       const imgUrl =
@@ -934,14 +958,14 @@ async function processMessengerEvent(
       };
     });
 
-    const leadText = matchedSpecificProds.length > 0
-      ? `জি অবশ্যই! 🌸 নিচে '${matchedSpecificProds[0].title}'-সহ আমাদের রানিং কালেকশনের বড় ছবি দেওয়া হলো।\n\n💡 ছবিতে অথবা '🔍 ফুল ছবি দেখুন' বাটনে চাপ দিলে সম্পূর্ণ ফুল-সাইজ HD ছবি দেখতে পাবেন! অর্ডার করতে '🛍️ অর্ডার করুন' বাটনে চাপ দিন। ✨`
+    const leadText = categoryName
+      ? `জি অবশ্যই! 🌸 নিচে আমাদের স্টোরের রানিং ${categoryName} এক্সক্লুসিভ কালেকশনের বড় ছবি ও মূল্য তালিকা দেওয়া হলো।\n\n💡 ছবিতে অথবা '🔍 ফুল ছবি দেখুন' বাটনে চাপ দিলে সম্পূর্ণ ফুল-সাইজ HD ছবি দেখতে পাবেন! অর্ডার করতে '🛍️ অর্ডার করুন' বাটনে চাপ দিন। ✨`
       : `জি অবশ্যই! 🌸 নিচে আমাদের স্টোরের রানিং কালেকশনের বড় ছবি ও মূল্য তালিকা দেওয়া হলো।\n\n💡 ছবিতে অথবা '🔍 ফুল ছবি দেখুন' বাটনে চাপ দিলে সম্পূর্ণ ফুল-সাইজ HD ছবি দেখতে পাবেন! ✨`;
 
     await recordChatTurn(senderId, rawText, `[Sent High-Res Product Images Carousel]`, { channel });
 
-    if (matchedSpecificProds.length > 0 && matchedSpecificProds[0].images?.[0]) {
-      const topImg = matchedSpecificProds[0].images[0];
+    if (displayList.length > 0 && displayList[0].images?.[0]) {
+      const topImg = displayList[0].images[0];
       if (topImg.startsWith('http')) {
         await sendFbImageAttachment(senderId, topImg, pageToken);
       }
@@ -988,8 +1012,9 @@ async function processMessengerEvent(
     return;
   }
 
-  // 13. Anti-Spam & API Quota Protection (if user is repeatedly off-topic / non-business)
+  // 13. Anti-Spam & API Quota Protection
   const isBusinessKeywords =
+    lowerText.length <= 4 ||
     lowerText.includes('order') ||
     lowerText.includes('product') ||
     lowerText.includes('dam') ||
@@ -1031,7 +1056,11 @@ async function processMessengerEvent(
     lowerText.includes('ঠিকানা') ||
     lowerText.includes('ফোন') ||
     lowerText.includes('কবে') ||
-    lowerText.includes('টাকা');
+    lowerText.includes('টাকা') ||
+    lowerText.includes('ta') ||
+    lowerText.includes('oi') ||
+    lowerText.includes('ei') ||
+    lowerText.includes('agei');
 
   if (!isBusinessKeywords && !recentOrder && rawText.length > 0) {
     session.nonBusinessCount = (session.nonBusinessCount || 0) + 1;
@@ -1039,7 +1068,7 @@ async function processMessengerEvent(
     session.nonBusinessCount = 0;
   }
 
-  if (session.nonBusinessCount >= 2 && !payload) {
+  if (session.nonBusinessCount >= 5 && !payload) {
     const helpline = settings?.helplinePhone || '01700000000';
     const reply = `আসসালামু আলাইকুম! 🌸 আমি OrderFlow BD-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`;
     await recordChatTurn(senderId, rawText, reply, { channel });
