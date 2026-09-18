@@ -510,21 +510,21 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <button
                 onClick={handleFacebookLoginPopup}
                 disabled={isLoggingInFb}
-                className="w-full py-3.5 bg-gradient-to-r from-[#1877F2] via-[#1b6fd8] to-[#145fc2] hover:from-[#166fe5] hover:to-[#1255af] text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2.5"
+                className="w-full py-3.5 bg-gradient-to-r from-[#1877F2] via-[#1b6fd8] to-[#145fc2] hover:from-[#166fe5] hover:to-[#1255af] text-white font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-blue-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
                 {isLoggingInFb ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>ফেসবুক পেজ লোড হচ্ছে...</span>
+                    <span>পেজ লোড হচ্ছে...</span>
                   </>
                 ) : (
                   <>
                     <span className="font-black text-lg leading-none">f</span>
-                    <span>Continue with Facebook (১-ক্লিক কানেক্ট)</span>
+                    <span>Continue with Facebook</span>
                   </>
                 )}
               </button>
@@ -534,10 +534,10 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
                   setShowConnectModal(true);
                   setConnectTab('token');
                 }}
-                className="w-full py-2 text-neutral-400 hover:text-neutral-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full py-3.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-100 hover:text-white border border-neutral-700 font-bold text-xs sm:text-sm rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg"
               >
-                <Key className="w-3.5 h-3.5 text-neutral-500" />
-                <span>টোকেন বা ম্যানুয়াল পেজ আইডি দিয়ে কানেক্ট করতে চাইলে এখানে ক্লিক করুন</span>
+                <Key className="w-4 h-4 text-emerald-400" />
+                <span>টোকেন দিয়ে পেজ লোড করুন</span>
               </button>
             </div>
           )}
