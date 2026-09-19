@@ -18,7 +18,11 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import confetti from 'canvas-confetti';
+// canvas-confetti loaded dynamically to avoid SSR crash
+const fireConfetti = () => {
+  try { (window as any).__confetti?.({ particleCount: 120, spread: 70, origin: { y: 0.6 } }); } catch {}
+  try { import('canvas-confetti').then((m) => m.default({ particleCount: 120, spread: 70, origin: { y: 0.6 } })).catch(() => {}); } catch {}
+};
 
 interface WhatsAppStatus {
   connected: boolean;
@@ -85,7 +89,7 @@ export const WhatsAppIntegrationCard: React.FC<WhatsAppIntegrationCardProps> = (
 
       if (data.status === 'CONNECTED') {
         setQrPhase('CONNECTED');
-        try { confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } }); } catch {}
+        fireConfetti();
         toast.success(`🎉 WhatsApp (${data.phone}) সফলভাবে কানেক্ট হয়েছে!`);
         clearInterval(pollRef.current);
         await fetchStatus();
@@ -365,7 +369,12 @@ export const WhatsAppIntegrationCard: React.FC<WhatsAppIntegrationCardProps> = (
                   </div>
                 ) : qrPhase === 'READY' && qrCodeImage ? (
                   <img
-                    src={qrCodeImage.startsWith('data:') ? qrCodeImage : qrCodeImage.startsWith('http') ? qrCodeImage : `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrCodeImage)}`}
+                    src={(() => {
+                      const qr = String(qrCodeImage || '');
+                      if (!qr) return '';
+                      if (qr.startsWith('data:') || qr.startsWith('http')) return qr;
+                      return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qr)}`;
+                    })()}
                     alt="WhatsApp QR Code"
                     className="w-full h-full object-contain rounded-xl"
                   />
