@@ -15,6 +15,13 @@ export const FACEBOOK_REQUIRED_SCOPES = [
   'public_profile',
 ].join(',');
 
+export const WHATSAPP_REQUIRED_SCOPES = [
+  'whatsapp_business_messaging',
+  'whatsapp_business_management',
+  'business_management',
+  'public_profile',
+].join(',');
+
 let isSdkLoading = false;
 let sdkLoadedPromise: Promise<boolean> | null = null;
 
@@ -75,10 +82,18 @@ export async function loginWithFacebookPopup(): Promise<FacebookLoginResult> {
   }
 
   // Use direct OAuth Dialog Popup to avoid "JSSDK Option is Not Toggled" restrictions
-  return launchOAuthPopupFallback();
+  return launchOAuthPopupFallback(FACEBOOK_REQUIRED_SCOPES);
 }
 
-function launchOAuthPopupFallback(): Promise<FacebookLoginResult> {
+export async function loginWithWhatsAppPopup(): Promise<FacebookLoginResult> {
+  if (typeof window === 'undefined') {
+    return { success: false, error: 'Window is not defined' };
+  }
+
+  return launchOAuthPopupFallback(WHATSAPP_REQUIRED_SCOPES);
+}
+
+function launchOAuthPopupFallback(scope: string = FACEBOOK_REQUIRED_SCOPES): Promise<FacebookLoginResult> {
   return new Promise((resolve) => {
     const redirectUri =
       window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -86,7 +101,7 @@ function launchOAuthPopupFallback(): Promise<FacebookLoginResult> {
         : `${window.location.origin}/api/facebook/oauth-callback`;
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(
       redirectUri,
-    )}&scope=${FACEBOOK_REQUIRED_SCOPES}&response_type=token&auth_type=rerequest&display=popup`;
+    )}&scope=${encodeURIComponent(scope)}&response_type=token&auth_type=rerequest&display=popup`;
 
     const width = 600;
     const height = 700;

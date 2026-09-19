@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FacebookIntegrationCard } from '@/components/integrations/FacebookIntegrationCard';
+import { WhatsAppIntegrationCard } from '@/components/integrations/WhatsAppIntegrationCard';
 
 interface BotFaqItem {
   id: string;
@@ -698,88 +699,99 @@ export default function BotSettingsPage() {
 
       {/* TAB 3: CONNECTIONS & API KEYS */}
       {activeTab === 'connections' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column: Google Gemini AI API Key */}
-          <div className="space-y-6">
-            <div className="rounded-3xl bg-gradient-to-br from-[#151228] via-[#0f101d] to-[#0a0c16] border border-indigo-500/40 p-6 sm:p-7 space-y-5 shadow-2xl">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-neutral-100">Google Gemini AI Studio API Key</h3>
-                    <p className="text-xs text-neutral-400">ফুল ন্যাচারাল ল্যাঙ্গুয়েজ সেলস ও ইন্টেলিজেন্ট অটোমেশন</p>
-                  </div>
+        <div className="space-y-8">
+          {/* Top Section: Google Gemini AI API Key */}
+          <div className="rounded-3xl bg-gradient-to-br from-[#151228] via-[#0f101d] to-[#0a0c16] border border-indigo-500/40 p-6 sm:p-7 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Sparkles className="w-5 h-5" />
                 </div>
-
-                {keyVerified || geminiApiKey ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-1.5 shadow-sm">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> এআই কানেক্টেড
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center gap-1.5">
-                    কী যুক্ত করা হয়নি
-                  </span>
-                )}
+                <div>
+                  <h3 className="text-base font-black text-neutral-100">Google Gemini AI Studio API Key</h3>
+                  <p className="text-xs text-neutral-400">ফুল ন্যাচারাল ল্যাঙ্গুয়েজ সেলস ও ইন্টেলিজেন্ট অটোমেশন ইঞ্জিন</p>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="relative">
-                  <input
-                    type={showApiKey ? 'text' : 'password'}
-                    value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
-                    placeholder="AIzaSy..."
-                    className="w-full bg-neutral-950/90 border border-neutral-800 rounded-2xl pl-4 pr-12 py-3.5 text-xs sm:text-sm text-neutral-100 font-mono focus:outline-none focus:border-indigo-500 transition-all shadow-inner"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200 transition-colors p-1"
-                    title={showApiKey ? 'হাইড করুন' : 'দেখান'}
-                  >
-                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+              {keyVerified || geminiApiKey ? (
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-1.5 shadow-sm">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> এআই সক্রিয় ও কানেক্টেড
+                </span>
+              ) : (
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center gap-1.5">
+                  কী যুক্ত করা হয়নি
+                </span>
+              )}
+            </div>
 
-                <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleSaveAndVerifyGeminiKey}
-                    disabled={isVerifyingKey}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50"
-                  >
-                    {isVerifyingKey ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        যাচাই ও সেভ হচ্ছে...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-3.5 h-3.5" />
-                        জেমিনাই Key সেভ ও টেস্ট করুন
-                      </>
-                    )}
-                  </button>
+            <div className="space-y-3">
+              <div className="relative">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full bg-neutral-950/90 border border-neutral-800 rounded-2xl pl-4 pr-12 py-3.5 text-xs sm:text-sm text-neutral-100 font-mono focus:outline-none focus:border-indigo-500 transition-all shadow-inner"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200 transition-colors p-1"
+                  title={showApiKey ? 'হাইড করুন' : 'দেখান'}
+                >
+                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
 
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition-colors font-medium"
-                  >
-                    Google AI Studio থেকে ফ্রি Key নিন
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
+              <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveAndVerifyGeminiKey}
+                  disabled={isVerifyingKey}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50"
+                >
+                  {isVerifyingKey ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      যাচাই ও সেভ হচ্ছে...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      জেমিনাই Key সেভ ও টেস্ট করুন
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 transition-colors font-medium"
+                >
+                  Google AI Studio থেকে ফ্রি Key নিন
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Facebook Page & Messenger Bot Integration */}
-          <div className="space-y-6">
-            <FacebookIntegrationCard />
+          {/* Bottom Section: Connected Messaging Channels (Facebook Messenger & WhatsApp) */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <h3 className="text-base font-bold text-neutral-100">মেসেজিং চ্যানেল ও সোশ্যাল বট ইন্টিগ্রেশন</h3>
+                <p className="text-xs text-neutral-400">ফেসবুক পেজ ও হোয়াটসঅ্যাপ বিজনেস চ্যানেলে এআই বট চালু করুন</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Facebook Page & Messenger Bot Integration */}
+              <FacebookIntegrationCard />
+
+              {/* WhatsApp Cloud API & Bot Integration */}
+              <WhatsAppIntegrationCard />
+            </div>
           </div>
         </div>
       )}
