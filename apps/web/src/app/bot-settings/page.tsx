@@ -51,6 +51,7 @@ export default function BotSettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [isVerifyingKey, setIsVerifyingKey] = useState(false);
   const [keyVerified, setKeyVerified] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Connection State
   const [fbPageId, setFbPageId] = useState('');
@@ -96,6 +97,15 @@ export default function BotSettingsPage() {
       setGeminiApiKey(cachedKey);
       setKeyVerified(true);
     }
+
+    fetch('/api/auth')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        }
+      })
+      .catch(() => {});
 
     fetch('/api/bot-config')
       .then((res) => res.json())
@@ -327,10 +337,10 @@ export default function BotSettingsPage() {
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold rounded-full mb-1">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>AI সেলস ও মেসেঞ্জার নলেজবেস কন্ট্রোল প্যানেল</span>
+              <span>{currentUser?.organizationName || 'OrderFlow BD'} AI সেলস ও মেসেঞ্জার কন্ট্রোল প্যানেল</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-neutral-100 tracking-tight">
-              AI ট্রেইনিং ও চ্যাটবট ম্যানেজমেন্ট
+              {currentUser?.organizationName ? `${currentUser.organizationName} AI সেলস বট স্টুডিও` : 'AI ট্রেইনিং ও চ্যাটবট ম্যানেজমেন্ট'}
             </h2>
             <p className="text-xs sm:text-sm text-neutral-400 max-w-2xl leading-relaxed">
               আপনার শপের প্রশ্ন-উত্তর, ডেলিভারি নিয়মাবলী ও AI এর আচার-আচরণ সম্পূর্ণ নিজের মতো কাস্টমাইজ করুন।
@@ -776,8 +786,15 @@ export default function BotSettingsPage() {
 
       {/* TAB 4: LIVE BOT SIMULATOR */}
       {activeTab === 'tester' && (
-        <div className="max-w-xl mx-auto">
-          <LiveBotTester />
+        <div className="max-w-xl mx-auto space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Bot className="w-5 h-5 text-blue-400" />
+              <span>{currentUser?.organizationName || 'OrderFlow BD'} AI সেলস বট স্টুডিও</span>
+            </h3>
+            <span className="text-xs text-slate-400">লাইভ কাস্টমার চ্যাট ও অর্ডার টেস্ট সিমুলেটর</span>
+          </div>
+          <LiveBotTester storeName={currentUser?.organizationName || 'OrderFlow BD'} />
         </div>
       )}
 

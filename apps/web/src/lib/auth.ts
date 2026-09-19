@@ -96,9 +96,11 @@ export async function getCurrentUser(req?: NextRequest): Promise<User | null> {
   try {
     const sql = getSql();
     const rows = await sql`
-      SELECT id, "organizationId", name, email, role, avatar, phone, title, "isActive", "createdAt"
-      FROM "User"
-      WHERE id = ${payload.userId} AND "isActive" = true
+      SELECT u.id, u."organizationId", u.name, u.email, u.role, u.avatar, u.phone, u.title, u."isActive", u."createdAt",
+             o.name as "organizationName"
+      FROM "User" u
+      LEFT JOIN "Organization" o ON o.id = u."organizationId"
+      WHERE u.id = ${payload.userId} AND u."isActive" = true
       LIMIT 1
     `;
     if (rows.length > 0) {
@@ -106,6 +108,7 @@ export async function getCurrentUser(req?: NextRequest): Promise<User | null> {
       return {
         id: r.id,
         organizationId: r.organizationId,
+        organizationName: r.organizationName || undefined,
         name: r.name,
         email: r.email,
         role: r.role as UserRole,
@@ -123,6 +126,7 @@ export async function getCurrentUser(req?: NextRequest): Promise<User | null> {
   return {
     id: payload.userId,
     organizationId: payload.organizationId,
+    organizationName: payload.organizationId === 'org-1' ? 'OrderFlow BD' : undefined,
     name: payload.name,
     email: payload.email,
     role: payload.role,

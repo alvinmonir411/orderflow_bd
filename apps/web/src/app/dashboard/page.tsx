@@ -69,6 +69,7 @@ export default function DashboardPage() {
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const loadData = async () => {
     try {
@@ -91,6 +92,14 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 4000);
+    fetch('/api/auth')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        }
+      })
+      .catch(() => {});
     return () => clearInterval(interval);
   }, []);
 
@@ -352,11 +361,11 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-1">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Bot className="w-5 h-5 text-blue-400" />
-              লাইভ কাস্টমার চ্যাট ও অর্ডার সিমুলেটর
+              <span>{currentUser?.organizationName || 'OrderFlow BD'} AI সেলস বট স্টুডিও</span>
             </h3>
-            <span className="text-xs text-slate-400">মেসেজ লিখে বা বাটন চেপে টেস্ট করুন, ড্যাশবোর্ডে লাইভ অর্ডার আসবে</span>
+            <span className="text-xs text-slate-400">লাইভ কাস্টমার চ্যাট ও অর্ডার টেস্ট সিমুলেটর</span>
           </div>
-          <LiveBotTester onOrderCreated={loadData} />
+          <LiveBotTester storeName={currentUser?.organizationName || 'OrderFlow BD'} onOrderCreated={loadData} />
         </div>
       )}
 

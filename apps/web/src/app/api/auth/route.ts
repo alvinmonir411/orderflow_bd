@@ -213,6 +213,7 @@ export async function POST(req: NextRequest) {
           user: {
             id: 'usr-platform-owner',
             organizationId: 'org-1',
+            organizationName: 'OrderFlow BD',
             name: 'Alvin Monir',
             email: normalizedEmail,
             role: 'SUPER_ADMIN',
@@ -241,6 +242,7 @@ export async function POST(req: NextRequest) {
           user: {
             id: userId,
             organizationId: 'org-1',
+            organizationName: 'Moner Kotha Fashion',
             name: demoUser.name,
             email: normalizedEmail,
             role: demoUser.role,
@@ -278,7 +280,7 @@ export async function POST(req: NextRequest) {
 
       const rows = await sql`
         SELECT u.id, u."organizationId", u.name, u.email, u."passwordHash", u.role, u.avatar, u.title, u."isActive",
-               o.status as "orgStatus"
+               o.status as "orgStatus", o.name as "organizationName"
         FROM "User" u
         LEFT JOIN "Organization" o ON u."organizationId" = o.id
         WHERE u.email = ${normalizedEmail}
@@ -332,6 +334,7 @@ export async function POST(req: NextRequest) {
         user: {
           id: userRow.id,
           organizationId: userRow.organizationId,
+          organizationName: userRow.organizationName || 'OrderFlow BD',
           name: userRow.name,
           email: userRow.email,
           role: userRow.role,

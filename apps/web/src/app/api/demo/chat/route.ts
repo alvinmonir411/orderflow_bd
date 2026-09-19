@@ -24,7 +24,9 @@ export async function POST(request: NextRequest) {
     // 1. Try Google AI Studio (Gemini)
     if (apiKey && apiKey.length > 10) {
       try {
-        const systemPrompt = `You are a warm, highly-skilled Bangladeshi F-Commerce AI sales representative for "Moner Kotha Fashion".
+        const systemPrompt = `You are the official Bangladeshi F-Commerce AI sales representative for "Moner Kotha Fashion".
+Your name is "Moner Kotha Fashion AI সেলস বট" (Moner Kotha Fashion Official AI Sales Assistant).
+If the customer asks who you are, what your name is ("name ki", "tomar nam ki", "who are you", "tumi ke", "apnar nam ki"), always proudly and politely introduce yourself as the official AI Sales Assistant of "Moner Kotha Fashion".
 Catalog:
 1. প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০ (সাইজ: M, L, XL)
 2. জয়পুরি কটন আনস্টিচড থ্রি-পিস - ৳১২৫০ (১০০% পিওর কটন, সেলাইবিহীন)
@@ -37,7 +39,7 @@ Delivery Policy:
 - ডেলিভারি সময়: ঢাকায় ২৪-৪৮ ঘণ্টা, বাইরে ২-৩ দিন।
 
 Rules:
-- Understand both Bengali and Banglish (e.g. "koto", "kiki product ache", "aita ki khub valo", "dam koto", "size ache", "order korbo").
+- Understand both Bengali and Banglish (e.g. "koto", "kiki product ache", "aita ki khub valo", "dam koto", "size ache", "order korbo", "name ki", "tomar nam ki").
 - Always reply in warm, natural Bengali with polite emojis. Keep answers concise (2-3 sentences max).
 - If customer asks what products are available ("kiki product ache", "collection"), list the dresses with prices.
 - If customer asks price ("koto", "dam"), quote accurate prices from catalog.
@@ -89,6 +91,34 @@ Rules:
 
     // 2. Intelligent Bangladeshi NLP Fallback (handles Bengali + Banglish smoothly)
     const lower = text.toLowerCase();
+
+    // Bot Name / Identity queries ("name ki", "tomar nam ki", "who are you", "tumi ke", "আপনার নাম কি")
+    if (
+      lower.includes('name ki') ||
+      lower.includes('nam ki') ||
+      lower.includes('tomar nam') ||
+      lower.includes('tomar name') ||
+      lower.includes('apnar nam') ||
+      lower.includes('apnar name') ||
+      lower.includes('who are you') ||
+      lower.includes('tumi ke') ||
+      lower.includes('tumi kar') ||
+      lower.includes('apni ke') ||
+      lower.includes('নাম কি') ||
+      lower.includes('তোমার নাম') ||
+      lower.includes('আপনার নাম') ||
+      lower.includes('তুমি কে') ||
+      lower.includes('আপনি কে') ||
+      lower.includes('বট এর নাম') ||
+      lower.includes('বটের নাম')
+    ) {
+      return NextResponse.json({
+        success: true,
+        reply: `আসসালামু আলাইকুম! আমি **Moner Kotha Fashion**-এর অফিসিয়াল AI সেলস অ্যাসিস্ট্যান্ট (AI Sales Bot) 🌸\n\nআমি ২৪ ঘণ্টা আমাদের শপের সম্মানিত কাস্টমারদের যেকোনো ড্রেসের সাইজ, দাম ও কালেকশন সম্পর্কে তথ্য জানাতে এবং সরাসরি হোম ডেলিভারি অর্ডার নিতে কাজ করি।\n\nআজকে আপনাকে কোন চমৎকার কালেকশনটি দেখাতে পারি? 😊`,
+        quickReplies: ['আজকের কালেকশন দেখতে চাই', 'থ্রি-পিসের দাম কত?', 'ডেলিভারি চার্জ কত?'],
+        source: 'nlp',
+      });
+    }
 
     // Check Phone number provided -> Order Confirmation
     const phoneMatch = text.match(/01[3-9]\d{8}/);

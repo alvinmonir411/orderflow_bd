@@ -10,11 +10,16 @@ interface Message {
   timestamp: string;
 }
 
-export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrderCreated }) => {
+export interface LiveBotTesterProps {
+  storeName?: string;
+  onOrderCreated?: () => void;
+}
+
+export const LiveBotTester: React.FC<LiveBotTesterProps> = ({ storeName = 'Moner Kotha Fashion', onOrderCreated }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: 'bot',
-      text: 'আসসালামু আলাইকুম! Moner Kotha শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇',
+      text: `আসসালামু আলাইকুম! ${storeName} শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇`,
       quickReplies: [
         { title: 'প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০', payload: 'PROD_1' },
         { title: 'জয়পুরি কটন থ্রি-পিস - ৳১২৫০', payload: 'PROD_2' },
@@ -135,6 +140,43 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
   };
 
   const processBotReply = (text: string, currentMsgs: Message[]) => {
+    const lower = text.toLowerCase();
+
+    // Check if customer is asking bot name or identity
+    if (
+      lower.includes('name ki') ||
+      lower.includes('nam ki') ||
+      lower.includes('tomar nam') ||
+      lower.includes('tomar name') ||
+      lower.includes('apnar nam') ||
+      lower.includes('apnar name') ||
+      lower.includes('who are you') ||
+      lower.includes('tumi ke') ||
+      lower.includes('apni ke') ||
+      lower.includes('নাম কি') ||
+      lower.includes('তোমার নাম') ||
+      lower.includes('আপনার নাম') ||
+      lower.includes('তুমি কে') ||
+      lower.includes('আপনি কে') ||
+      lower.includes('বট এর নাম') ||
+      lower.includes('বটের নাম')
+    ) {
+      setMessages([
+        ...currentMsgs,
+        {
+          sender: 'bot',
+          text: `আসসালামু আলাইকুম! আমি **${storeName}**-এর অফিসিয়াল AI সেলস অ্যাসিস্ট্যান্ট (AI Sales Bot) 🌸\n\nআমি ২৪ ঘণ্টা আমাদের শপের কাস্টমারদের প্রোডাক্ট তথ্য, সাইজ ও ডেলিভারি সংক্রান্ত সহায়তা দিতে এবং সরাসরি অর্ডার গ্রহণ করতে কাজ করি।\n\nআপনি কোন প্রোডাক্টটি অর্ডার করতে চান তা নির্বাচন করতে পারেন 👇`,
+          quickReplies: [
+            { title: 'প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০', payload: 'PROD_1' },
+            { title: 'জয়পুরি কটন থ্রি-পিস - ৳১২৫০', payload: 'PROD_2' },
+            { title: 'ডিজাইনার পার্টি গাউন - ৳১৫০০', payload: 'PROD_3' },
+          ],
+          timestamp: 'এখন',
+        },
+      ]);
+      return;
+    }
+
     if (step === 'PHONE') {
       const phoneMatch = text.match(/(01[3-9]\d{8})/);
       const phone = phoneMatch ? phoneMatch[0] : '01938909812';
@@ -178,7 +220,7 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
     setMessages([
       {
         sender: 'bot',
-        text: 'আসসালামু আলাইকুম! Moner Kotha শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇',
+        text: `আসসালামু আলাইকুম! ${storeName} শপে আপনাকে স্বাগতম। 🌸\nকোন প্রোডাক্টটি আপনি নিতে চান তা নির্বাচন করুন 👇`,
         quickReplies: [
           { title: 'প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০', payload: 'PROD_1' },
           { title: 'জয়পুরি কটন থ্রি-পিস - ৳১২৫০', payload: 'PROD_2' },
@@ -201,9 +243,9 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
             <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#121520] rounded-full" />
           </div>
           <div>
-            <h4 className="font-extrabold text-neutral-100 text-sm flex items-center gap-1.5">
-              Moner Kotha
-              <span className="px-1.5 py-0.5 text-[9px] bg-blue-500/20 text-blue-300 font-bold rounded-md border border-blue-500/30">
+            <h4 className="font-extrabold text-neutral-100 text-sm flex items-center gap-1.5 truncate max-w-[220px]">
+              <span>{storeName}</span>
+              <span className="px-1.5 py-0.5 text-[9px] bg-blue-500/20 text-blue-300 font-bold rounded-md border border-blue-500/30 shrink-0">
                 Active Now
               </span>
             </h4>
@@ -240,6 +282,12 @@ export const LiveBotTester: React.FC<{ onOrderCreated?: () => void }> = ({ onOrd
                       : 'bg-[#151924] text-neutral-200 border border-neutral-750/80 rounded-tl-none'
                   }`}
                 >
+                  {msg.sender === 'bot' && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-indigo-400 font-bold mb-1">
+                      <Bot className="w-3.5 h-3.5" />
+                      <span>{storeName} AI সেলস বট</span>
+                    </div>
+                  )}
                   {msg.text}
                 </div>
 

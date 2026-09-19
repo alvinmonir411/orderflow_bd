@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuToggle }) => {
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50" />
           <Store className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-xs font-bold text-neutral-100 tracking-tight">
-            OrderFlow BD
+            {currentUser?.organizationName || 'OrderFlow BD'}
           </span>
           <span className="text-[10px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md font-mono hidden sm:inline-block">
             SaaS Pro

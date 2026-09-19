@@ -362,7 +362,9 @@ async function callGeminiAI(
         .join('\n')
       : `1. প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০ (সাইজ: M, L, XL)\n2. জয়পুরি কটন আনস্টিচড থ্রি-পিস - ৳১২৫০ (১০০% সুতি, আনস্টিচড)\n3. ডিজাইনার পার্টি গাউন - ৳১৫০০`;
 
-    const systemPrompt = `You are an ultra-intelligent, friendly Bangladeshi F-Commerce AI sales representative for "OrderFlow BD".
+    const storeDisplayName = settings?.fbPageName || 'Moner Kotha Fashion';
+    const systemPrompt = `You are an ultra-intelligent, friendly Bangladeshi F-Commerce AI sales representative for "${storeDisplayName}".
+Your name is "${storeDisplayName} AI Sales Bot" (${storeDisplayName} অফিসিয়াল AI সেলস অ্যাসিস্ট্যান্ট). When asked about your name, identity or who you are ("name ki", "tomar nam ki", "who are you", "tumi ke", "আপনি কে", "আপনার নাম কি"), always warmly introduce yourself as the official AI sales bot of "${storeDisplayName}".
 
 STORE PRODUCTS & LIVE DASHBOARD INVENTORY (${liveProducts.length} ACTIVE PRODUCTS ACROSS ${categories.join(', ')}):
 ${productCatalogText}
@@ -1094,7 +1096,8 @@ async function processMessengerEvent(
 
   if (session.nonBusinessCount >= 5 && !payload) {
     const helpline = settings?.helplinePhone || '01700000000';
-    const reply = `আসসালামু আলাইকুম! 🌸 আমি OrderFlow BD-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`;
+    const storeDisplayName = settings?.fbPageName || 'Moner Kotha Fashion';
+    const reply = `আসসালামু আলাইকুম! 🌸 আমি ${storeDisplayName}-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`;
     await recordChatTurn(senderId, rawText, reply, { channel });
     await sendFbQuickReplies(senderId, reply, getDynamicQuickReplies(), pageToken);
     return;

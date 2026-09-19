@@ -764,7 +764,7 @@ export default function DemoDashboardPage() {
                 </div>
                 <div className="px-2.5 py-1 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center gap-1.5 text-xs text-indigo-300">
                   <Bot className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Gemini 2.5 Flash</span>
+                  <span>Moner Kotha AI</span>
                 </div>
               </div>
 
@@ -835,7 +835,7 @@ export default function DemoDashboardPage() {
                         👋
                       </h2>
                       <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-                        মেসেঞ্জার ও ফেসবুকে আপনার স্মার্ট Gemini AI সেলস বট ২৪ ঘণ্টা কাস্টমারদের সাথে কথা বলছে, ড্রেসের দাম ও ছবি দেখাচ্ছে এবং নিখুঁত ফোন নম্বর ও ঠিকানা নিয়ে সরাসরি ড্যাশবোর্ডে অর্ডার যোগ করছে।
+                        মেসেঞ্জার ও ফেসবুকে আপনার স্মার্ট Moner Kotha AI সেলস বট ২৪ ঘণ্টা কাস্টমারদের সাথে কথা বলছে, ড্রেসের দাম ও ছবি দেখাচ্ছে এবং নিখুঁত ফোন নম্বর ও ঠিকানা নিয়ে সরাসরি ড্যাশবোর্ডে অর্ডার যোগ করছে।
                       </p>
                     </div>
 
@@ -1572,21 +1572,21 @@ export default function DemoDashboardPage() {
                     <div>
                       <h2 className="text-xl font-black text-white flex items-center gap-2">
                         <Bot className="w-5 h-5 text-indigo-400" />
-                        <span>Google Gemini AI সেলস বট স্টুডিও</span>
+                        <span>Moner Kotha Fashion AI সেলস বট স্টুডিও</span>
                       </h2>
                       <p className="text-xs text-slate-400">
                         বাংলা ও বাংলিশ উভয় ভাষাতেই চতুরভাবে কাস্টমার হ্যান্ডেল করে
                       </p>
                     </div>
                     <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-full w-fit">
-                      🟢 Gemini 2.5 Flash Connected
+                      🟢 Moner Kotha AI Active
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
                     <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
                       <span className="text-slate-400">এআই মডেল:</span>
-                      <p className="font-bold text-white">Gemini 2.5 Flash (Bengali NLP)</p>
+                      <p className="font-bold text-white">Moner Kotha AI (Bengali NLP)</p>
                     </div>
                     <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
                       <span className="text-slate-400">স্বয়ংক্রিয় অর্ডার ক্যাপচার:</span>
@@ -1626,7 +1626,7 @@ export default function DemoDashboardPage() {
                             {msg.sender === 'bot' && (
                               <div className="flex items-center gap-1.5 text-[10px] text-indigo-400 font-bold">
                                 <Bot className="w-3.5 h-3.5" />
-                                <span>Gemini 2.5 Flash (Bengali Engine)</span>
+                                <span>Moner Kotha Fashion AI সেলস বট</span>
                               </div>
                             )}
                             <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>
