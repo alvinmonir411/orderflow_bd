@@ -428,17 +428,6 @@ export async function initDatabase(): Promise<void> {
         ('usr-agent-2', 'org-1', 'Fatima Rahman', 'support@orderflow.com', 'agent123', 'agent123', 'USER', 'FR', 'Customer Support Executive', true, NOW())
       ON CONFLICT ("id") DO NOTHING;
     `;
-
-    // Seed default ChannelConnection for Meta Page if configured in env
-    const defaultFbToken = process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
-    const defaultFbPageId = process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
-    if (defaultFbToken && defaultFbPageId) {
-      await sql`
-        INSERT INTO "ChannelConnection" ("id", "organizationId", "platform", "pageId", "pageName", "accessToken", "status", "createdAt", "updatedAt")
-        VALUES ('conn-fb-default', 'org-1', 'FACEBOOK_MESSENGER', ${defaultFbPageId}, 'Moner Kotha', ${defaultFbToken}, 'CONNECTED', NOW(), NOW())
-        ON CONFLICT ("id") DO NOTHING;
-      `;
-    }
   } catch (err) {
     console.error('[DB Init Error]:', err);
     dbInitPromise = null;

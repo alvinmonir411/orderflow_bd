@@ -9,6 +9,18 @@ interface Props {
 }
 
 export const InvoiceModal: React.FC<Props> = ({ order, onClose }) => {
+  const [storeName, setStoreName] = React.useState('স্মার্ট অনলাইন শপ');
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('orderflow_user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u.organizationName) setStoreName(u.organizationName);
+      }
+    } catch {}
+  }, []);
+
   if (!order) return null;
 
   const handlePrint = () => {
@@ -29,14 +41,14 @@ export const InvoiceModal: React.FC<Props> = ({ order, onClose }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-sm font-bold transition-all shadow-md active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-colors"
             >
               <Printer className="w-4 h-4" />
-              প্রিন্ট চালান
+              প্রিন্ট / PDF সেভ করুন
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-200/60 transition-colors"
+              className="p-2 text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -52,7 +64,7 @@ export const InvoiceModal: React.FC<Props> = ({ order, onClose }) => {
                 <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-black text-sm">
                   OF
                 </div>
-                <h1 className="text-2xl font-black text-neutral-900 tracking-tight">Moner Kotha</h1>
+                <h1 className="text-2xl font-black text-neutral-900 tracking-tight">{storeName}</h1>
               </div>
               <p className="text-xs text-neutral-600 mt-1 font-medium">Smart F-Commerce Platform</p>
               <p className="text-xs text-neutral-500">ঢাকা, বাংলাদেশ | হেল্পলাইন: 01938-909812</p>

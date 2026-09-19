@@ -304,6 +304,7 @@ async function generateAiReply(
   const lower = userText.toLowerCase().trim();
   const cleanPhone = fromPhoneRaw.replace(/[^0-9]/g, '');
 
+  const storeDisplayName = (settings?.fbPageName || '').trim() || 'আমাদের শপ';
   const feeDhaka = settings.deliveryFeeDhaka || 120;
   const feeOutside = settings.deliveryFeeOutside || 150;
   const timeDhaka = settings.deliveryTimeDhaka || '২৪-৪৮ ঘণ্টা (১-২ দিন)';
@@ -374,7 +375,7 @@ async function generateAiReply(
         notes: `[WhatsApp অটো-অর্ডার]: ${prodTitle} | ফোন: ${extractedPhone} | ঠিকানা: ${address}`,
       });
 
-      return `🎉 অভিনন্দন ${name !== 'সম্মানিত কাস্টমার' ? name : customerName}! আপনার অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে।\n\n📦 অর্ডার নম্বর: #OF-${newOrder.orderNumber}\n🛍️ প্রোডাক্ট: ${prodTitle}\n💵 পণ্যের মূল্য: ৳${toBanglaDigits(prodPrice)}\n🚚 ডেলিভারি চার্জ: ৳${toBanglaDigits(deliveryFee)}\n💰 মোট প্রদেয় বিল: ৳${toBanglaDigits(totalPrice)} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${address}\n📱 মোবাইল: ${extractedPhone}\n\n🚚 ডেলিভারি সময়: ${isDhaka ? '২৪-৪৮ ঘণ্টার মধ্যে' : '২-৩ কার্যদিবসের মধ্যে'}। পার্সেল ডেলিভারিতে দেওয়ার সাথে সাথে আপনাকে এসএমএস ও ট্র্যাকিং জানানো হবে।\n\nOrderFlow BD-এর সাথে থাকার জন্য ধন্যবাদ! ❤️`;
+      return `🎉 অভিনন্দন ${name !== 'সম্মানিত কাস্টমার' ? name : customerName}! আপনার অর্ডারটি সফলভাবে কনফার্ম করা হয়েছে।\n\n📦 অর্ডার নম্বর: #OF-${newOrder.orderNumber}\n🛍️ প্রোডাক্ট: ${prodTitle}\n💵 পণ্যের মূল্য: ৳${toBanglaDigits(prodPrice)}\n🚚 ডেলিভারি চার্জ: ৳${toBanglaDigits(deliveryFee)}\n💰 মোট প্রদেয় বিল: ৳${toBanglaDigits(totalPrice)} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${address}\n📱 মোবাইল: ${extractedPhone}\n\n🚚 ডেলিভারি সময়: ${isDhaka ? '২৪-৪৮ ঘণ্টার মধ্যে' : '২-৩ কার্যদিবসের মধ্যে'}। পার্সেল ডেলিভারিতে দেওয়ার সাথে সাথে আপনাকে এসএমএস ও ট্র্যাকিং জানানো হবে।\n\n${storeDisplayName}-এর সাথে থাকার জন্য ধন্যবাদ! ❤️`;
     } catch (orderErr) {
       console.error('[WhatsApp Auto-Order Creation Error]:', orderErr);
     }
@@ -393,7 +394,7 @@ async function generateAiReply(
         'gemini-flash-latest',
         'gemini-2.5-flash',
       ];
-      const systemPrompt = `You are a polite, helpful Bangladeshi F-Commerce AI sales representative for OrderFlow BD on WhatsApp.
+      const systemPrompt = `You are a polite, helpful Bangladeshi F-Commerce AI sales representative for "${storeDisplayName}" on WhatsApp.
 Customer Name: ${customerName}
 
 LIVE STORE PRODUCTS & PRICES:
@@ -411,7 +412,7 @@ Instructions:
 1. Always reply in warm, natural Bengali (বাংলা) with tasteful emojis.
 2. Directly answer the customer's question with specific product names, prices, and details.
 3. If they ask what products you have ("ki product ache", "ki ki ache", "name ki"), list our top 5-6 products with names and prices clearly!
-4. If they ask what you do ("tumi ki koro"), introduce yourself as OrderFlow BD's AI Assistant ready to help them browse dresses, know prices, and place orders.
+4. If they ask what you do ("tumi ki koro"), introduce yourself as ${storeDisplayName}'s AI Assistant ready to help them browse dresses, know prices, and place orders.
 5. If they want to order, ask for their Name, 11-digit mobile number, full delivery address, and product name/size.
 6. Keep the response neat, easy to read on WhatsApp with bullet points.`;
 
@@ -471,7 +472,7 @@ Instructions:
     lower.includes('লিস্ট');
 
   if (isCatalogQuery) {
-    return `ধন্যবাদ ${customerName}! OrderFlow BD-তে আপনাকে স্বাগতম। 🌸\n\nআমাদের রানিং সেরা কালেকশন ও মূল্য তালিকা:\n${fullCatalogList}\n\n🚚 ডেলিভারি চার্জ: ঢাকা সিটিতে ৳${toBanglaDigits(feeDhaka)}, ঢাকার বাইরে ৳${toBanglaDigits(feeOutside)}।\n💵 পেমেন্ট: ১০০% ক্যাশ অন ডেলিভারি (কোনো অগ্রিম ছাড়া)।\n\nআপনার কোন ড্রেসটি পছন্দ হয়েছে জানাবেন? সাইজ ও ডেলিভারি ঠিকানা দিলে এখনই অর্ডার বুক করে দেওয়া হবে! 🛍️✨`;
+    return `ধন্যবাদ ${customerName}! ${storeDisplayName}-এ আপনাকে স্বাগতম। 🌸\n\nআমাদের রানিং সেরা কালেকশন ও মূল্য তালিকা:\n${fullCatalogList}\n\n🚚 ডেলিভারি চার্জ: ঢাকা সিটিতে ৳${toBanglaDigits(feeDhaka)}, ঢাকার বাইরে ৳${toBanglaDigits(feeOutside)}।\n💵 পেমেন্ট: ১০০% ক্যাশ অন ডেলিভারি (কোনো অগ্রিম ছাড়া)।\n\nআপনার কোন ড্রেসটি পছন্দ হয়েছে জানাবেন? সাইজ ও ডেলিভারি ঠিকানা দিলে এখনই অর্ডার বুক করে দেওয়া হবে! 🛍️✨`;
   }
 
   // B. Specific Category Searches (Kurti, Saree, Three-Piece, Gown, Kaftan, Borkha)
@@ -559,7 +560,7 @@ Instructions:
     lower.includes('কি কাজ');
 
   if (isWhatDoYouDo) {
-    return `আমি OrderFlow BD-এর স্মার্ট AI সেলস অ্যাসিস্ট্যান্ট! 🤖✨\n\nআমি আপনাকে আমাদের প্রিমিয়াম ড্রেস কালেকশন দেখতে, দাম ও সাইজ জানতে এবং সরাসরি ক্যাশ অন ডেলিভারিতে দ্রুত অর্ডার কনফার্ম করতে সাহায্য করি।\n\nআপনি কি আমাদের আজকের স্পেশাল কালেকশন দেখতে চান? 😊`;
+    return `আমি ${storeDisplayName}-এর স্মার্ট AI সেলস অ্যাসিস্ট্যান্ট! 🤖✨\n\nআমি আপনাকে আমাদের প্রিমিয়াম প্রোডাক্ট কালেকশন দেখতে, দাম ও সাইজ জানতে এবং সরাসরি ক্যাশ অন ডেলিভারিতে দ্রুত অর্ডার কনফার্ম করতে সাহায্য করি।\n\nআপনি কি আমাদের আজকের স্পেশাল কালেকশন দেখতে চান? 😊`;
   }
 
   // G. Greetings ("Ki obostha", "Kemon acho", "Hi", "Hello", "Salam")
@@ -577,7 +578,7 @@ Instructions:
     lower.includes('কি অবস্থা');
 
   if (isGreeting) {
-    return `আলহামদুলিল্লাহ ভালো আছি! OrderFlow BD-তে আপনাকে স্বাগতম। 🌸\n\nআমাদের কাছে রয়েছে এক্সক্লুসিভ পার্টি গাউন, টাঙ্গাইল জামদানি শাড়ি, ডিজাইনার কুর্তি ও প্রিমিয়াম থ্রি-পিস কালেকশন।\n\nআজকে আপনাকে কোন প্রোডাক্টের ব্যাপারে সাহায্য করতে পারি? 😊`;
+    return `আলহামদুলিল্লাহ ভালো আছি! ${storeDisplayName}-এ আপনাকে স্বাগতম। 🌸\n\nআমাদের সেরা কালেকশন থেকে আজকে আপনাকে কোন প্রোডাক্টের ব্যাপারে সাহায্য করতে পারি? 😊`;
   }
 
   // H. Order Request (wants to order but details not provided yet)
@@ -612,6 +613,6 @@ Instructions:
   }
 
   // Default Smart Assistant Fallback with Catalog Highlights
-  return `ধন্যবাদ ${customerName}! OrderFlow BD-তে আপনাকে স্বাগতম। 🌸\n\nআমাদের সেরা কালেকশনসমূহ:\n${fullCatalogList}\n\nডেলিভারি চার্জ: ঢাকা সিটিতে ৳${toBanglaDigits(feeDhaka)}, ঢাকার বাইরে ৳${toBanglaDigits(feeOutside)} (১০০% ক্যাশ অন ডেলিভারি)।\n\nকোনো ড্রেস পছন্দ হলে বা অর্ডার করতে আমাদের জানান! 🛍️`;
+  return `ধন্যবাদ ${customerName}! ${storeDisplayName}-এ আপনাকে স্বাগতম। 🌸\n\nআমাদের সেরা কালেকশনসমূহ:\n${fullCatalogList}\n\nডেলিভারি চার্জ: ঢাকা সিটিতে ৳${toBanglaDigits(feeDhaka)}, ঢাকার বাইরে ৳${toBanglaDigits(feeOutside)} (১০০% ক্যাশ অন ডেলিভারি)।\n\nকোনো প্রোডাক্ট পছন্দ হলে বা অর্ডার করতে আমাদের জানান! 🛍️`;
 }
 

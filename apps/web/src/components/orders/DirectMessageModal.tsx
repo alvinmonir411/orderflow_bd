@@ -64,12 +64,23 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [fbProfile, setFbProfile] = useState<CustomerProfile | null>(null);
   const [inboxUrl, setInboxUrl] = useState<string>('');
+  const [storeName, setStoreName] = useState<string>('আমাদের শপ');
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('orderflow_user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u.organizationName) setStoreName(u.organizationName);
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (order && isOpen) {
       // Default initial message
       setMessageText(
-        `আসসালামু আলাইকুম ${order.customerName || 'সম্মানিত গ্রাহক'}! OrderFlow BD থেকে আপনার অর্ডার #${order.orderNumber} এর ব্যাপারে যোগাযোগ করছি। 🌸`,
+        `আসসালামু আলাইকুম ${order.customerName || 'সম্মানিত গ্রাহক'}! ${storeName} থেকে আপনার অর্ডার #${order.orderNumber} এর ব্যাপারে যোগাযোগ করছি। 🌸`,
       );
 
       // Fetch live conversation history and Facebook profile
@@ -143,7 +154,7 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
             {
               id: `msg-${Date.now()}`,
               text: messageText.trim(),
-              senderName: 'Moner Kotha (Admin)',
+              senderName: `${storeName} (Admin)`,
               isPage: true,
               time: new Date().toISOString(),
             },

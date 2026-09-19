@@ -68,11 +68,11 @@ export async function POST(request: NextRequest) {
       const settings = await getBotSettings();
 
       // Lookup all ChannelConnections to support multi-org page routing
+      const { getSql } = await import('@/lib/db');
+      const sql = getSql();
       let allChannelConnections: any[] = [];
       try {
-        const { getSql } = await import('@/lib/db');
-        const sql = getSql();
-        allChannelConnections = await sql`SELECT "organizationId", "pageId", "accessToken", "pageName" FROM "ChannelConnection" WHERE "platform" = 'FACEBOOK_MESSENGER' AND "status" = 'CONNECTED' ORDER BY "createdAt" DESC`;
+        allChannelConnections = await sql`SELECT "organizationId", "pageId", "accessToken", "pageName" FROM "ChannelConnection" WHERE "platform" = 'FACEBOOK_MESSENGER' AND "status" = 'CONNECTED' ORDER BY "updatedAt" DESC, "createdAt" DESC`;
       } catch (_) {}
 
       const pageToken =
@@ -99,6 +99,16 @@ export async function POST(request: NextRequest) {
         const activePageToken = matchedConn?.accessToken || (activeOrgId === 'org-1' ? pageToken : '');
         const orgSettings = await getBotSettings(activeOrgId);
         const activeGeminiKey = orgSettings.geminiApiKey || geminiKey;
+        let storeDisplayName = (matchedConn?.pageName || orgSettings?.fbPageName || '').trim();
+        if (!storeDisplayName && activeOrgId) {
+          try {
+            const orgRows = await sql`SELECT name FROM "Organization" WHERE id = ${activeOrgId} LIMIT 1`;
+            if (orgRows.length > 0 && orgRows[0].name) {
+              storeDisplayName = orgRows[0].name.trim();
+            }
+          } catch {}
+        }
+        if (!storeDisplayName) storeDisplayName = 'আমাদের শপ';
 
         // ============================================================
         // A. FACEBOOK & INSTAGRAM POST COMMENTS (FEED CHANGES)
@@ -129,7 +139,8 @@ export async function POST(request: NextRequest) {
                   orgSettings,
                   activeGeminiKey,
                   body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_COMMENT',
-                  activeOrgId
+                  activeOrgId,
+                  storeDisplayName
                 );
               }
             }
@@ -191,7 +202,18 @@ export async function POST(request: NextRequest) {
           }
 
           const channel = body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_MESSENGER';
-          await processMessengerEvent(senderId, text, payload, activePageToken, activeGeminiKey, orgSettings, incomingImageUrl, channel, activeOrgId);
+          await processMessengerEvent(
+            senderId,
+            text,
+            payload,
+            activePageToken,
+            activeGeminiKey,
+            orgSettings,
+            incomingImageUrl,
+            channel,
+            activeOrgId,
+            storeDisplayName
+          );
         }
       }
 
@@ -342,6 +364,7 @@ async function callGeminiAI(
   recentOrder: any | null,
   settings: any,
   liveProducts: any[],
+  storeName?: string,
 ): Promise<{ replyText: string; orderData?: any }> {
   try {
     // Dynamic catalog string built directly from active dashboard database products
@@ -365,7 +388,7 @@ async function callGeminiAI(
         .join('\n')
       : `1. প্রিমিয়াম কাশ্মীরি কুর্তি - ৳৮৫০ (সাইজ: M, L, XL)\n2. জয়পুরি কটন আনস্টিচড থ্রি-পিস - ৳১২৫০ (১০০% সুতি, আনস্টিচড)\n3. ডিজাইনার পার্টি গাউন - ৳১৫০০`;
 
-    const storeDisplayName = settings?.fbPageName || 'Moner Kotha Fashion';
+    const storeDisplayName = (storeName || settings?.fbPageName || '').trim() || 'আমাদের শপ';
     const systemPrompt = `You are an ultra-intelligent, friendly Bangladeshi F-Commerce AI sales representative for "${storeDisplayName}".
 Your name is "${storeDisplayName} AI Sales Bot" (${storeDisplayName} অফিসিয়াল AI সেলস অ্যাসিস্ট্যান্ট). When asked about your name, identity or who you are ("name ki", "tomar nam ki", "who are you", "tumi ke", "আপনি কে", "আপনার নাম কি"), always warmly introduce yourself as the official AI sales bot of "${storeDisplayName}".
 
@@ -529,7 +552,10 @@ async function processMessengerEvent(
   incomingImageUrl?: string,
   channel: string = 'FACEBOOK_MESSENGER',
   organizationId: string = 'org-1',
+  storeName?: string,
 ) {
+  const storeDisplayName = (storeName || settings?.fbPageName || '').trim() || 'আমাদের শপ';
+
   // 1. Fetch DB chat history for persistent context across serverless requests
   const dbHistory = await getDbChatMessagesBySender(senderId, organizationId);
 
@@ -568,7 +594,7 @@ async function processMessengerEvent(
   const lowerText = rawText.toLowerCase();
 
   // 2. Fetch live products from Neon PostgreSQL DB
-  const liveProducts = await getDbProducts();
+  const liveProducts = await getDbProducts(organizationId);
 
   // 3. Helper to build quick reply items from live dashboard products
   const getDynamicQuickReplies = () => {
@@ -620,9 +646,9 @@ async function processMessengerEvent(
     const recentOrder = await findCustomerLatestOrder(senderId);
     let reply = '';
     if (recentOrder) {
-      reply = `ধন্যবাদ চমৎকার ছবিটি পাঠানোর জন্য ${recentOrder.customerName || ''}! 🌸 এটি আমাদের প্রিমিয়াম কালেকশনের সাথে মিলিয়ে দেখা হচ্ছে।\n\nআপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম ও ঠিকানায় কি এই প্রোডাক্টের নতুন অর্ডারটি কনফার্ম করে দেব? অনুগ্রহ করে 'হ্যাঁ' অথবা পছন্দের সাইজটি লিখে জানান! ❤️`;
+      reply = `ধন্যবাদ চমৎকার ছবিটি পাঠানোর জন্য ${recentOrder.customerName || ''}! 🌸 এটি আমাদের '${storeDisplayName}'-এর প্রিমিয়াম কালেকশনের সাথে মিলিয়ে দেখা হচ্ছে।\n\nআপনার আগের অর্ডারের (#OF-${recentOrder.orderNumber}) সংরক্ষিত নাম ও ঠিকানায় কি এই প্রোডাক্টের নতুন অর্ডারটি কনফার্ম করে দেব? অনুগ্রহ করে 'হ্যাঁ' অথবা পছন্দের সাইজটি লিখে জানান! ❤️`;
     } else {
-      reply = `ধন্যবাদ সুন্দর ছবিটি পাঠানোর জন্য! 🌸 এটি আমাদের শপের প্রিমিয়াম কালেকশনের সাথে ম্যাচিং করে দেখা হচ্ছে।\n\nঅর্ডার নিশ্চিত করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর এবং সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠান। আমরা দ্রুততম সময়ে ডেলিভারির ব্যবস্থা করব! ❤️`;
+      reply = `ধন্যবাদ সুন্দর ছবিটি পাঠানোর জন্য! 🌸 এটি আমাদের '${storeDisplayName}'-এর প্রিমিয়াম কালেকশনের সাথে ম্যাচিং করে দেখা হচ্ছে।\n\nঅর্ডার নিশ্চিত করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর এবং সম্পূর্ণ ডেলিভারি ঠিকানা লিখে পাঠান। আমরা দ্রুততম সময়ে ডেলিভারির ব্যবস্থা করব! ❤️`;
     }
     await recordChatTurn(senderId, `[Customer Sent Image: ${incomingImageUrl}]`, reply, { channel });
     await sendFbMessage(senderId, reply, pageToken);
@@ -699,7 +725,7 @@ async function processMessengerEvent(
       `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
       `📞 মোবাইল: ${finalPhone}\n` +
       `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
-      `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ আমাদের সাথে থাকার জন্য! ❤️`;
+      `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ ${storeDisplayName}-এর সাথে থাকার জন্য! ❤️`;
 
     await recordChatTurn(senderId, rawText, reply, { customerName: finalName, channel });
     await sendFbMessage(senderId, reply, pageToken);
@@ -777,7 +803,7 @@ async function processMessengerEvent(
       `📞 মোবাইল: ${phone}\n` +
       `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} হোম ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
       `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে কুরিয়ারের মাধ্যমে আপনার ঠিকানায় পৌঁছে যাবে।\n\n` +
-      `ডেলিভারিম্যানের কাছ থেকে পণ্য চেক করে দেখে নেওয়ার পূর্ণ সুবিধা রয়েছে। ধন্যবাদ আমাদের সাথে থাকার জন্য! ❤️`;
+      `ডেলিভারিম্যানের কাছ থেকে পণ্য চেক করে দেখে নেওয়ার পূর্ণ সুবিধা রয়েছে। ধন্যবাদ ${storeDisplayName}-এর সাথে থাকার জন্য! ❤️`;
 
     await recordChatTurn(senderId, rawText, reply, {
       customerName: finalName,
@@ -866,7 +892,7 @@ async function processMessengerEvent(
           `👗 প্রোডাক্ট: ${prodTitle}\n` +
           `📍 ডেলিভারি ঠিকানা: ${finalAddress}\n` +
           `💰 মোট প্রদেয় বিল: ৳${totalPrice} (৳${deliveryCharge} ডেলিভারি চার্জ সহ, ক্যাশ অন ডেলিভারি)\n` +
-          `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ! ❤️`;
+          `🚚 ডেলিভারি সময়: ${deliveryTime} মধ্যে আপনার ঠিকানায় পৌঁছে যাবে। ধন্যবাদ ${storeDisplayName}-এর সাথে থাকার জন্য! ❤️`;
 
         await recordChatTurn(senderId, rawText, reply, { customerName: finalName, channel });
         await sendFbMessage(senderId, reply, pageToken);
@@ -1099,7 +1125,6 @@ async function processMessengerEvent(
 
   if (session.nonBusinessCount >= 5 && !payload) {
     const helpline = settings?.helplinePhone || '01700000000';
-    const storeDisplayName = settings?.fbPageName || 'Moner Kotha Fashion';
     const reply = `আসসালামু আলাইকুম! 🌸 আমি ${storeDisplayName}-এর সেলস সহকারী। আমি আমাদের পোশাকের কালেকশন, দাম ও হোম ডেলিভারি অর্ডার নিতে সাহায্য করি।\n\nঅন্য যেকোনো ব্যক্তিগত বা সাধারণ বিষয়ে কথা বলতে আমাদের কাস্টমার কেয়ারে সরাসরি কল করতে পারেন: 📞 ${helpline}\n\nআমাদের প্রোডাক্ট কালেকশন দেখতে নিচে নির্বাচন করুন 👇`;
     await recordChatTurn(senderId, rawText, reply, { channel });
     await sendFbQuickReplies(senderId, reply, getDynamicQuickReplies(), pageToken);
@@ -1108,7 +1133,7 @@ async function processMessengerEvent(
 
   // 14. If Gemini AI Key is available, prioritize Google AI Studio with LIVE DB Products
   if (geminiKey && rawText && !payload) {
-    const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey, recentOrder, settings, liveProducts);
+    const { replyText, orderData } = await callGeminiAI(rawText, session, geminiKey, recentOrder, settings, liveProducts, storeDisplayName);
     if (replyText) {
       await recordChatTurn(senderId, rawText, replyText, { channel });
 
@@ -1379,7 +1404,7 @@ async function processMessengerEvent(
       categoriesMap[cat].push(p);
     }
 
-    let reply = `👗 আমাদের শপের বর্তমান রানিং কালেকশন ও প্রাইস লিস্ট (${liveProducts.length}টি এভেলেবল):\n\n`;
+    let reply = `👗 '${storeDisplayName}'-এর বর্তমান রানিং কালেকশন ও প্রাইস লিস্ট (${liveProducts.length}টি এভেলেবল):\n\n`;
     for (const [catName, prods] of Object.entries(categoriesMap)) {
       reply += `✨ ${catName}:\n`;
       for (const p of prods.slice(0, 3)) {
@@ -1485,7 +1510,7 @@ async function processMessengerEvent(
   session.state = 'IDLE';
   userSessions[senderId] = session;
 
-  const reply = `আসসালামু আলাইকুম! OrderFlow BD শপে আপনাকে স্বাগতম। 🌸\n\nআমাদের বর্তমান ${liveProducts.length}টি স্পেশাল কালেকশন থেকে পছন্দের প্রোডাক্ট নির্বাচন করুন 👇`;
+  const reply = `আসসালামু আলাইকুম! ${storeDisplayName}-এ আপনাকে স্বাগতম। 🌸\n\nআমাদের বর্তমান ${liveProducts.length}টি স্পেশাল কালেকশন থেকে পছন্দের প্রোডাক্ট নির্বাচন করুন 👇`;
   await recordChatTurn(senderId, rawText, reply);
   await sendFbQuickReplies(senderId, reply, getDynamicQuickReplies(), pageToken);
 }
@@ -1646,9 +1671,11 @@ async function handleFacebookComment(
   settings: any,
   geminiKey: string,
   channel: string = 'FACEBOOK_COMMENT',
-  organizationId: string = 'org-1'
+  organizationId: string = 'org-1',
+  storeName?: string
 ) {
   if (!commentId || !pageToken) return;
+  const storeDisplayName = (storeName || settings?.fbPageName || '').trim() || 'আমাদের শপ';
 
   // 1. Save customer comment in Neon PostgreSQL DB
   await saveDbChatMessage({
@@ -1687,7 +1714,7 @@ async function handleFacebookComment(
   }
 
   // 3. Send Private Message to the user using recipient.comment_id
-  const privateDmText = `আসসালামু আলাইকুম ${senderName || ''}! 🌸 পোস্টে কমেন্ট করার জন্য ধন্যবাদ।\n\nআমাদের '${prodTitle}'-এর অফার মূল্য মাত্র ৳${prodPrice}!\n\n🚚 ডেলিভারি চার্জ: ঢাকা সিটিতে ৳${deliveryCharge}, ঢাকার বাইরে ৳${settings?.deliveryFeeOutside || 150} (১০০% ক্যাশ অন ডেলিভারি)।\n\nঅর্ডার কনফার্ম করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা লিখে পাঠান! 🛍️✨`;
+  const privateDmText = `আসসালামু আলাইকুম ${senderName || ''}! 🌸 '${storeDisplayName}'-এর পোস্টে কমেন্ট করার জন্য ধন্যবাদ।\n\nআমাদের '${prodTitle}'-এর অফার মূল্য মাত্র ৳${prodPrice}!\n\n🚚 ডেলিভারি চার্জ: ঢাকা সিটিতে ৳${deliveryCharge}, ঢাকার বাইরে ৳${settings?.deliveryFeeOutside || 150} (১০০% ক্যাশ অন ডেলিভারি)।\n\nঅর্ডার কনফার্ম করতে অনুগ্রহ করে আপনার নাম, ১১ ডিজিটের মোবাইল নম্বর ও ডেলিভারি ঠিকানা লিখে পাঠান! 🛍️✨`;
 
   try {
     const dmUrl = `https://graph.facebook.com/v20.0/me/messages?access_token=${pageToken}`;
