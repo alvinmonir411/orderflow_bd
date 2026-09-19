@@ -12,6 +12,12 @@ export async function POST(request: NextRequest) {
     await updateBotSettings(
       {
         whatsappConnected: false,
+        whatsappToken: '',
+        whatsappPhoneId: '',
+        whatsappPhone: '',
+        whatsappBusinessId: '',
+        waapiInstanceId: '',
+        waapiApiToken: '',
       },
       orgId
     );

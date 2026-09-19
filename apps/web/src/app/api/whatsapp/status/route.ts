@@ -19,11 +19,9 @@ export async function GET(request: NextRequest) {
     const instanceId = settings.waapiInstanceId || (orgId === 'org-1' ? process.env.WAAPI_INSTANCE_ID || '' : '');
     const waapiToken = settings.waapiApiToken || (orgId === 'org-1' ? process.env.WAAPI_API_TOKEN || '' : '');
 
-    const isConnected = Boolean(
-      settings.whatsappConnected ||
-      (provider === 'META' && phoneId && token) ||
-      (provider === 'WAAPI' && instanceId && (waapiToken || token))
-    );
+    // IMPORTANT: Only trust the explicit `whatsappConnected` flag.
+    // Do NOT infer connected state from env-var tokens — those persist after disconnect.
+    const isConnected = Boolean(settings.whatsappConnected);
 
     let displayPhoneNumber = phone;
     let verifiedName = '';
