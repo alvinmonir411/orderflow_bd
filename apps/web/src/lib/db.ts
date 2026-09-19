@@ -301,8 +301,15 @@ export async function initDatabase(): Promise<void> {
     try { await sql`ALTER TABLE "Customer" ALTER COLUMN "storeId" DROP NOT NULL;`; } catch (_) {}
     await sql`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "city" TEXT DEFAULT 'ঢাকা';`;
-    await sql`ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    try {
+      await sql`
+        UPDATE "Order"
+        SET "organizationId" = REPLACE("storeId", 'store-', '')
+        WHERE "storeId" LIKE 'store-org-%' AND ("organizationId" = 'org-1' OR "organizationId" IS NULL);
+      `;
+    } catch (_) {}
     await sql`ALTER TABLE "Store" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
@@ -727,7 +734,7 @@ export async function getDbOrders(organizationId?: string) {
             c."deliveryRate" as "c_deliveryRate"
           FROM "Order" o
           LEFT JOIN "Customer" c ON o."customerId" = c.id
-          WHERE o."organizationId" = ${organizationId}
+          WHERE (o."organizationId" = ${organizationId} OR o."storeId" = ${'store-' + organizationId})
           ORDER BY o."createdAt" DESC;
         `
       : await sql`
@@ -895,12 +902,12 @@ export async function insertDbOrder(data: {
     const orderId = `ord-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const insertedOrder = await sql`
       INSERT INTO "Order" (
-        "id", "storeId", "customerId", "channel", "status",
+        "id", "organizationId", "storeId", "customerId", "channel", "status",
         "itemsPrice", "deliveryCharge", "discount", "totalPrice",
         "deliveryAddress", "deliveryCity", "customerPhone", "customerName",
         "createdAt", "updatedAt"
       ) VALUES (
-        ${orderId}, ${storeId}, ${customerId}, ${channel}::"ChannelType", ${status}::"OrderStatus",
+        ${orderId}, ${orgId}, ${storeId}, ${customerId}, ${channel}::"ChannelType", ${status}::"OrderStatus",
         ${data.itemsPrice}, ${data.deliveryCharge}, ${discount}, ${totalPrice},
         ${data.deliveryAddress}, ${data.deliveryCity || 'ঢাকা'}, ${data.customerPhone}, ${data.customerName},
         NOW(), NOW()
@@ -959,7 +966,7 @@ export async function updateDbOrderStatus(
             "courierTrackingId" = ${extra.courierTrackingId || null},
             "notes" = COALESCE(${extra.notes || null}, "notes"),
             "updatedAt" = NOW()
-          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND "organizationId" = ${orgId}
+          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND ("organizationId" = ${orgId} OR "storeId" = ${'store-' + orgId})
           RETURNING id;
         `;
       } else {
@@ -983,7 +990,7 @@ export async function updateDbOrderStatus(
             "status" = ${status}::"OrderStatus",
             "notes" = ${extra.notes},
             "updatedAt" = NOW()
-          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND "organizationId" = ${orgId}
+          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND ("organizationId" = ${orgId} OR "storeId" = ${'store-' + orgId})
           RETURNING id;
         `;
       } else {
@@ -1004,7 +1011,7 @@ export async function updateDbOrderStatus(
           SET 
             "status" = ${status}::"OrderStatus",
             "updatedAt" = NOW()
-          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND "organizationId" = ${orgId}
+          WHERE ("id" = ${orderId} OR "orderNumber"::text = ${orderId}) AND ("organizationId" = ${orgId} OR "storeId" = ${'store-' + orgId})
           RETURNING id;
         `;
       } else {
