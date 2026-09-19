@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FacebookIntegrationCard } from '@/components/integrations/FacebookIntegrationCard';
-import { WhatsAppIntegrationCard } from '@/components/integrations/WhatsAppIntegrationCard';
+// WhatsApp integration hidden (coming soon)
 
 interface BotFaqItem {
   id: string;
@@ -776,21 +776,14 @@ export default function BotSettingsPage() {
             </div>
           </div>
 
-          {/* Bottom Section: Connected Messaging Channels (Facebook Messenger & WhatsApp) */}
+          {/* Facebook Messenger Bot Integration */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <div>
-                <h3 className="text-base font-bold text-neutral-100">মেসেজিং চ্যানেল ও সোশ্যাল বট ইন্টিগ্রেশন</h3>
-                <p className="text-xs text-neutral-400">ফেসবুক পেজ ও হোয়াটসঅ্যাপ বিজনেস চ্যানেলে এআই বট চালু করুন</p>
-              </div>
+            <div className="px-1">
+              <h3 className="text-base font-bold text-neutral-100">Facebook Messenger AI বট ইন্টিগ্রেশন</h3>
+              <p className="text-xs text-neutral-400 mt-0.5">আপনার Facebook Page কানেক্ট করুন — কাস্টমার মেসেজ করলেই AI স্বয়ংক্রিয়ভাবে উত্তর দেবে এবং অর্ডার নেবে</p>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Facebook Page & Messenger Bot Integration */}
+            <div className="max-w-2xl">
               <FacebookIntegrationCard />
-
-              {/* WhatsApp Cloud API & Bot Integration */}
-              <WhatsAppIntegrationCard />
             </div>
           </div>
         </div>
@@ -809,6 +802,7 @@ export default function BotSettingsPage() {
           <LiveBotTester storeName={currentUser?.organizationName || 'OrderFlow BD'} />
         </div>
       )}
+
 
       {/* MODAL: ADD / EDIT FAQ */}
       {showFaqModal && (
