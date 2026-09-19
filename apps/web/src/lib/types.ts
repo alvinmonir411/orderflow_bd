@@ -30,6 +30,12 @@ export interface Organization {
   maxConversationsPerMonth: number;
   approvedAt?: string;
   approvedBy?: string;
+  paymentMethod?: string;
+  paymentSenderPhone?: string;
+  paymentTrxId?: string;
+  paymentScreenshot?: string;
+  paymentNote?: string;
+  paymentSubmittedAt?: string;
   createdAt: string;
 }
 
@@ -47,6 +53,12 @@ export interface AdminOrganization {
   conversationCount: number;
   approvedAt?: string;
   approvedBy?: string;
+  paymentMethod?: string;
+  paymentSenderPhone?: string;
+  paymentTrxId?: string;
+  paymentScreenshot?: string;
+  paymentNote?: string;
+  paymentSubmittedAt?: string;
   createdAt: string;
 }
 

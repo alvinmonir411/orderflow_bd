@@ -27,6 +27,10 @@ import {
   Layers,
   ChevronRight,
   CreditCard,
+  Eye,
+  Copy,
+  Check,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminOrganization, SuperAdminStats, OrganizationStatus } from '@/lib/types';
@@ -42,6 +46,15 @@ export default function SuperAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
+  const [copiedTrxId, setCopiedTrxId] = useState<string | null>(null);
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedTrxId(text);
+    toast.success(`${label} কপি করা হয়েছে!`);
+    setTimeout(() => setCopiedTrxId(null), 2000);
+  };
 
   const loadData = async (statusFilter = activeTab) => {
     try {
@@ -411,6 +424,77 @@ export default function SuperAdminPage() {
                           রেজিস্ট্রেশন: {new Date(org.createdAt).toLocaleDateString('bn-BD')}
                         </span>
                       </div>
+
+                      {/* Payment Proof Section (bKash / Nagad / Rocket) */}
+                      {(org.paymentMethod || org.paymentTrxId || org.paymentScreenshot) ? (
+                        <div className="mt-2.5 p-3 bg-slate-950/70 border border-slate-800/90 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div className="flex flex-wrap items-center gap-3">
+                            {/* Method Badge */}
+                            <div className="flex items-center gap-1.5">
+                              <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                              <span className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${
+                                org.paymentMethod === 'bKash'
+                                  ? 'bg-pink-500/20 text-pink-300 border-pink-500/30'
+                                  : org.paymentMethod === 'Nagad'
+                                  ? 'bg-orange-500/20 text-orange-300 border-orange-500/30'
+                                  : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                              }`}>
+                                {org.paymentMethod || 'bKash'}
+                              </span>
+                            </div>
+
+                            {/* Sender Phone */}
+                            {org.paymentSenderPhone && (
+                              <div className="flex items-center gap-1 text-slate-300">
+                                <span className="text-slate-500 text-[11px]">প্রেরক:</span>
+                                <span className="font-mono font-bold text-emerald-400">{org.paymentSenderPhone}</span>
+                              </div>
+                            )}
+
+                            {/* Trx ID */}
+                            {org.paymentTrxId && (
+                              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-lg">
+                                <span className="text-slate-500 text-[10px]">TrxID:</span>
+                                <span className="font-mono font-bold text-white tracking-wider">{org.paymentTrxId}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(org.paymentTrxId!, 'Trx ID')}
+                                  className="text-slate-400 hover:text-white cursor-pointer ml-1"
+                                  title="Trx ID কপি করুন"
+                                >
+                                  {copiedTrxId === org.paymentTrxId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Note if any */}
+                            {org.paymentNote && (
+                              <span className="text-slate-400 text-[11px] italic">
+                                "{org.paymentNote}"
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Screenshot View Button */}
+                          {org.paymentScreenshot && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedScreenshot(org.paymentScreenshot!)}
+                                className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:scale-102"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>স্ক্রিনশট দেখুন</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : org.status === 'PENDING' ? (
+                        <div className="mt-2 text-[11px] text-amber-400/90 flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg w-fit">
+                          <Clock className="w-3 h-3 animate-pulse" />
+                          <span>পেমেন্ট প্রুফ এখনো ওয়েবসাইটে সাবমিট করেনি (হোয়াটসঅ্যাপে যোগাযোগ করুন)</span>
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Action Buttons */}
@@ -482,6 +566,52 @@ export default function SuperAdminPage() {
           </div>
         )}
       </div>
+
+      {/* Full-screen Screenshot Modal */}
+      {selectedScreenshot && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedScreenshot(null)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] flex flex-col space-y-4 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm sm:text-base font-bold text-white">পেমেন্ট ভেরিফিকেশন স্ক্রিনশট</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={selectedScreenshot}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-all"
+                  title="নতুন ট্যাবে খুলুন"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setSelectedScreenshot(null)}
+                  className="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-800 hover:bg-rose-500/20 rounded-lg transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto rounded-2xl bg-black/50 border border-slate-800 flex items-center justify-center p-2 min-h-[300px]">
+              <img
+                src={selectedScreenshot}
+                alt="Payment Screenshot"
+                className="max-h-[70vh] w-auto max-w-full object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -122,12 +122,68 @@ export async function POST(req: NextRequest) {
         pendingApproval: true,
         message: 'আপনার রেজিস্ট্রেশন সফল হয়েছে! পেমেন্ট নিশ্চিতকরণের পর সুপার অ্যাডমিন অনুমোদন করবেন।',
         details: {
+          organizationId: orgId,
           organizationName: orgName,
           ownerName: name,
           email: email.toLowerCase().trim(),
           phone: merchantPhone,
           plan,
         },
+      });
+    }
+
+    // 2.1 SUBMIT PAYMENT PROOF
+    if (action === 'submit_payment_proof') {
+      const {
+        organizationId,
+        email: merchantEmail,
+        paymentMethod = 'bKash',
+        paymentSenderPhone = '',
+        paymentTrxId = '',
+        paymentScreenshot = '',
+        paymentNote = '',
+      } = body;
+
+      if (!organizationId && !merchantEmail) {
+        return NextResponse.json(
+          { success: false, error: 'organizationId অথবা ইমেইল আবশ্যক' },
+          { status: 400 },
+        );
+      }
+
+      let targetOrgId = organizationId;
+      if (!targetOrgId && merchantEmail) {
+        const uRows = await sql`
+          SELECT "organizationId" FROM "User" WHERE LOWER("email") = ${merchantEmail.toLowerCase().trim()} LIMIT 1;
+        `;
+        if (uRows.length > 0) {
+          targetOrgId = uRows[0].organizationId;
+        }
+      }
+
+      if (!targetOrgId) {
+        return NextResponse.json(
+          { success: false, error: 'স্টোর বা অ্যাকাউন্ট খুঁজে পাওয়া যায়নি' },
+          { status: 404 },
+        );
+      }
+
+      await sql`
+        UPDATE "Organization"
+        SET
+          "paymentMethod" = ${paymentMethod},
+          "paymentSenderPhone" = ${paymentSenderPhone},
+          "paymentTrxId" = ${paymentTrxId},
+          "paymentScreenshot" = ${paymentScreenshot},
+          "paymentNote" = ${paymentNote},
+          "paymentSubmittedAt" = NOW(),
+          "updatedAt" = NOW()
+        WHERE "id" = ${targetOrgId};
+      `;
+
+      return NextResponse.json({
+        success: true,
+        message: 'পেমেন্ট প্রুফ সফলভাবে জমা দেওয়া হয়েছে! সুপার অ্যাডমিন ভেরিফাই করে আপনার অ্যাকাউন্ট অনুমোদন করবেন।',
       });
     }
 

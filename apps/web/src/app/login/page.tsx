@@ -84,7 +84,7 @@ export default function LoginPage() {
     const text = encodeURIComponent(
       `আসসালামু আলাইকুম Super Admin,\nআমি OrderFlow BD তে লগইন করার চেষ্টা করছি (${email}), কিন্তু অ্যাকাউন্টটি এখনো অনুমোদনের অপেক্ষায় রয়েছে। অনুগ্রহ করে অ্যাকাউন্টটি সক্রিয় (Approve) করে দিন।`,
     );
-    return `https://wa.me/8801700000000?text=${text}`;
+    return `https://wa.me/8801979915165?text=${text}`;
   };
 
   return (

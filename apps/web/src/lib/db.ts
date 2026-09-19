@@ -94,9 +94,14 @@ export const DEFAULT_FAQS: BotFaqItem[] = [
   },
 ];
 
-export async function initDatabase() {
-  const sql = getSql();
-  try {
+let dbInitPromise: Promise<void> | null = null;
+
+export async function initDatabase(): Promise<void> {
+  if (dbInitPromise) return dbInitPromise;
+
+  dbInitPromise = (async () => {
+    const sql = getSql();
+    try {
     // 1. Ensure default store exists
     await sql`
       INSERT INTO "Store" ("id", "name", "slug", "phone", "currency", "createdAt", "updatedAt")
@@ -307,6 +312,12 @@ export async function initDatabase() {
     await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "package" TEXT DEFAULT 'PRO';`;
     await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "approvedAt" TIMESTAMP;`;
     await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "approvedBy" TEXT;`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "paymentMethod" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "paymentSenderPhone" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "paymentTrxId" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "paymentScreenshot" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "paymentNote" TEXT DEFAULT '';`;
+    await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "paymentSubmittedAt" TIMESTAMP;`;
 
     // 8. Ensure Normalized Tag and ConversationTag tables exist
     await sql`
@@ -429,7 +440,11 @@ export async function initDatabase() {
     }
   } catch (err) {
     console.error('[DB Init Error]:', err);
+    dbInitPromise = null;
   }
+})();
+
+  return dbInitPromise;
 }
 
 export async function getBotSettings() {
@@ -1615,6 +1630,12 @@ export async function getDbAllOrganizations(statusFilter?: string): Promise<Admi
           o.plan,
           o.status,
           o."ownerPhone",
+          o."paymentMethod",
+          o."paymentSenderPhone",
+          o."paymentTrxId",
+          o."paymentScreenshot",
+          o."paymentNote",
+          o."paymentSubmittedAt",
           o."approvedAt",
           o."approvedBy",
           o."createdAt",
@@ -1643,6 +1664,12 @@ export async function getDbAllOrganizations(statusFilter?: string): Promise<Admi
           o.plan,
           o.status,
           o."ownerPhone",
+          o."paymentMethod",
+          o."paymentSenderPhone",
+          o."paymentTrxId",
+          o."paymentScreenshot",
+          o."paymentNote",
+          o."paymentSubmittedAt",
           o."approvedAt",
           o."approvedBy",
           o."createdAt",
@@ -1672,6 +1699,12 @@ export async function getDbAllOrganizations(statusFilter?: string): Promise<Admi
       ownerName: r.ownerName || 'Merchant Owner',
       ownerEmail: r.ownerEmail || '',
       ownerPhone: r.ownerPhone || r.userPhone || '01700000000',
+      paymentMethod: r.paymentMethod || undefined,
+      paymentSenderPhone: r.paymentSenderPhone || undefined,
+      paymentTrxId: r.paymentTrxId || undefined,
+      paymentScreenshot: r.paymentScreenshot || undefined,
+      paymentNote: r.paymentNote || undefined,
+      paymentSubmittedAt: r.paymentSubmittedAt ? new Date(r.paymentSubmittedAt).toISOString() : undefined,
       userCount: Number(r.userCount) || 1,
       orderCount: Number(r.orderCount) || 0,
       conversationCount: Number(r.conversationCount) || 0,
