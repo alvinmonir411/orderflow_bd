@@ -940,14 +940,66 @@ export default function LandingPage() {
       </section>
 
       {/* 8. Footer */}
-      <footer className="mt-auto border-t border-neutral-800/80 bg-[#07080c] py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-emerald-400" />
-            <span className="font-bold text-neutral-300">OrderFlow BD 2.0</span>
-            <span>— Smart F-Commerce AI Platform</span>
+      <footer className="mt-auto border-t border-neutral-800/80 bg-[#06080e] pt-12 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center justify-between pb-8 border-b border-neutral-800/80">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-neutral-950 font-black shadow-md shadow-emerald-500/20">
+                  <Zap className="w-4 h-4 fill-neutral-950" />
+                </div>
+                <span className="font-extrabold text-lg text-white tracking-tight">OrderFlow BD</span>
+                <span className="px-1.5 py-0.5 text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-md">2.0</span>
+              </div>
+              <p className="text-xs text-neutral-400 max-w-sm leading-relaxed">
+                বাংলাদেশের অনলাইন ও এফ-কমার্স শপগুলোর জন্য সেন্ট্রালাইজড অর্ডার অটোমেশন ও স্মার্ট AI সেলস প্ল্যাটফর্ম।
+              </p>
+            </div>
+
+            {/* WhatsApp Community Support Highlight Card */}
+            <div className="lg:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-950/30 via-[#0c121e] to-neutral-900/90 border border-emerald-500/30 shadow-xl">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>অফিশিয়াল সাপোর্ট ও কমিউনিটি</span>
+                </div>
+                <h4 className="text-sm font-bold text-white">যেকোনো সহায়তায় আমাদের WhatsApp গ্রুপে যুক্ত হোন</h4>
+                <p className="text-xs text-neutral-400">
+                  ২৪ ঘণ্টা প্রশ্ন, গাইডলাইন বা নতুন ফিচার আপডেটের জন্য আমাদের সক্রিয় সাপোর্ট কমিউনিটিতে অংশ নিন।
+                </p>
+              </div>
+
+              <a
+                href="https://chat.whatsapp.com/GLhBIGB3fbOLoVg0uDYoGk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition-all shrink-0 cursor-pointer group"
+              >
+                <MessageCircle className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
+                <span>WhatsApp গ্রুপে জয়েন করুন</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
-          <p>© {new Date().getFullYear()} OrderFlow BD. All rights reserved.</p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
+            <p>© {new Date().getFullYear()} OrderFlow BD. All rights reserved.</p>
+            <div className="flex flex-wrap items-center gap-4">
+              <Link href="/demo" className="hover:text-neutral-300 transition-colors">লাইভ ডেমো</Link>
+              <Link href="/login" className="hover:text-neutral-300 transition-colors">লগইন</Link>
+              <Link href="/register" className="hover:text-neutral-300 transition-colors">রেজিস্ট্রেশন</Link>
+              <a
+                href="https://chat.whatsapp.com/GLhBIGB3fbOLoVg0uDYoGk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 transition-colors"
+              >
+                <MessageCircle className="w-3 h-3" />
+                <span>WhatsApp Community</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

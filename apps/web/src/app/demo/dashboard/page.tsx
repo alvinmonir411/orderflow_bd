@@ -1683,6 +1683,27 @@ export default function DemoDashboardPage() {
                 </div>
               </div>
             )}
+
+            {/* Demo Dashboard Footer */}
+            <footer className="mt-12 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-200">OrderFlow BD Demo</span>
+                <span>• এফ-কমার্স স্বয়ংক্রিয় অর্ডার ম্যানেজমেন্ট</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="text-slate-400 hidden sm:inline">সাপোর্ট ও কমিউনিটি:</span>
+                <a
+                  href="https://chat.whatsapp.com/GLhBIGB3fbOLoVg0uDYoGk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-xl font-bold transition-all shadow-sm group"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                  <span>WhatsApp সাপোর্ট গ্রুপ</span>
+                  <ExternalLink className="w-3 h-3 opacity-70" />
+                </a>
+              </div>
+            </footer>
           </main>
         </div>
       </div>

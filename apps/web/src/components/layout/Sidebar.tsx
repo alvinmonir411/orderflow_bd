@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ExternalLink,
   MessageSquare,
+  MessageCircle,
   LogOut,
   Crown,
   Briefcase,
@@ -249,6 +250,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             );
           })}
         </nav>
+
+        {/* WhatsApp Community Support Help Card */}
+        <div className="mx-3 mb-2 p-3 bg-emerald-950/25 border border-emerald-500/25 rounded-2xl relative overflow-hidden">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <MessageCircle className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-white leading-tight flex items-center gap-1">
+                <span>WhatsApp সাপোর্ট</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              </p>
+              <p className="text-[10px] text-emerald-400/80">সাহায্য ও আপডেট কমিউনিটি</p>
+            </div>
+          </div>
+          <a
+            href="https://chat.whatsapp.com/GLhBIGB3fbOLoVg0uDYoGk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+          >
+            <span>গ্রুপে জয়েন করুন</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
 
         {/* User Profile & Logout Section */}
         <div className="p-3 m-3 bg-[#0a0d16] border border-neutral-800/90 rounded-2xl relative overflow-hidden shadow-lg space-y-2.5">
