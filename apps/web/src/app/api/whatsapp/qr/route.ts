@@ -76,8 +76,25 @@ export async function GET(request: NextRequest) {
       console.warn('[WAAPI Client Me Check Warning]:', meErr);
     }
 
-    // 2. If not connected, fetch the Live QR Code from WAAPI
+    // 2. Try to start/initialize the instance first (needed when Unauthenticated)
     try {
+      await fetch(`https://waapi.app/api/v1/instances/${instanceId}/client/action/start`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token.trim()}`,
+          'Content-Type': 'application/json',
+          accept: 'application/json',
+        },
+      });
+      // Small wait for instance to boot up
+      await new Promise((r) => setTimeout(r, 1500));
+    } catch {
+      // ignore start errors, continue to QR fetch
+    }
+
+    // 3. Fetch the Live QR Code from WAAPI
+    try {
+      // Try /client/qr endpoint first
       const qrRes = await fetch(`https://waapi.app/api/v1/instances/${instanceId}/client/qr`, {
         headers: {
           Authorization: `Bearer ${token.trim()}`,
@@ -87,17 +104,24 @@ export async function GET(request: NextRequest) {
 
       const qrData = await qrRes.json();
 
-      if (qrRes.ok && qrData?.data?.qrCode) {
-        const qrBase64 = qrData.data.qrCode.base64 || qrData.data.qrCode;
+      // Handle various QR response shapes from WAAPI
+      const qrCode =
+        qrData?.data?.qrCode?.base64 ||
+        qrData?.data?.qrCode ||
+        qrData?.data?.qr ||
+        qrData?.qrCode ||
+        null;
+
+      if (qrRes.ok && qrCode) {
         return NextResponse.json({
           status: 'SCAN_QR_CODE',
-          qrCode: qrBase64,
+          qrCode,
           instanceId,
-          message: 'লাইভ QR কোড প্রস্তুত। আপনার ফোনের WhatsApp দিয়ে স্ক্যান করুন।',
+          message: 'লাইভ QR কোড প্রস্তুত। আপনার ফোনের WhatsApp দিয়ে স্ক্যান করুন।',
         });
       }
 
-      // Alternative WAAPI endpoint: get-qr-code action
+      // Fallback: try POST action/get-qr-code endpoint
       const actionQrRes = await fetch(
         `https://waapi.app/api/v1/instances/${instanceId}/client/action/get-qr-code`,
         {
@@ -110,25 +134,31 @@ export async function GET(request: NextRequest) {
         }
       );
       const actionData = await actionQrRes.json();
-      if (actionQrRes.ok && actionData?.data?.qrCode) {
-        const qrBase64 = actionData.data.qrCode.base64 || actionData.data.qrCode;
+      const actionQrCode =
+        actionData?.data?.qrCode?.base64 ||
+        actionData?.data?.qrCode ||
+        actionData?.data?.qr ||
+        null;
+
+      if (actionQrRes.ok && actionQrCode) {
         return NextResponse.json({
           status: 'SCAN_QR_CODE',
-          qrCode: qrBase64,
+          qrCode: actionQrCode,
           instanceId,
-          message: 'লাইভ QR কোড প্রস্তুত। আপনার ফোনের WhatsApp দিয়ে স্ক্যান করুন।',
+          message: 'লাইভ QR কোড প্রস্তুত। আপনার ফোনের WhatsApp দিয়ে স্ক্যান করুন।',
         });
       }
 
+      // Instance started but QR not ready yet — client will poll again
       return NextResponse.json({
         status: 'WAITING_FOR_QR',
-        message: qrData?.message || 'QR কোড লোড হচ্ছে, অনুগ্রহ করে কয়েক সেকেন্ড অপেক্ষা করুন...',
+        message: 'Instance চালু হচ্ছে, QR কোড তৈরি হচ্ছে... (কয়েক সেকেন্ড অপেক্ষা করুন)',
         instanceId,
       });
     } catch (qrErr: any) {
       console.error('[WAAPI QR Fetch Error]:', qrErr);
       return NextResponse.json(
-        { status: 'ERROR', error: qrErr.message || 'QR কোড লোড করতে সমস্যা হয়েছে' },
+        { status: 'ERROR', error: qrErr.message || 'QR কোড লোড করতে সমস্যা হয়েছে' },
         { status: 500 }
       );
     }
