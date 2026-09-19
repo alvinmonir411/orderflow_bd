@@ -62,8 +62,82 @@ export async function POST(request: NextRequest) {
         }),
       });
 
-      const metaData = await metaRes.json();
-      if (metaRes.ok && metaData.messages?.[0]?.id) {
+      let metaData = await metaRes.json();
+
+      // If error 133010 (Account not registered), attempt automatic registration with Meta PIN
+      if (metaData.error?.code === 133010) {
+        try {
+          const regRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/register`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token.trim()}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              pin: '123456',
+            }),
+          });
+          const regData = await regRes.json();
+          console.log('[Meta Auto-Register Attempt Result]:', regData);
+
+          if (regData.success) {
+            // Retry sending text message
+            const retryRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token.trim()}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: formattedPhone,
+                type: 'text',
+                text: { preview_url: false, body: testText },
+              }),
+            });
+            metaData = await retryRes.json();
+          }
+        } catch (regErr) {
+          console.warn('[Auto-register Exception]:', regErr);
+        }
+      }
+
+      // If text message fails (e.g. outside 24h window), try Meta official pre-approved hello_world template
+      if (!metaData.messages?.[0]?.id) {
+        try {
+          const tplRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token.trim()}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: formattedPhone,
+              type: 'template',
+              template: {
+                name: 'hello_world',
+                language: { code: 'en_US' },
+              },
+            }),
+          });
+          const tplData = await tplRes.json();
+          if (tplRes.ok && tplData.messages?.[0]?.id) {
+            return NextResponse.json({
+              success: true,
+              message: `টেস্ট মেসেজ (মেটা প্রি-অ্যাপ্রুভড টেমপ্লেট) সফলভাবে ${formattedPhone} নম্বরে পাঠানো হয়েছে! 🎉`,
+              messageId: tplData.messages[0].id,
+            });
+          }
+        } catch (tplErr) {
+          console.warn('[Template Fallback Exception]:', tplErr);
+        }
+      }
+
+      if (metaData.messages?.[0]?.id) {
         return NextResponse.json({
           success: true,
           message: `টেস্ট মেসেজ সফলভাবে ${formattedPhone} নম্বরে পাঠানো হয়েছে!`,
@@ -74,7 +148,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: `মেটা বার্তা পাঠাতে পারেনি: ${errorMsg}. মনে রাখবেন, ট্রায়াল নম্বরে পাঠানোর আগে নম্বরটি Meta App এ Recipient হিসেবে যোগ থাকতে হয়।`,
+            error: `মেটা বার্তা পাঠাতে পারেনি: ${errorMsg}. মনে রাখবেন, মেটা টেস্ট নম্বরে পাঠানোর আগে নম্বরটি Meta App এ Recipient হিসেবে যোগ থাকতে হয়, অথবা নম্বরটি WhatsApp Manager-এ ওটিপি দিয়ে ভেরিফাই সম্পন্ন থাকতে হয়।`,
           },
           { status: 400 }
         );
