@@ -96,7 +96,9 @@ export async function POST(request: NextRequest) {
         // Determine which org this page belongs to for correct order/message routing
         const matchedConn = allChannelConnections.find((c: any) => c.pageId === pageId);
         const activeOrgId = matchedConn?.organizationId || 'org-1';
-        const activePageToken = matchedConn?.accessToken || pageToken;
+        const activePageToken = matchedConn?.accessToken || (activeOrgId === 'org-1' ? pageToken : '');
+        const orgSettings = await getBotSettings(activeOrgId);
+        const activeGeminiKey = orgSettings.geminiApiKey || geminiKey;
 
         // ============================================================
         // A. FACEBOOK & INSTAGRAM POST COMMENTS (FEED CHANGES)
@@ -123,10 +125,11 @@ export async function POST(request: NextRequest) {
                   senderId,
                   senderName,
                   commentText,
-                  pageToken,
-                  settings,
-                  geminiKey,
-                  body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_COMMENT'
+                  activePageToken,
+                  orgSettings,
+                  activeGeminiKey,
+                  body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_COMMENT',
+                  activeOrgId
                 );
               }
             }
@@ -181,14 +184,14 @@ export async function POST(request: NextRequest) {
             await sql`
               UPDATE "Customer"
               SET psid = ${senderId}, "updatedAt" = NOW()
-              WHERE id = 'cust-01979915165' OR psid IS NULL;
+              WHERE "organizationId" = ${activeOrgId} AND psid IS NULL;
             `;
           } catch (linkErr) {
             console.error('[Auto-link PSID Error]:', linkErr);
           }
 
           const channel = body.object === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK_MESSENGER';
-          await processMessengerEvent(senderId, text, payload, activePageToken, geminiKey, settings, incomingImageUrl, channel, activeOrgId);
+          await processMessengerEvent(senderId, text, payload, activePageToken, activeGeminiKey, orgSettings, incomingImageUrl, channel, activeOrgId);
         }
       }
 
@@ -528,7 +531,7 @@ async function processMessengerEvent(
   organizationId: string = 'org-1',
 ) {
   // 1. Fetch DB chat history for persistent context across serverless requests
-  const dbHistory = await getDbChatMessagesBySender(senderId);
+  const dbHistory = await getDbChatMessagesBySender(senderId, organizationId);
 
   const session: UserSession = userSessions[senderId] || {
     state: 'IDLE',
@@ -561,7 +564,7 @@ async function processMessengerEvent(
   }
   userSessions[senderId] = session;
 
-  const rawText = text.trim();
+  const rawText = (text || '').trim();
   const lowerText = rawText.toLowerCase();
 
   // 2. Fetch live products from Neon PostgreSQL DB
@@ -1642,7 +1645,8 @@ async function handleFacebookComment(
   pageToken: string,
   settings: any,
   geminiKey: string,
-  channel: string = 'FACEBOOK_COMMENT'
+  channel: string = 'FACEBOOK_COMMENT',
+  organizationId: string = 'org-1'
 ) {
   if (!commentId || !pageToken) return;
 
@@ -1653,9 +1657,10 @@ async function handleFacebookComment(
     sender: 'customer',
     text: `[পোস্ট কমেন্ট]: "${message}"`,
     channel,
+    organizationId,
   });
 
-  const products = await getDbProducts();
+  const products = await getDbProducts(organizationId);
   const lower = message.toLowerCase();
 
   // Matched product from comment text
@@ -1708,6 +1713,7 @@ async function handleFacebookComment(
     channel,
     productTitle: prodTitle,
     productPrice: prodPrice,
+    organizationId,
   });
 }
 

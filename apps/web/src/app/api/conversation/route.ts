@@ -23,6 +23,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ success: true, threads: [] });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const queryOrgId = searchParams.get('orgId');
     const orgId = user?.role === 'SUPER_ADMIN' && queryOrgId ? queryOrgId : (user?.organizationId || 'org-1');
@@ -38,16 +42,16 @@ export async function GET(request: NextRequest) {
     try {
       const conns = await getDbChannelConnections(orgId);
       const fbConn = conns.find((c: any) => c.platform === 'FACEBOOK_MESSENGER' && c.status === 'CONNECTED');
-      if (fbConn) {
+      if (fbConn && fbConn.accessToken) {
         pageToken = fbConn.accessToken || '';
         pageId = fbConn.pageId || '';
       }
     } catch (_) {}
 
     if (!pageToken) {
-      const settings = await getBotSettings();
-      pageToken = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
-      pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
+      const settings = await getBotSettings(orgId);
+      pageToken = settings.fbPageToken || '';
+      pageId = settings.fbPageId || '';
     }
     const sql = getSql();
 
@@ -186,8 +190,8 @@ export async function GET(request: NextRequest) {
           totalSpent: ord.totalPrice,
           isAiActive: true,
           status: dbC.status || (ord.status === 'DELIVERED' ? 'RESOLVED' : ord.status === 'CANCELLED' ? 'CLOSED' : 'OPEN'),
-          assignedToId: dbC.assignedToId || 'usr-admin-1',
-          assignedToName: dbC.assignedToName || 'Alvin Monir',
+          assignedToId: dbC.assignedToId || user?.id || null,
+          assignedToName: dbC.assignedToName || user?.name || 'অ্যাসাইন করা হয়নি',
           tags: dbC.tags || ['💎 VIP', '🛍️ Interested'],
           messages: noteMessages.length > 0 ? noteMessages : [
             {
@@ -222,7 +226,7 @@ export async function GET(request: NextRequest) {
           const rawMsgs = fbConv.messages?.data || [];
           const threadMsgs = rawMsgs.reverse().map((m: any) => ({
             id: m.id,
-            sender: (pageId && m.from?.id === pageId) || m.from?.name === 'Moner Kotha' ? 'ai' : 'customer',
+            sender: (pageId && m.from?.id === pageId) ? 'ai' : 'customer',
             text: m.message || 'মেসেজ',
             time: new Date(m.created_time).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
           }));

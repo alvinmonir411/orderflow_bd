@@ -1,26 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSql } from '@/lib/db';
+import { getSql, getDbProducts } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
-export async function GET() {
-  const sql = getSql();
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
   try {
-    const products = await sql`
-      SELECT 
-        id,
-        "storeId",
-        title,
-        COALESCE(category, 'সাধারণ') as category,
-        description,
-        "basePrice"::float as "basePrice",
-        stock,
-        "isActive",
-        images,
-        "createdAt",
-        "updatedAt"
-      FROM "Product"
-      ORDER BY "createdAt" DESC;
-    `;
+    const user = await getCurrentUser(request);
+    const searchParams = request.nextUrl.searchParams;
+    const queryOrgId = searchParams.get('orgId');
+    const orgId = user?.role === 'SUPER_ADMIN' && queryOrgId ? queryOrgId : (user?.organizationId || 'org-1');
 
+    const products = await getDbProducts(orgId);
     return NextResponse.json(products);
   } catch (error) {
     console.error('[Products GET API Error]:', error);
@@ -31,6 +22,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const sql = getSql();
   try {
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+
     const body = await request.json();
     const { title, category, description, basePrice, stock, images } = body;
 
@@ -40,8 +34,8 @@ export async function POST(request: NextRequest) {
     const imgArray = Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop&q=80'];
 
     const newProd = await sql`
-      INSERT INTO "Product" ("id", "storeId", "title", "category", "description", "basePrice", "stock", "isActive", "images", "createdAt", "updatedAt")
-      VALUES (${id}, 'store-1', ${title}, ${cat}, ${desc}, ${Number(basePrice) || 0}, ${Number(stock) || 0}, true, ${imgArray}, NOW(), NOW())
+      INSERT INTO "Product" ("id", "storeId", "organizationId", "title", "category", "description", "basePrice", "stock", "isActive", "images", "createdAt", "updatedAt")
+      VALUES (${id}, ${`store-${orgId}`}, ${orgId}, ${title}, ${cat}, ${desc}, ${Number(basePrice) || 0}, ${Number(stock) || 0}, true, ${imgArray}, NOW(), NOW())
       RETURNING 
         id,
         "storeId",
@@ -66,6 +60,9 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const sql = getSql();
   try {
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+
     const body = await request.json();
     const { id, title, category, description, basePrice, stock, images, isActive } = body;
 
@@ -96,7 +93,7 @@ export async function PUT(request: NextRequest) {
           images = ${imgArray},
           "isActive" = ${active},
           "updatedAt" = NOW()
-        WHERE id = ${id};
+        WHERE id = ${id} AND ("organizationId" = ${orgId} OR (${orgId} = 'org-1' AND "organizationId" IS NULL));
       `;
     } else {
       await sql`
@@ -109,7 +106,7 @@ export async function PUT(request: NextRequest) {
           stock = ${stockQty},
           "isActive" = ${active},
           "updatedAt" = NOW()
-        WHERE id = ${id};
+        WHERE id = ${id} AND ("organizationId" = ${orgId} OR (${orgId} = 'org-1' AND "organizationId" IS NULL));
       `;
     }
 
@@ -123,6 +120,9 @@ export async function PUT(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const sql = getSql();
   try {
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+
     const body = await request.json();
     const { id, stockDelta, stock, title, category, basePrice, images, isActive } = body;
 
@@ -134,13 +134,13 @@ export async function PATCH(request: NextRequest) {
       await sql`
         UPDATE "Product"
         SET stock = GREATEST(0, stock + ${stockDelta}), "updatedAt" = NOW()
-        WHERE id = ${id};
+        WHERE id = ${id} AND ("organizationId" = ${orgId} OR (${orgId} = 'org-1' AND "organizationId" IS NULL));
       `;
     } else if (stock !== undefined && title === undefined) {
       await sql`
         UPDATE "Product"
         SET stock = ${stock}, "updatedAt" = NOW()
-        WHERE id = ${id};
+        WHERE id = ${id} AND ("organizationId" = ${orgId} OR (${orgId} = 'org-1' AND "organizationId" IS NULL));
       `;
     } else {
       // Full or partial field updates
@@ -158,7 +158,7 @@ export async function PATCH(request: NextRequest) {
           images = COALESCE(${images || null}, images),
           "isActive" = COALESCE(${isActive !== undefined ? isActive : null}, "isActive"),
           "updatedAt" = NOW()
-        WHERE id = ${id};
+        WHERE id = ${id} AND ("organizationId" = ${orgId} OR (${orgId} = 'org-1' AND "organizationId" IS NULL));
       `;
     }
 
@@ -172,6 +172,9 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const sql = getSql();
   try {
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+
     const searchParams = request.nextUrl.searchParams;
     let id = searchParams.get('id');
 
@@ -191,7 +194,7 @@ export async function DELETE(request: NextRequest) {
       await sql`DELETE FROM "OrderItem" WHERE "productId" = ${id};`;
     } catch (e) {}
 
-    await sql`DELETE FROM "Product" WHERE id = ${id};`;
+    await sql`DELETE FROM "Product" WHERE id = ${id} AND ("organizationId" = ${orgId} OR (${orgId} = 'org-1' AND "organizationId" IS NULL));`;
 
     return NextResponse.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBotSettings, getSql } from '@/lib/db';
+import { getBotSettings, getDbChannelConnections, getSql } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+
     const body = await request.json();
     const { orderId, customerPhone, psid, message, channel } = body;
 
@@ -12,13 +16,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'মেসেজ খালি হতে পারবে না' }, { status: 400 });
     }
 
-    const settings = await getBotSettings();
-    const pageToken = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN;
+    let pageToken = '';
+    try {
+      const conns = await getDbChannelConnections(orgId);
+      const fbConn = conns.find((c: any) => c.platform === 'FACEBOOK_MESSENGER' && c.status === 'CONNECTED');
+      if (fbConn && fbConn.accessToken) {
+        pageToken = fbConn.accessToken;
+      }
+    } catch (_) {}
+
+    const settings = await getBotSettings(orgId);
+    if (!pageToken) {
+      pageToken = settings.fbPageToken || '';
+    }
 
     const sql = getSql();
     let targetPsid = psid;
 
-    // If PSID not provided directly, lookup from Database by orderId or customerPhone
+    // If PSID not provided directly, lookup from Database by orderId or customerPhone strictly for this org
     if (!targetPsid && (orderId || customerPhone)) {
       try {
         if (orderId) {
@@ -26,7 +41,8 @@ export async function POST(request: NextRequest) {
             SELECT c.psid 
             FROM "Order" o
             LEFT JOIN "Customer" c ON o."customerId" = c.id
-            WHERE o.id = ${orderId} OR o."orderNumber"::text = ${String(orderId)}
+            WHERE (o.id = ${orderId} OR o."orderNumber"::text = ${String(orderId)})
+              AND o."organizationId" = ${orgId}
             LIMIT 1;
           `;
           if (rows.length > 0 && rows[0].psid) {
@@ -37,23 +53,13 @@ export async function POST(request: NextRequest) {
         if (!targetPsid && customerPhone) {
           const custRows = await sql`
             SELECT psid FROM "Customer" 
-            WHERE phone = ${customerPhone} AND psid IS NOT NULL AND psid != ''
+            WHERE phone = ${customerPhone} 
+              AND ("organizationId" = ${orgId} OR (${orgId} = 'org-1' AND "organizationId" IS NULL))
+              AND psid IS NOT NULL AND psid != ''
             LIMIT 1;
           `;
           if (custRows.length > 0 && custRows[0].psid) {
             targetPsid = custRows[0].psid;
-          }
-        }
-
-        if (!targetPsid) {
-          const anyCust = await sql`
-            SELECT psid FROM "Customer" 
-            WHERE psid IS NOT NULL AND psid != ''
-            ORDER BY "updatedAt" DESC 
-            LIMIT 1;
-          `;
-          if (anyCust.length > 0 && anyCust[0].psid) {
-            targetPsid = anyCust[0].psid;
           }
         }
       } catch (dbErr) {
@@ -222,6 +228,7 @@ export async function POST(request: NextRequest) {
         sender: 'admin',
         text: message.trim(),
         channel: channel === 'WHATSAPP' || waSent ? 'WHATSAPP' : 'FACEBOOK_MESSENGER',
+        organizationId: orgId,
       });
     } catch (saveErr) {
       console.error('[Save Admin Chat Message Error]:', saveErr);
@@ -235,7 +242,8 @@ export async function POST(request: NextRequest) {
           UPDATE "Order"
           SET notes = COALESCE(notes || E'\n', '') || ${noteEntry},
               "updatedAt" = NOW()
-          WHERE id = ${orderId} OR "orderNumber"::text = ${String(orderId)};
+          WHERE (id = ${orderId} OR "orderNumber"::text = ${String(orderId)})
+            AND "organizationId" = ${orgId};
         `;
       } catch (noteErr) {
         console.error('[Save Note Error]:', noteErr);

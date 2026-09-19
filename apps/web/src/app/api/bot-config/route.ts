@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBotSettings, updateBotSettings } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const settings = await getBotSettings();
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
+    const settings = await getBotSettings(orgId);
     return NextResponse.json(settings);
   } catch (error: any) {
     console.error('[API GET /bot-config Error]:', error);
@@ -15,9 +18,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request);
+    const orgId = user?.organizationId || 'org-1';
     const body = await request.json();
-    await updateBotSettings(body);
-    const updated = await getBotSettings();
+    await updateBotSettings(body, orgId);
+    const updated = await getBotSettings(orgId);
 
     // If new Facebook Page Token provided, automatically subscribe Page to Webhooks in Meta Graph API
     if (body.fbPageToken && body.fbPageToken.trim().length > 10) {

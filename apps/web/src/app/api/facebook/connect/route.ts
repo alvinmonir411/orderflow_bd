@@ -138,30 +138,12 @@ export async function POST(request: NextRequest) {
         accessToken: targetPageToken,
       });
 
-      // 4. Update BotSettings in Neon DB (global fallback for org-1)
-      if (userOrgId === 'org-1') {
-        await updateBotSettings({
-          fbPageId: targetPageId,
-          fbPageToken: targetPageToken,
-          fbPageName: targetPageName,
-        });
-      } else {
-        // For non-default orgs, store settings in their org-scoped BotSettings
-        try {
-          const sql = getSql();
-          await sql`
-            INSERT INTO "BotSettings" ("id", "storeId", "organizationId", "fbPageId", "fbPageToken", "fbPageName", "updatedAt")
-            VALUES (${`settings-${userOrgId}`}, ${`store-${userOrgId}`}, ${userOrgId}, ${targetPageId}, ${targetPageToken}, ${targetPageName}, NOW())
-            ON CONFLICT ("id") DO UPDATE SET
-              "fbPageId" = EXCLUDED."fbPageId",
-              "fbPageToken" = EXCLUDED."fbPageToken",
-              "fbPageName" = EXCLUDED."fbPageName",
-              "updatedAt" = NOW();
-          `;
-        } catch (botErr) {
-          console.warn('[BotSettings upsert for new org warning]:', botErr);
-        }
-      }
+      // 4. Update BotSettings for this organization
+      await updateBotSettings({
+        fbPageId: targetPageId,
+        fbPageToken: targetPageToken,
+        fbPageName: targetPageName,
+      }, userOrgId);
 
       // 5. Also update Store record if available
       try {
@@ -169,7 +151,7 @@ export async function POST(request: NextRequest) {
         await sql`
           UPDATE "Store"
           SET "fbPageId" = ${targetPageId}, "updatedAt" = NOW()
-          WHERE "id" = ${`store-${userOrgId}`} OR "id" = 'store-1';
+          WHERE "id" = ${`store-${userOrgId}`} OR (${userOrgId} = 'org-1' AND "id" = 'store-1');
         `;
       } catch (storeErr) {
         console.warn('[Store Update fbPageId Warning]:', storeErr);

@@ -305,6 +305,7 @@ export async function initDatabase(): Promise<void> {
     await sql`ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "Store" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
     await sql`ALTER TABLE "BotSettings" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
+    await sql`ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "organizationId" TEXT DEFAULT 'org-1';`;
 
     // Ensure organization status and approval columns exist
     await sql`ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'ACTIVE';`;
@@ -447,20 +448,26 @@ export async function initDatabase(): Promise<void> {
   return dbInitPromise;
 }
 
-export async function getBotSettings() {
+export async function getBotSettings(organizationId: string = 'org-1') {
   const sql = getSql();
   try {
     await initDatabase();
-    const rows = await sql`SELECT * FROM "BotSettings" WHERE "id" = 'settings-1' LIMIT 1`;
+    const rows = await sql`
+      SELECT * FROM "BotSettings"
+      WHERE "organizationId" = ${organizationId} OR "id" = ${'settings-' + organizationId}
+      LIMIT 1
+    `;
     if (rows.length > 0) {
       const row = rows[0];
+      const isOrg1 = organizationId === 'org-1';
       return {
         id: row.id,
         storeId: row.storeId,
+        organizationId: row.organizationId || organizationId,
         systemPrompt: row.systemPrompt || '',
-        geminiApiKey: row.geminiApiKey || process.env.GEMINI_API_KEY || '',
-        fbPageToken: row.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '',
-        fbPageId: row.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '',
+        geminiApiKey: row.geminiApiKey || (isOrg1 ? (process.env.GEMINI_API_KEY || '') : ''),
+        fbPageToken: row.fbPageToken || (isOrg1 ? (process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '') : ''),
+        fbPageId: row.fbPageId || (isOrg1 ? (process.env.DEFAULT_FACEBOOK_PAGE_ID || '') : ''),
         fbPageName: row.fbPageName || (row.fbPageId ? 'Facebook Page' : ''),
         deliveryTimeDhaka: row.deliveryTimeDhaka || '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)',
         deliveryTimeOutside: row.deliveryTimeOutside || '২ থেকে ৩ কার্যদিবস',
@@ -475,11 +482,11 @@ export async function getBotSettings() {
         pathaoSecretKey: row.pathaoSecretKey || '',
         whatsappConnected: Boolean(row.whatsappConnected),
         whatsappPhone: row.whatsappPhone || '',
-        whatsappPhoneId: row.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-        whatsappToken: row.whatsappToken || process.env.WHATSAPP_TOKEN || process.env.WAAPI_API_TOKEN || '',
+        whatsappPhoneId: row.whatsappPhoneId || (isOrg1 ? (process.env.WHATSAPP_PHONE_NUMBER_ID || '') : ''),
+        whatsappToken: row.whatsappToken || (isOrg1 ? (process.env.WHATSAPP_TOKEN || process.env.WAAPI_API_TOKEN || '') : ''),
         whatsappBusinessId: row.whatsappBusinessId || '',
-        waapiInstanceId: row.waapiInstanceId || process.env.WAAPI_INSTANCE_ID || '',
-        waapiApiToken: row.waapiApiToken || process.env.WAAPI_API_TOKEN || '',
+        waapiInstanceId: row.waapiInstanceId || (isOrg1 ? (process.env.WAAPI_INSTANCE_ID || '') : ''),
+        waapiApiToken: row.waapiApiToken || (isOrg1 ? (process.env.WAAPI_API_TOKEN || '') : ''),
         whatsappProvider: row.whatsappProvider || 'META',
         smsApiKey: row.smsApiKey || '',
         smsSenderId: row.smsSenderId || 'OrderFlowBD',
@@ -488,14 +495,17 @@ export async function getBotSettings() {
   } catch (err) {
     console.error('[DB Get BotSettings Error]:', err);
   }
+
+  const isOrg1 = organizationId === 'org-1';
   return {
-    id: 'settings-1',
-    storeId: 'store-1',
+    id: isOrg1 ? 'settings-1' : `settings-${organizationId}`,
+    storeId: isOrg1 ? 'store-1' : `store-${organizationId}`,
+    organizationId: organizationId,
     systemPrompt: '',
-    geminiApiKey: process.env.GEMINI_API_KEY || '',
-    fbPageToken: process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '',
-    fbPageId: process.env.DEFAULT_FACEBOOK_PAGE_ID || '',
-    fbPageName: process.env.DEFAULT_FACEBOOK_PAGE_ID ? 'Facebook Page' : '',
+    geminiApiKey: isOrg1 ? (process.env.GEMINI_API_KEY || '') : '',
+    fbPageToken: isOrg1 ? (process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '') : '',
+    fbPageId: isOrg1 ? (process.env.DEFAULT_FACEBOOK_PAGE_ID || '') : '',
+    fbPageName: isOrg1 && process.env.DEFAULT_FACEBOOK_PAGE_ID ? 'Facebook Page' : '',
     deliveryTimeDhaka: '২৪ থেকে ৪৮ ঘণ্টা (১-২ দিন)',
     deliveryTimeOutside: '২ থেকে ৩ কার্যদিবস',
     deliveryFeeDhaka: 120,
@@ -509,49 +519,54 @@ export async function getBotSettings() {
     pathaoSecretKey: '',
     whatsappConnected: false,
     whatsappPhone: '',
-    whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-    whatsappToken: process.env.WHATSAPP_TOKEN || process.env.WAAPI_API_TOKEN || '',
+    whatsappPhoneId: isOrg1 ? (process.env.WHATSAPP_PHONE_NUMBER_ID || '') : '',
+    whatsappToken: isOrg1 ? (process.env.WHATSAPP_TOKEN || process.env.WAAPI_API_TOKEN || '') : '',
     whatsappBusinessId: '',
-    waapiInstanceId: process.env.WAAPI_INSTANCE_ID || '',
-    waapiApiToken: process.env.WAAPI_API_TOKEN || '',
+    waapiInstanceId: isOrg1 ? (process.env.WAAPI_INSTANCE_ID || '') : '',
+    waapiApiToken: isOrg1 ? (process.env.WAAPI_API_TOKEN || '') : '',
     whatsappProvider: 'META',
     smsApiKey: '',
     smsSenderId: 'OrderFlowBD',
   };
 }
 
-export async function updateBotSettings(data: {
-  systemPrompt?: string;
-  geminiApiKey?: string;
-  fbPageToken?: string;
-  fbPageId?: string;
-  fbPageName?: string;
-  deliveryTimeDhaka?: string;
-  deliveryTimeOutside?: string;
-  deliveryFeeDhaka?: number;
-  deliveryFeeOutside?: number;
-  helplinePhone?: string;
-  returnPolicy?: string;
-  faqs?: BotFaqItem[];
-  steadfastApiKey?: string;
-  steadfastSecretKey?: string;
-  pathaoClientId?: string;
-  pathaoSecretKey?: string;
-  whatsappConnected?: boolean;
-  whatsappPhone?: string;
-  whatsappPhoneId?: string;
-  whatsappToken?: string;
-  whatsappBusinessId?: string;
-  waapiInstanceId?: string;
-  waapiApiToken?: string;
-  whatsappProvider?: string;
-  smsApiKey?: string;
-  smsSenderId?: string;
-}) {
+export async function updateBotSettings(
+  data: {
+    systemPrompt?: string;
+    geminiApiKey?: string;
+    fbPageToken?: string;
+    fbPageId?: string;
+    fbPageName?: string;
+    deliveryTimeDhaka?: string;
+    deliveryTimeOutside?: string;
+    deliveryFeeDhaka?: number;
+    deliveryFeeOutside?: number;
+    helplinePhone?: string;
+    returnPolicy?: string;
+    faqs?: BotFaqItem[];
+    steadfastApiKey?: string;
+    steadfastSecretKey?: string;
+    pathaoClientId?: string;
+    pathaoSecretKey?: string;
+    whatsappConnected?: boolean;
+    whatsappPhone?: string;
+    whatsappPhoneId?: string;
+    whatsappToken?: string;
+    whatsappBusinessId?: string;
+    waapiInstanceId?: string;
+    waapiApiToken?: string;
+    whatsappProvider?: string;
+    smsApiKey?: string;
+    smsSenderId?: string;
+  },
+  organizationId: string = 'org-1',
+) {
   const sql = getSql();
   try {
     await initDatabase();
-    const current = await getBotSettings();
+    const current = await getBotSettings(organizationId);
+    const settingsId = organizationId === 'org-1' ? 'settings-1' : `settings-${organizationId}`;
+    const storeId = organizationId === 'org-1' ? 'store-1' : `store-${organizationId}`;
 
     const systemPrompt = data.systemPrompt !== undefined ? data.systemPrompt : current.systemPrompt;
     const geminiApiKey = data.geminiApiKey !== undefined ? data.geminiApiKey : current.geminiApiKey;
@@ -582,7 +597,7 @@ export async function updateBotSettings(data: {
 
     await sql`
       INSERT INTO "BotSettings" (
-        "id", "storeId", "systemPrompt", "geminiApiKey", "fbPageToken", "fbPageId", "fbPageName",
+        "id", "storeId", "organizationId", "systemPrompt", "geminiApiKey", "fbPageToken", "fbPageId", "fbPageName",
         "deliveryTimeDhaka", "deliveryTimeOutside", "deliveryFeeDhaka", "deliveryFeeOutside",
         "helplinePhone", "returnPolicy", "faqs",
         "steadfastApiKey", "steadfastSecretKey", "pathaoClientId", "pathaoSecretKey",
@@ -590,7 +605,7 @@ export async function updateBotSettings(data: {
         "waapiInstanceId", "waapiApiToken", "whatsappProvider",
         "smsApiKey", "smsSenderId", "updatedAt"
       ) VALUES (
-        'settings-1', 'store-1', ${systemPrompt}, ${geminiApiKey}, ${fbPageToken}, ${fbPageId}, ${fbPageName},
+        ${settingsId}, ${storeId}, ${organizationId}, ${systemPrompt}, ${geminiApiKey}, ${fbPageToken}, ${fbPageId}, ${fbPageName},
         ${deliveryTimeDhaka}, ${deliveryTimeOutside}, ${deliveryFeeDhaka}, ${deliveryFeeOutside},
         ${helplinePhone}, ${returnPolicy}, ${JSON.stringify(faqs)}::jsonb,
         ${steadfastApiKey}, ${steadfastSecretKey}, ${pathaoClientId}, ${pathaoSecretKey},
@@ -599,6 +614,7 @@ export async function updateBotSettings(data: {
         ${smsApiKey}, ${smsSenderId}, NOW()
       )
       ON CONFLICT ("id") DO UPDATE SET
+        "organizationId" = EXCLUDED."organizationId",
         "systemPrompt" = EXCLUDED."systemPrompt",
         "geminiApiKey" = EXCLUDED."geminiApiKey",
         "fbPageToken" = EXCLUDED."fbPageToken",
@@ -1020,24 +1036,42 @@ export async function updateDbOrderStatus(
   }
 }
 
-export async function getDbProducts() {
+export async function getDbProducts(organizationId?: string) {
   const sql = getSql();
   try {
-    const products = await sql`
-      SELECT 
-        id,
-        "storeId",
-        title,
-        COALESCE(category, 'সাধারণ') as category,
-        description,
-        "basePrice"::float as "basePrice",
-        stock,
-        "isActive",
-        images
-      FROM "Product"
-      WHERE "isActive" = true
-      ORDER BY "createdAt" DESC;
-    `;
+    const products = organizationId
+      ? await sql`
+          SELECT 
+            id,
+            "storeId",
+            "organizationId",
+            title,
+            COALESCE(category, 'সাধারণ') as category,
+            description,
+            "basePrice"::float as "basePrice",
+            stock,
+            "isActive",
+            images
+          FROM "Product"
+          WHERE "isActive" = true AND ("organizationId" = ${organizationId} OR (("organizationId" IS NULL OR "organizationId" = 'org-1') AND ${organizationId} = 'org-1'))
+          ORDER BY "createdAt" DESC;
+        `
+      : await sql`
+          SELECT 
+            id,
+            "storeId",
+            "organizationId",
+            title,
+            COALESCE(category, 'সাধারণ') as category,
+            description,
+            "basePrice"::float as "basePrice",
+            stock,
+            "isActive",
+            images
+          FROM "Product"
+          WHERE "isActive" = true
+          ORDER BY "createdAt" DESC;
+        `;
     return products;
   } catch (err) {
     console.error('[DB Get Products Error]:', err);
@@ -1086,7 +1120,7 @@ export async function getDbChatMessagesBySender(senderId: string, organizationId
       ? await sql`
           SELECT id, "organizationId", "senderId", "customerName", sender, text, channel, "productTitle", "productPrice"::float as "productPrice", "productImage", "createdAt"
           FROM "ChatMessage"
-          WHERE "senderId" = ${senderId} AND ("organizationId" = ${organizationId} OR "organizationId" IS NULL)
+          WHERE "senderId" = ${senderId} AND ("organizationId" = ${organizationId} OR ("organizationId" IS NULL AND ${organizationId} = 'org-1'))
           ORDER BY "createdAt" ASC;
         `
       : await sql`
@@ -1126,7 +1160,7 @@ export async function getDbChatThreads(organizationId = 'org-1') {
           SELECT id FROM (
             SELECT id, ROW_NUMBER() OVER (PARTITION BY "senderId" ORDER BY "createdAt" DESC) as rn
             FROM "ChatMessage"
-            WHERE "organizationId" = ${organizationId} OR (m."organizationId" IS NULL AND ${organizationId} = 'org-1')
+            WHERE "organizationId" = ${organizationId} OR ("organizationId" IS NULL AND ${organizationId} = 'org-1')
           ) sub WHERE sub.rn = 1
         )
       ORDER BY m."createdAt" DESC;

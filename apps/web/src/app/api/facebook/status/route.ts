@@ -7,7 +7,17 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
-    const orgId = user?.organizationId || 'org-1';
+    if (!user) {
+      return NextResponse.json({
+        connected: false,
+        pageId: '',
+        pageName: '',
+        webhookSubscribed: false,
+        message: 'কোনো ফেসবুক পেজ কানেক্ট করা নেই',
+      });
+    }
+
+    const orgId = user.organizationId || 'org-1';
 
     let token = '';
     let pageId = '';
@@ -17,18 +27,18 @@ export async function GET(request: NextRequest) {
     try {
       const conns = await getDbChannelConnections(orgId);
       const fbConn = conns.find((c: any) => c.platform === 'FACEBOOK_MESSENGER' && c.status === 'CONNECTED');
-      if (fbConn) {
+      if (fbConn && fbConn.accessToken) {
         token = fbConn.accessToken || '';
         pageId = fbConn.pageId || '';
         pageName = fbConn.pageName || '';
       }
     } catch (_) {}
 
-    // Fallback to BotSettings if not in ChannelConnection
+    // Fallback to BotSettings for this specific organization
     if (!token) {
-      const settings = await getBotSettings();
-      token = settings.fbPageToken || process.env.DEFAULT_FACEBOOK_PAGE_TOKEN || '';
-      pageId = settings.fbPageId || process.env.DEFAULT_FACEBOOK_PAGE_ID || '';
+      const settings = await getBotSettings(orgId);
+      token = settings.fbPageToken || '';
+      pageId = settings.fbPageId || '';
       pageName = settings.fbPageName || '';
     }
 
@@ -52,8 +62,8 @@ export async function GET(request: NextRequest) {
         }
       } catch (e) {}
     }
-    if (!pageName || pageName === 'Facebook Page') {
-      pageName = pageId === '443213442199594' ? 'FastLain' : (pageName || 'Facebook Page');
+    if (!pageName) {
+      pageName = 'Facebook Page';
     }
 
     // Check Graph API live subscription
