@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -124,18 +124,18 @@ export default function LandingPage() {
     },
     {
       id: 4,
-      title: '৫. ১-ক্লিকে Steadfast কুরিয়ার বুকিং',
-      shortTitle: 'কুরিয়ার বুকিং',
-      subtitle: 'একটি বাটন চাপলেই Steadfast API-তে পার্সেল এন্ট্রি ও ট্র্যাকিং কোড জেনারেট',
-      icon: Truck,
-      badge: 'Step 5: 1-Click Courier',
+      title: '৫. ১-ক্লিকে ইনভয়েস ও মেমো জেনারেট',
+      shortTitle: 'মেমো ও ইনভয়েস',
+      subtitle: 'কাস্টমারের বিস্তারিত বিবরণ ও বারকোড সহ প্রফেশনাল ক্যাশমেমো ইনস্ট্যান্ট তৈরি ও প্রিন্ট',
+      icon: Printer,
+      badge: 'Step 5: Instant Invoice',
       color: 'from-purple-500/20 to-pink-500/10 text-purple-300 border-purple-500/30',
       demo: {
-        type: 'courier_dispatch',
-        courier: 'Steadfast Courier API',
-        consignmentId: 'CID-984210',
-        trackingCode: 'STDF984210',
-        status: 'ইন ট্রানজিট / পার্সেল বুকড',
+        type: 'invoice_ready',
+        invoiceNo: 'INV-1048',
+        customer: 'সাবিহা চৌধুরী',
+        amount: '৳১,৩২০',
+        status: 'প্রিন্ট ও ডেলিভারি রেডি',
       },
     },
     {
@@ -150,7 +150,7 @@ export default function LandingPage() {
         type: 'whatsapp_connect',
         customerPhone: '+8801712345678',
         directAction: '১-ক্লিকে অফিসিয়াল WhatsApp চ্যাট চালু',
-        smsPreview: 'আপনার অর্ডার #OF-1048 Steadfast কুরিয়ারে পাঠানো হয়েছে।',
+        smsPreview: 'আপনার অর্ডার #OF-1048 ডেলিভারির জন্য প্রস্তুত করা হয়েছে।',
       },
     },
   ];
@@ -161,8 +161,8 @@ export default function LandingPage() {
       a: 'OrderFlow BD চালিত হচ্ছে Google Gemini AI দিয়ে। এটি সাধারণ বাটন-ভিত্তিক বোকা বট নয়। কাস্টমার যেভাবেই বাংলায় বা বাংলিশে প্রশ্ন করুক না কেন—সাইজ, কালার, স্টক বা ডেলিভারির নিয়ম নিয়ে মানুষের মতোই মিষ্টি ও সাবলীল বাংলায় কথা বলে ডিল ক্লোজ করে।',
     },
     {
-      q: 'Steadfast এ ১-ক্লিকে পার্সেল বুকিং কীভাবে কাজ করে?',
-      a: 'আমরা Steadfast কুরিয়ারের অফিসিয়াল মার্চেন্ট API ব্যবহার করি। ড্যাশবোর্ডে "Steadfast" বাটনে চাপ দিলেই কাস্টমারের নাম, ফোন, ঠিকানা ও টাকার পরিমাণ স্বয়ংক্রিয়ভাবে Steadfast সার্ভারে জমা হয়ে যায় এবং সাথে সাথে একটি অফিসিয়াল ট্র্যাকিং কোড (CID) জেনারেট হয়।',
+      q: 'অর্ডারগুলো কীভাবে ডেলিভারির জন্য প্রসেস করা হয়?',
+      a: 'অর্ডার কনফার্ম হওয়ার সাথে সাথে ড্যাশবোর্ডে কাস্টমারের নাম, মোবাইল ও সম্পূর্ণ ডেলিভারি ঠিকানাসহ অটোমেটিক মেমো ও চালান তৈরি হয়। আপনি ড্যাশবোর্ড থেকেই স্ট্যাটাস আপডেট (Confirmed, In-Transit, Delivered) এবং কাস্টমার যোগাযোগ সহজে পরিচালনা করতে পারবেন।',
     },
     {
       q: 'আমি নতুন প্রোডাক্ট অ্যাড করলে AI কীভাবে জানতে পারবে?',
@@ -259,13 +259,13 @@ export default function LandingPage() {
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-neutral-100 tracking-tight leading-[1.2]">
               মেসেঞ্জারে অটোমেটিক সেলস,{' '}
               <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-                ১-ক্লিকে Steadfast কুরিয়ার বুকিং
+                স্মার্ট অর্ডার প্রসেসিং
               </span>{' '}
               ও অ্যাডভান্সড CRM ড্যাশবোর্ড!
             </h1>
             <p className="text-base sm:text-xl text-neutral-300 leading-relaxed max-w-3xl mx-auto font-normal">
               পেজে শত শত কাস্টমার মেসেজ দিলেও আর একটি সেলও মিস হবে না। Google Gemini AI মানুষের মতো
-              মিষ্টি বাংলায় কথা বলে ১:১ সাইজে ছবি দেখিয়ে অর্ডার নিবে, ড্যাশবোর্ডে টিম অ্যাসাইনমেন্ট ও ট্যাগিং করবে এবং সরাসরি Steadfast কুরিয়ারে বুকিং করবে।
+              মিষ্টি বাংলায় কথা বলে ১:১ সাইজে ছবি দেখিয়ে অর্ডার নিবে, ড্যাশবোর্ডে টিম অ্যাসাইনমেন্ট ও ট্যাগিং করবে এবং স্বয়ংক্রিয়ভাবে ক্যাশমেমো তৈরি করবে।
             </p>
           </div>
 
@@ -302,11 +302,11 @@ export default function LandingPage() {
 
             <div className="p-3.5 bg-neutral-900/60 border border-neutral-800/80 rounded-2xl flex items-center gap-3">
               <div className="p-2 bg-purple-500/15 text-purple-400 rounded-xl">
-                <Truck className="w-4 h-4" />
+                <Printer className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs text-neutral-400">কুরিয়ার ইন্টিগ্রেশন</p>
-                <p className="text-sm font-bold text-purple-300 font-mono">১-ক্লিক Steadfast</p>
+                <p className="text-xs text-neutral-400">মেমো ও ইনভয়েস</p>
+                <p className="text-sm font-bold text-purple-300 font-mono">১-ক্লিক ক্যাশমেমো</p>
               </div>
             </div>
 
@@ -343,7 +343,7 @@ export default function LandingPage() {
               <span>রিয়েল-ওয়ার্ল্ড ইন্টারেক্টিভ সিমুলেটর</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-black text-neutral-100 tracking-tight">
-              ইনবক্স থেকে কুরিয়ার ডেলিভারি —{' '}
+              ইনবক্স থেকে সফল ডেলিভারি —{' '}
               <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
                 স্টেপ বাই স্টেপ কীভাবে কাজ করে?
               </span>
@@ -548,33 +548,33 @@ export default function LandingPage() {
                   <div className="animate-in fade-in zoom-in-95 duration-300 max-w-md mx-auto bg-neutral-900/90 border border-purple-500/30 rounded-2xl p-5 space-y-4 shadow-xl">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Truck className="w-5 h-5 text-purple-400" />
+                        <Printer className="w-5 h-5 text-purple-400" />
                         <span className="text-sm font-bold text-purple-300">
-                          Steadfast Courier API
+                          প্রিন্ট-রেডি ক্যাশমেমো ও বারকোড
                         </span>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-md">
-                        ১-ক্লিক বুকড
+                        ৮০ মিমি রেডি
                       </span>
                     </div>
 
                     <div className="p-3.5 bg-purple-950/30 border border-purple-500/20 rounded-xl space-y-1.5 font-mono text-xs">
-                      <p className="text-neutral-400">
-                        Consignment ID:{' '}
-                        <span className="text-purple-300 font-bold">
-                          {steps[4].demo.consignmentId}
-                        </span>
-                      </p>
-                      <p className="text-neutral-400">
-                        Tracking Code:{' '}
-                        <span className="text-emerald-400 font-bold">
-                          {steps[4].demo.trackingCode}
-                        </span>
-                      </p>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">চালান নং:</span>
+                        <span className="text-purple-300 font-bold">{steps[4].demo.invoiceNo}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">কাস্টমার:</span>
+                        <span className="text-neutral-200">{steps[4].demo.customer}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">মোট বিল (COD):</span>
+                        <span className="text-emerald-400 font-bold">{steps[4].demo.amount}</span>
+                      </div>
                     </div>
 
                     <p className="text-xs text-neutral-300 text-center font-medium">
-                      🚀 কুরিয়ারের পোর্টালে আর হাত দিয়ে টাইপ করার দরকার নেই!
+                      🖨️ ১-ক্লিক থার্মাল ও এ৪ ক্যাশমেমো প্রিন্ট করে পার্সেলের সাথে সেঁটে দিন!
                     </p>
                   </div>
                 )}
@@ -666,10 +666,10 @@ export default function LandingPage() {
               <Truck className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-extrabold text-neutral-100">
-              ১-ক্লিক Steadfast API বুকিং
+              অর্ডার ও ডেলিভারি লাইফসাইকেল
             </h3>
             <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
-              ড্যাশবোর্ডের ১ ক্লিকেই কাস্টমারের নাম, ফোন, ঠিকানা ও টাকার পরিমাণ দিয়ে Steadfast কুরিয়ারে বুকিং এবং লাইভ ট্র্যাকিং আইডি জেনারেট।
+              অর্ডার গ্রহণ, কনফার্মেশন, ইন-ট্রানজিট এবং ডেলিভারি সম্পন্ন হওয়া পর্যন্ত পুরো সেলস ও ডেলিভারি পাইপলাইন এক স্ক্রিনে ট্র্যাক করুন।
             </p>
           </div>
 
@@ -847,7 +847,7 @@ export default function LandingPage() {
                 <p className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
                   {hoursSavedPerMonth} ঘণ্টা
                 </p>
-                <p className="text-[11px] text-neutral-500">ম্যানুয়াল টাইপিং ও কুরিয়ার এন্ট্রি মুক্ত</p>
+                <p className="text-[11px] text-neutral-500">ম্যানুয়াল চ্যাট ও হিসাবের ঝামেলামুক্ত</p>
               </div>
 
               <div className="p-4 bg-neutral-900/80 border border-neutral-800 rounded-2xl text-center space-y-1">

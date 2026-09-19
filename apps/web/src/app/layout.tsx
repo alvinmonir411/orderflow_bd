@@ -13,7 +13,7 @@ const hindSiliguri = Hind_Siliguri({
 
 export const metadata: Metadata = {
   title: 'OrderFlow BD — Smart F-Commerce Order Automation Platform',
-  description: 'Facebook Messenger & WhatsApp Order Management, Steadfast & Pathao Courier Automation with Google Gemini AI',
+  description: 'Facebook Messenger & WhatsApp Order Management, AI Sales Automation with Google Gemini AI',
 };
 
 export default function RootLayout({

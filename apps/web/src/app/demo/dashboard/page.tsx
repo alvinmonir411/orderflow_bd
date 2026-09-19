@@ -764,7 +764,7 @@ export default function DemoDashboardPage() {
                 </div>
                 <div className="px-2.5 py-1 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center gap-1.5 text-xs text-indigo-300">
                   <Bot className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Gemini 1.5 Flash</span>
+                  <span>Gemini 2.5 Flash</span>
                 </div>
               </div>
 
@@ -1579,14 +1579,14 @@ export default function DemoDashboardPage() {
                       </p>
                     </div>
                     <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-full w-fit">
-                      🟢 Gemini 1.5 Flash Connected
+                      🟢 Gemini 2.5 Flash Connected
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
                     <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
                       <span className="text-slate-400">এআই মডেল:</span>
-                      <p className="font-bold text-white">Gemini 1.5 Flash (Bengali NLP)</p>
+                      <p className="font-bold text-white">Gemini 2.5 Flash (Bengali NLP)</p>
                     </div>
                     <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1">
                       <span className="text-slate-400">স্বয়ংক্রিয় অর্ডার ক্যাপচার:</span>
@@ -1626,7 +1626,7 @@ export default function DemoDashboardPage() {
                             {msg.sender === 'bot' && (
                               <div className="flex items-center gap-1.5 text-[10px] text-indigo-400 font-bold">
                                 <Bot className="w-3.5 h-3.5" />
-                                <span>Gemini 1.5 Flash (Bengali Engine)</span>
+                                <span>Gemini 2.5 Flash (Bengali Engine)</span>
                               </div>
                             )}
                             <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>

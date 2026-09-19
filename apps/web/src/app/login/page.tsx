@@ -157,7 +157,7 @@ export default function LoginPage() {
                     <Truck className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-bold text-white">অটো কুরিয়ার ট্র্যাকিং:</span> Steadfast ও Pathao লাইভ পার্সেল স্ট্যাটাস
+                    <span className="font-bold text-white">অর্ডার ও ডেলিভারি স্ট্যাটাস:</span> লাইভ পার্সেল ট্র্যাকিং ও হিস্ট্রি
                   </div>
                 </div>
 

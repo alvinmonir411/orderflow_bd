@@ -13,7 +13,7 @@
 
 <br />
 
-**OrderFlow BD** is a production-ready, multi-tenant B2B SaaS platform engineered specifically for social commerce (F-Commerce) and e-commerce merchants in Bangladesh. Powered by **Google Gemini Generative AI**, it replaces rigid, outdated template bots with an intelligent virtual sales closer that engages leads in natural Bengali/Banglish 24/7, verifies customer credentials, generates orders, and synchronizes directly with courier networks (Steadfast & Pathao).
+**OrderFlow BD** is a production-ready, multi-tenant B2B SaaS platform engineered specifically for social commerce (F-Commerce) and e-commerce merchants in Bangladesh. Powered by **Google Gemini Generative AI**, it replaces rigid, outdated template bots with an intelligent virtual sales closer that engages leads in natural Bengali/Banglish 24/7, verifies customer credentials, generates orders, and streamlines fulfillment with instant printable invoices.
 
 [Live Demo Preview](https://orderflowbd.vercel.app/demo/dashboard) • [Production Portal](https://orderflowbd.vercel.app/login) • [Report Issue](https://github.com/alvinmonir411/orderflow_bd/issues)
 
@@ -26,7 +26,7 @@
 2. [Core Product Modules](#-core-product-modules)
 3. [System Architecture & Data Isolation](#-system-architecture--data-isolation)
 4. [Database Entity Relationship Model](#-database-entity-relationship-model)
-5. [Logistics & Courier Automation](#-logistics--courier-automation)
+5. [Order Fulfillment & Invoicing Pipeline](#-order-fulfillment--invoicing-pipeline)
 6. [Security & Authentication Hardening](#-security--authentication-hardening)
 7. [Getting Started & Local Development](#-getting-started--local-development)
 8. [Environment Configuration Reference](#-environment-configuration-reference)
@@ -50,7 +50,7 @@ Most F-Commerce businesses waste 40–60% of their Facebook & Instagram Ad spend
 | **Objection Handling** | Fails or sends generic "Agent is away" | Explains fabric quality, sizing guidance, COD safety |
 | **Visual Sales Showcase** | Static single cards | Dynamically renders 1:1 HD variants from live database |
 | **Fraud & Number Shield** | Accepts arbitrary text inputs | Regex parses & validates 11-digit BD numbers (013–019) |
-| **Courier Synchronization** | Manual CSV export / copy-pasting | Instant 1-click booking into Steadfast & Pathao APIs |
+| **Order Management & Invoicing** | Manual notebooks & lost chat receipts | Centralized 8-stage Kanban & instant 80mm thermal cash memos |
 | **Availability & Uptime** | Requires human takeover for non-standard queries | **24/7/365 autonomous closing** with zero latency (~450ms) |
 
 ---
@@ -105,7 +105,7 @@ Most F-Commerce businesses waste 40–60% of their Facebook & Instagram Ad spend
   [Gemini AI Sales Engine]                             [Next.js Server Actions / API]
   - Natural Bengali NLU                                ├── CRM Inbox & Notes
   - Product Catalog Lookup                             ├── Order Lifecycle Manager
-  - Auto-Extraction (Phone/Address)                    └── Steadfast/Pathao Courier
+  - Auto-Extraction (Phone/Address)                    └── Fulfillment & Invoicing
             │                                               │
             └───────────────────────┬───────────────────────┘
                                     ▼
@@ -163,27 +163,20 @@ erDiagram
 
 ---
 
-## 🚚 Logistics & Courier Automation
-
-OrderFlow BD features direct API integration with leading Bangladeshi logistics providers:
+## 📦 Order Fulfillment & Invoicing Pipeline
 
 ```
-[Order Confirmed by AI] ──▶ [1-Click Courier Dispatch] ──▶ [Steadfast / Pathao API]
-                                                                    │
-                                            ┌───────────────────────┴───────────────────────┐
-                                            ▼                                               ▼
-                                  [Consignment ID]                                   [Tracking Code]
-                               (e.g., CID-991201)                                 (e.g., STDF-88231)
-                                            │                                               │
-                                            └───────────────────────┬───────────────────────┘
-                                                                    ▼
-                                                    [Instant Thermal Invoice Printed]
-                                                    [Customer SMS / Tracking Sent]
+[Order Confirmed by AI] ──▶ [Dashboard Review & Processing] ──▶ [80mm Thermal Cash Memo Printed]
+                                                                          │
+                                                  ┌───────────────────────┴───────────────────────┐
+                                                  ▼                                               ▼
+                                         [Status Tracking]                               [1-Click Customer SMS/WhatsApp]
+                                    (Confirmed / In-Transit)                              (Direct wa.me/8801... Link)
 ```
 
-- **Steadfast Courier API**: Automatic parcel dispatch, real-time tracking query, and wallet balance check.
-- **Pathao Logistics API**: Webhook callback ingestion for automated delivery status reconciliations.
-- **Automated Fraud Detection**: Checks recipient phone number history to alert merchants of high-return probability customers before dispatch.
+- **Live Order Status Tracking**: Real-time transitions across order states (`PENDING_CONFIRMATION`, `CONFIRMED`, `PROCESSING`, `IN_TRANSIT`, `DELIVERED`, `CANCELLED`, `RETURNED`).
+- **80mm Thermal & A4 Invoice Generator**: Instant printable cash memos with QR/Barcode, store logo, customer details, delivery charge, and COD totals.
+- **Direct WhatsApp Messaging**: 1-click WhatsApp customer link without needing to save phone numbers in contacts.
 
 ---
 
@@ -247,8 +240,6 @@ Navigate to [http://localhost:3000](http://localhost:3000) to view the applicati
 | `DEFAULT_FACEBOOK_PAGE_ID` | Optional | Primary Facebook Page ID for fallback webhook | `104829381293` |
 | `DEFAULT_FACEBOOK_PAGE_TOKEN` | Optional | Page Access Token for Meta Graph API calls | `EAAO...` |
 | `DEFAULT_FACEBOOK_VERIFY_TOKEN`| Optional | Meta Webhook subscription verification token | `orderflow_bd_verify_token` |
-| `STEADFAST_API_KEY` | Optional | Steadfast Courier Merchant API Key | `stdf_api_key_...` |
-| `STEADFAST_SECRET_KEY` | Optional | Steadfast Courier Secret Key | `stdf_secret_...` |
 
 ---
 
@@ -274,12 +265,13 @@ node test-security.mjs
 
 ## 🗺️ Roadmap & Vision
 
-- [x] **v1.0**: Core F-Commerce CRM Inbox, Manual Orders, Steadfast Courier Integration.
+- [x] **v1.0**: Core F-Commerce CRM Inbox, Manual Orders, 80mm Thermal Invoice Generator.
 - [x] **v1.5**: Multi-Tenant Isolation, PBKDF2 Session Security, Facebook Messenger Webhooks.
 - [x] **v2.0**: Google Gemini AI Natural Bengali Sales Engine, Super Admin Master Portal, Standalone Demo Sandbox.
 - [ ] **v2.1**: Official WhatsApp Business Cloud API Direct Connection.
-- [ ] **v2.2**: Automated Voice Call Confirmation Bot (Bengali IVR).
+- [ ] **v2.2**: Automated Courier API Integrations (Steadfast & Pathao 1-Click Parcel Booking).
 - [ ] **v2.3**: Multi-Channel Inventory Sync (Shopify, WooCommerce, Daraz API).
+- [ ] **v2.4**: Automated Voice Call Confirmation Bot (Bengali IVR).
 
 ---
 

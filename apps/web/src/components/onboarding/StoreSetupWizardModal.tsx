@@ -47,12 +47,7 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
   const [inputToken, setInputToken] = useState('');
   const [isConnectingFb, setIsConnectingFb] = useState(false);
 
-  // Step 2: Steadfast
-  const [steadfastApiKey, setSteadfastApiKey] = useState('');
-  const [steadfastSecret, setSteadfastSecret] = useState('');
-  const [isConnectingSteadfast, setIsConnectingSteadfast] = useState(false);
-
-  // Step 3: AI & Delivery Fees
+  // Step 2: AI & Delivery Fees
   const [deliveryDhaka, setDeliveryDhaka] = useState(120);
   const [deliveryOutside, setDeliveryOutside] = useState(150);
   const [isSavingAll, setIsSavingAll] = useState(false);
@@ -67,8 +62,6 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
             setFbPageToken(data.fbPageToken || '');
             setFbPageId(data.fbPageId || '');
             setFbPageName(data.fbPageName || 'Facebook Page');
-            setSteadfastApiKey(data.steadfastApiKey || '');
-            setSteadfastSecret(data.steadfastSecretKey || '');
             setDeliveryDhaka(Number(data.deliveryFeeDhaka) || 120);
             setDeliveryOutside(Number(data.deliveryFeeOutside) || 150);
           }
@@ -80,7 +73,6 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
   if (!isOpen) return null;
 
   const fbConnected = Boolean(fbPageToken && fbPageToken.length > 10);
-  const steadfastConnected = Boolean(steadfastApiKey && steadfastApiKey.trim().length > 0);
 
   const handleFacebookLoginPopup = async () => {
     setIsConnectingFb(true);
@@ -182,35 +174,6 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
     }
   };
 
-  const handleSaveSteadfast = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!steadfastApiKey.trim() || !steadfastSecret.trim()) {
-      toast.error('দয়া করে আপনার Steadfast API Key এবং Secret Key দিন');
-      return;
-    }
-    setIsConnectingSteadfast(true);
-    try {
-      const res = await fetch('/api/bot-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          steadfastApiKey: steadfastApiKey.trim(),
-          steadfastSecretKey: steadfastSecret.trim(),
-        }),
-      });
-      if (res.ok) {
-        toast.success('🎉 Steadfast মার্চেন্ট API সফলভাবে সেভ হয়েছে!');
-        setCurrentStep(3);
-      } else {
-        toast.error('সেভ করা যায়নি');
-      }
-    } catch (err) {
-      toast.error('সার্ভারে সমস্যা হয়েছে');
-    } finally {
-      setIsConnectingSteadfast(false);
-    }
-  };
-
   const handleFinishSetup = async () => {
     setIsSavingAll(true);
     try {
@@ -220,8 +183,6 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
         body: JSON.stringify({
           deliveryFeeDhaka: deliveryDhaka,
           deliveryFeeOutside: deliveryOutside,
-          steadfastApiKey: steadfastApiKey.trim(),
-          steadfastSecretKey: steadfastSecret.trim(),
         }),
       });
       toast.success('🚀 আপনার সম্পূর্ণ শপ অটোমেশন সফলভাবে কনফিগার করা হয়েছে!');
@@ -265,11 +226,10 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
         </div>
 
         {/* Step Progress Indicators */}
-        <div className="grid grid-cols-3 gap-2 my-5 relative z-10">
+        <div className="grid grid-cols-2 gap-3 my-5 relative z-10">
           {[
             { step: 1, label: '১. ফেসবুক পেজ', icon: MessageSquare },
-            { step: 2, label: '২. Steadfast কুরিয়ার', icon: Truck },
-            { step: 3, label: '৩. AI ও ডেলিভারি', icon: Bot },
+            { step: 2, label: '২. AI ও ডেলিভারি সেটিংস', icon: Bot },
           ].map((item) => (
             <div
               key={item.step}
@@ -394,99 +354,13 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: Courier Connect */}
+          {/* STEP 2: Gemini AI Settings & Launch */}
           {currentStep === 2 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
-              <div className="p-4 bg-gradient-to-r from-purple-950/30 to-pink-950/20 border border-purple-500/25 rounded-2xl space-y-2">
-                <h3 className="font-extrabold text-sm sm:text-base text-neutral-100 flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-purple-400" />
-                  ধাপ ২: Steadfast কুরিয়ার কানেক্ট করুন
-                </h3>
-                <p className="text-xs text-neutral-300 leading-relaxed">
-                  Steadfast মার্চেন্ট প্যানেল (<a href="https://steadfast.com.bd/login" target="_blank" rel="noreferrer" className="text-purple-300 underline">steadfast.com.bd</a>) এর Settings ➔ API Information থেকে আপনার Key দিয়ে সেভ করুন।
-                </p>
-              </div>
-
-              {steadfastConnected ? (
-                <div className="p-5 bg-neutral-900/90 border border-emerald-500/30 rounded-2xl space-y-3 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
-                        SF
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-neutral-100">Steadfast Courier Ltd.</p>
-                        <p className="text-xs text-emerald-400 font-mono flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>মার্চেন্ট API Key সক্রিয় (১-ক্লিক বুকিং রেডি)</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <span className="px-3 py-1 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold">
-                      সংযুক্ত ✅
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setSteadfastApiKey('')}
-                    className="text-xs text-neutral-400 hover:text-neutral-200 underline"
-                  >
-                    কী পরিবর্তন করতে চান?
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleSaveSteadfast} className="p-5 bg-neutral-900/90 border border-neutral-800 rounded-2xl space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-neutral-300">Steadfast API Key</label>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                      <input
-                        type="password"
-                        value={steadfastApiKey}
-                        onChange={(e) => setSteadfastApiKey(e.target.value)}
-                        placeholder="আপনার Steadfast API Key দিন..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-950 border border-neutral-750 focus:border-purple-500 rounded-xl text-xs text-neutral-100 font-mono outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-neutral-300">Steadfast Secret Key</label>
-                    <div className="relative">
-                      <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                      <input
-                        type="password"
-                        value={steadfastSecret}
-                        onChange={(e) => setSteadfastSecret(e.target.value)}
-                        placeholder="আপনার Steadfast Secret Key দিন..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-neutral-950 border border-neutral-750 focus:border-purple-500 rounded-xl text-xs text-neutral-100 font-mono outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isConnectingSteadfast}
-                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    {isConnectingSteadfast ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      '১-ক্লিকে কুরিয়ার কী সেভ করুন'
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* STEP 3: Gemini AI Settings & Launch */}
-          {currentStep === 3 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
               <div className="p-4 bg-gradient-to-r from-emerald-950/30 to-teal-950/20 border border-emerald-500/25 rounded-2xl space-y-2">
                 <h3 className="font-extrabold text-sm sm:text-base text-neutral-100 flex items-center gap-2">
                   <Bot className="w-4 h-4 text-emerald-400" />
-                  ধাপ ৩: Google Gemini AI স্মার্ট সেলস ম্যানেজার
+                  ধাপ ২: Google Gemini AI ও ডেলিভারি চার্জ সেটিংস
                 </h3>
                 <p className="text-xs text-neutral-300 leading-relaxed">
                   আপনার হয়ে ২৪ ঘণ্টা সাবলীল বাংলায় কাস্টমারদের দাম, ছবি ও তথ্য দিয়ে অর্ডার কনফার্ম করবে।
@@ -548,7 +422,7 @@ export const StoreSetupWizardModal: React.FC<StoreSetupWizardModalProps> = ({
             <div />
           )}
 
-          {currentStep < 3 ? (
+          {currentStep < 2 ? (
             <button
               onClick={() => setCurrentStep((prev) => prev + 1)}
               className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-neutral-950 font-black rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-1.5"
