@@ -100,12 +100,7 @@ export default function SuperAdminPage() {
     toast.success('ডেটা সফলভাবে রিফ্রেশ হয়েছে');
   };
 
-  const handleOrgAction = async (orgId: string, action: 'approve' | 'suspend' | 'reactivate' | 'delete', orgName: string) => {
-    if (action === 'delete') {
-      const confirmDelete = window.confirm(`আপনি কি নিশ্চিত যে '${orgName}' এবং এর সকল ডেটা চিরতরে ডিলিট করতে চান?`);
-      if (!confirmDelete) return;
-    }
-
+  const executeOrgAction = async (orgId: string, action: 'approve' | 'suspend' | 'reactivate' | 'delete', orgName: string) => {
     setActionLoadingId(orgId);
     try {
       const res = await fetch('/api/admin/organizations', {
@@ -125,6 +120,26 @@ export default function SuperAdminPage() {
     } finally {
       setActionLoadingId(null);
     }
+  };
+
+  const handleOrgAction = (orgId: string, action: 'approve' | 'suspend' | 'reactivate' | 'delete', orgName: string) => {
+    if (action === 'delete') {
+      toast.warning(`'${orgName}' ডিলিট করতে চান?`, {
+        description: 'স্টোর ও এর সকল ডেটা চিরতরে মুছে যাবে।',
+        action: {
+          label: 'হ্যাঁ, ডিলিট করুন',
+          onClick: () => executeOrgAction(orgId, 'delete', orgName),
+        },
+        cancel: {
+          label: 'বাতিল',
+          onClick: () => {},
+        },
+        duration: 8000,
+      });
+      return;
+    }
+
+    executeOrgAction(orgId, action, orgName);
   };
 
   const filteredOrgs = useMemo(() => {

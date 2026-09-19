@@ -263,9 +263,7 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!confirm('আপনি কি নিশ্চিত যে ফেসবুক পেজ ডিসকানেক্ট করতে চান?')) return;
-
+  const executeDisconnect = async () => {
     setIsDisconnecting(true);
     try {
       const res = await fetch('/api/facebook/disconnect', { method: 'POST' });
@@ -279,6 +277,21 @@ export const FacebookIntegrationCard: React.FC<FacebookIntegrationCardProps> = (
     } finally {
       setIsDisconnecting(false);
     }
+  };
+
+  const handleDisconnect = () => {
+    toast.warning('ফেসবুক পেজ ডিসকানেক্ট করতে চান?', {
+      description: 'ডিসকানেক্ট করলে স্বয়ংক্রিয় এআই রিপ্লাই ও চ্যাট সিঙ্ক বন্ধ থাকবে।',
+      action: {
+        label: 'ডিসকানেক্ট করুন',
+        onClick: () => executeDisconnect(),
+      },
+      cancel: {
+        label: 'বাতিল',
+        onClick: () => {},
+      },
+      duration: 8000,
+    });
   };
 
   const isConnected = Boolean(status?.connected && status?.pageId);

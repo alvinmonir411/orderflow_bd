@@ -121,11 +121,7 @@ export default function TeamPage() {
     }
   };
 
-  const handleDeleteMember = async (userId: string, name: string) => {
-    if (!confirm(`আপনি কি নিশ্চিত যে "${name}"-কে টিম থেকে বাদ দিতে চান?`)) {
-      return;
-    }
-
+  const executeDeleteMember = async (userId: string, name: string) => {
     try {
       const res = await fetch(`/api/team?userId=${userId}`, {
         method: 'DELETE',
@@ -140,6 +136,21 @@ export default function TeamPage() {
     } catch (err) {
       toast.error('সার্ভার এরর');
     }
+  };
+
+  const handleDeleteMember = (userId: string, name: string) => {
+    toast.warning(`"${name}"-কে টিম থেকে বাদ দিতে চান?`, {
+      description: 'এই সদস্য আর অ্যাকাউন্টে লগইন করতে পারবেন না।',
+      action: {
+        label: 'হ্যাঁ, বাদ দিন',
+        onClick: () => executeDeleteMember(userId, name),
+      },
+      cancel: {
+        label: 'বাতিল',
+        onClick: () => {},
+      },
+      duration: 8000,
+    });
   };
 
   const filteredMembers = members.filter(
